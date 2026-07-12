@@ -204,6 +204,52 @@ tr:hover td{background:rgba(99,102,241,.04)}
 /* IDC 汇总区域 */
 .idc-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .idc-section .card-title{margin-bottom:10px}
+
+@media (max-width: 760px) {
+  body{display:block;min-height:100vh;overflow-x:hidden}
+  .sidebar{position:sticky;top:0;z-index:20;width:100%;height:auto;border-right:none;border-bottom:1px solid var(--border);padding:8px;background:var(--bg2);display:flex;flex-direction:row;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .logo{flex:0 0 auto;padding:7px 10px;font-size:13px;white-space:nowrap}
+  .nav-item{flex:0 0 auto;width:auto;padding:7px 10px;gap:5px;font-size:12px;white-space:nowrap}
+  .nav-icon{width:auto;font-size:14px}
+  .sidebar-bottom{margin-top:0;margin-left:auto;display:flex}
+  .main{min-width:0}
+  .topbar{position:sticky;top:49px;z-index:15;padding:10px 12px;align-items:flex-start;gap:8px;flex-wrap:wrap}
+  .topbar-title{font-size:14px;line-height:30px}
+  .topbar-right{margin-left:auto;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .status-text{font-size:11px}
+  .refresh-btn,.theme-btn{padding:5px 9px;font-size:11px}
+  .content{padding:10px;overflow:visible}
+  .card{padding:12px;border-radius:8px;margin-bottom:10px}
+  .card-title{font-size:12px;margin-bottom:10px}
+  .log-mode-btns,.log-controls,.page-controls,.batch-row{gap:6px}
+  .log-mode-btns .mode-btn,.log-controls .mode-btn{flex:1 1 calc(50% - 6px);padding:7px 8px}
+  .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
+  .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
+  #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .log-table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px}
+  .log-table-wrap table{min-width:920px}
+  th,td{padding:7px 8px}
+  .req-cell-wrap{max-width:220px}
+  .ua-cell-wrap{max-width:190px}
+  .stats-grid{grid-template-columns:1fr!important;gap:10px}
+  .stats-grid .card > div:first-child{gap:8px;align-items:flex-start!important;flex-wrap:wrap}
+  .stats-grid .card > div:first-child > div:last-child{display:flex;gap:4px;flex-wrap:wrap}
+  .mode-btn{padding:6px 10px}
+  .top-row{align-items:flex-start;gap:6px}
+  .top-rank{flex:0 0 16px}
+  .top-val{padding:0 4px;min-width:0}
+  .token-cell{min-width:0}
+  .token-text{overflow:hidden;text-overflow:ellipsis;display:block}
+  .risk-main{grid-template-columns:1fr;gap:5px}
+  .risk-meta,.risk-actions{justify-content:flex-start}
+  .risk-detail{padding:0 8px}
+  .ip-form{display:grid;grid-template-columns:1fr;gap:8px}
+  .ip-input,.comment-input,.btn-primary{width:100%;min-width:0}
+  .apply-row{align-items:flex-start;flex-wrap:wrap}
+  #panel-settings .stats-grid{grid-template-columns:1fr!important}
+  #panel-settings .card [style*="display:flex;gap:8px;align-items:flex-end"]{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  #toast{left:10px;right:10px;bottom:12px;text-align:center}
+}
 </style>
 </head>
 <body>
