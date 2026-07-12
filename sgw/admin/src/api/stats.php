@@ -10,6 +10,10 @@ $badUas = [];   // ua => count (403 only, today)
 $suspTokenIps = [];  // token => {ip => true}
 $suspIpTokens = [];  // ip    => {token => true}
 $suspIpDetail = [];  // ip    => detailed evidence for manual review
+$DETAIL_TOKEN_LIMIT = 20;
+$DETAIL_PATH_LIMIT = 20;
+$DETAIL_UA_LIMIT = 10;
+$DETAIL_SECOND_LIMIT = 120;
 
 // 读取Token黑名单（用于从统计中排除）
 $tokenBlacklist = [];
@@ -93,11 +97,19 @@ if (file_exists(LOG_FILE)) {
                     $second = preg_replace('/ \+\d+$/', '', $time);
 
                     $suspIpDetail[$ip]['requests']++;
-                    $suspIpDetail[$ip]['tokens'][$tok] = true;
-                    $suspIpDetail[$ip]['paths'][$path] = true;
-                    if ($ua !== '') $suspIpDetail[$ip]['uas'][$ua] = true;
-                    if (!isset($suspIpDetail[$ip]['seconds'][$second])) $suspIpDetail[$ip]['seconds'][$second] = 0;
-                    $suspIpDetail[$ip]['seconds'][$second]++;
+                    if (isset($suspIpDetail[$ip]['tokens'][$tok]) || count($suspIpDetail[$ip]['tokens']) < $DETAIL_TOKEN_LIMIT) {
+                        $suspIpDetail[$ip]['tokens'][$tok] = true;
+                    }
+                    if (isset($suspIpDetail[$ip]['paths'][$path]) || count($suspIpDetail[$ip]['paths']) < $DETAIL_PATH_LIMIT) {
+                        $suspIpDetail[$ip]['paths'][$path] = true;
+                    }
+                    if ($ua !== '' && (isset($suspIpDetail[$ip]['uas'][$ua]) || count($suspIpDetail[$ip]['uas']) < $DETAIL_UA_LIMIT)) {
+                        $suspIpDetail[$ip]['uas'][$ua] = true;
+                    }
+                    if (isset($suspIpDetail[$ip]['seconds'][$second]) || count($suspIpDetail[$ip]['seconds']) < $DETAIL_SECOND_LIMIT) {
+                        if (!isset($suspIpDetail[$ip]['seconds'][$second])) $suspIpDetail[$ip]['seconds'][$second] = 0;
+                        $suspIpDetail[$ip]['seconds'][$second]++;
+                    }
                     $suspIpDetail[$ip]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
                 }
             }
@@ -187,6 +199,7 @@ foreach ($suspIpTokens as $ip => $tokSet) {
     }
 }
 usort($suspIpList, fn($a,$b) => ($b['score'] <=> $a['score']) ?: ($b['token_count'] <=> $a['token_count']));
+$suspIpList = array_slice($suspIpList, 0, 500);
 
 json_out([
     'ok'          => true,
