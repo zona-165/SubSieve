@@ -1182,13 +1182,14 @@ function renderStats() {
     const uas = (r.uas || []).map(ua => `<div style="font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(ua)}">${esc(ua)}</div>`).join('');
     const tokens = (r.tokens || []).map(t => `<code title="${esc(t)}">${esc(t)}</code>`).join(' ');
     const reasons = (r.reasons || []).map((reason, idx) => `<div>${idx + 1}. ${esc(reason)}</div>`).join('');
+    const reqSummary = r.request_count ? `${r.token_count} 个Token / ${r.request_count} 次` : `${r.token_count} 个Token`;
     return `
     <div class="top-row" style="display:block">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="top-val">${esc(r.ip)}</span>
         <span style="color:${riskColor};font-weight:700;font-size:12px">${esc(r.risk || '可疑')} ${r.score || 0}</span>
-        <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token / ${r.request_count || 0} 次</span>
-        <span class="top-sub">1秒峰值 ${r.max_per_second || 0}</span>
+        <span class="top-count" style="white-space:nowrap">${reqSummary}</span>
+        ${r.max_per_second ? `<span class="top-sub">1秒峰值 ${r.max_per_second}</span>` : ''}
         ${r.last_time ? `<span class="top-sub">最后 ${esc(r.last_time)}</span>` : ''}
         ${suspBtn}
         <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>

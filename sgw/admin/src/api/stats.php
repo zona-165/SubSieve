@@ -9,11 +9,6 @@ $badUas = [];   // ua => count (403 only, today)
 // 全量日志用于可疑分析
 $suspTokenIps = [];  // token => {ip => true}
 $suspIpTokens = [];  // ip    => {token => true}
-$suspIpDetail = [];  // ip    => detailed evidence for manual review
-$DETAIL_TOKEN_LIMIT = 20;
-$DETAIL_PATH_LIMIT = 20;
-$DETAIL_UA_LIMIT = 10;
-$DETAIL_SECOND_LIMIT = 120;
 
 // 读取Token黑名单（用于从统计中排除）
 $tokenBlacklist = [];
@@ -83,34 +78,6 @@ if (file_exists(LOG_FILE)) {
                 if (!isset($tokenBlacklist[$tok])) {
                     $suspTokenIps[$tok][$ip] = true;
                     $suspIpTokens[$ip][$tok]  = true;
-                    if (!isset($suspIpDetail[$ip])) {
-                        $suspIpDetail[$ip] = [
-                            'requests' => 0,
-                            'tokens' => [],
-                            'paths' => [],
-                            'uas' => [],
-                            'seconds' => [],
-                            'last_time' => '',
-                        ];
-                    }
-                    $path = extract_request_path($request);
-                    $second = preg_replace('/ \+\d+$/', '', $time);
-
-                    $suspIpDetail[$ip]['requests']++;
-                    if (isset($suspIpDetail[$ip]['tokens'][$tok]) || count($suspIpDetail[$ip]['tokens']) < $DETAIL_TOKEN_LIMIT) {
-                        $suspIpDetail[$ip]['tokens'][$tok] = true;
-                    }
-                    if (isset($suspIpDetail[$ip]['paths'][$path]) || count($suspIpDetail[$ip]['paths']) < $DETAIL_PATH_LIMIT) {
-                        $suspIpDetail[$ip]['paths'][$path] = true;
-                    }
-                    if ($ua !== '' && (isset($suspIpDetail[$ip]['uas'][$ua]) || count($suspIpDetail[$ip]['uas']) < $DETAIL_UA_LIMIT)) {
-                        $suspIpDetail[$ip]['uas'][$ua] = true;
-                    }
-                    if (isset($suspIpDetail[$ip]['seconds'][$second]) || count($suspIpDetail[$ip]['seconds']) < $DETAIL_SECOND_LIMIT) {
-                        if (!isset($suspIpDetail[$ip]['seconds'][$second])) $suspIpDetail[$ip]['seconds'][$second] = 0;
-                        $suspIpDetail[$ip]['seconds'][$second]++;
-                    }
-                    $suspIpDetail[$ip]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
                 }
             }
         }
@@ -161,45 +128,27 @@ $suspIpList = [];
 foreach ($suspIpTokens as $ip => $tokSet) {
     $cnt = count($tokSet);
     if ($cnt >= $SUSP_IP_THRESHOLD) {
-        $detail = $suspIpDetail[$ip] ?? [
-            'requests' => 0,
-            'tokens' => [],
-            'paths' => [],
-            'uas' => [],
-            'seconds' => [],
-            'last_time' => '',
-        ];
-        $maxPerSecond = $detail['seconds'] ? max($detail['seconds']) : 0;
-        $score = min(100, 45 + ($cnt * 10) + max(0, $maxPerSecond - 2) * 8 + max(0, $detail['requests'] - 3) * 4);
+        $score = min(100, 45 + ($cnt * 12));
         $risk = $score >= 90 ? '极高危' : ($score >= 75 ? '高危' : '可疑');
-        $reasons = [
-            "触发 IP {$ip} 在日志周期内拉取了 {$cnt} 个不同 Token，超过阈值 {$SUSP_IP_THRESHOLD}。",
-            "1 秒内最高命中 {$maxPerSecond} 次订阅请求。",
-            "日志周期内订阅成功请求共 {$detail['requests']} 次。",
-        ];
-        if ($detail['paths']) {
-            $reasons[] = '命中路径：' . implode('、', array_slice(array_keys($detail['paths']), 0, 5)) . (count($detail['paths']) > 5 ? ' 等' : '') . '。';
-        }
-        if ($detail['uas']) {
-            $reasons[] = '请求 UA：' . implode(' | ', array_slice(array_keys($detail['uas']), 0, 3)) . (count($detail['uas']) > 3 ? ' 等' : '') . '。';
-        }
         $suspIpList[] = [
             'ip' => $ip,
             'token_count' => $cnt,
-            'request_count' => $detail['requests'],
-            'max_per_second' => $maxPerSecond,
+            'request_count' => 0,
+            'max_per_second' => 0,
             'score' => $score,
             'risk' => $risk,
-            'paths' => array_slice(array_keys($detail['paths']), 0, 8),
-            'uas' => array_slice(array_keys($detail['uas']), 0, 5),
-            'tokens' => array_slice(array_keys($detail['tokens']), 0, 8),
-            'last_time' => $detail['last_time'],
-            'reasons' => $reasons,
+            'tokens' => array_slice(array_keys($tokSet), 0, 8),
+            'paths' => [],
+            'uas' => [],
+            'last_time' => '',
+            'reasons' => [
+                "触发 IP {$ip} 在日志周期内拉取了 {$cnt} 个不同 Token，超过阈值 {$SUSP_IP_THRESHOLD}。",
+                '该判断来自成功订阅请求的 Token 去重统计，建议结合日志页按 IP 复核请求路径和 UA。',
+            ],
         ];
     }
 }
 usort($suspIpList, fn($a,$b) => ($b['score'] <=> $a['score']) ?: ($b['token_count'] <=> $a['token_count']));
-$suspIpList = array_slice($suspIpList, 0, 500);
 
 json_out([
     'ok'          => true,
@@ -209,10 +158,3 @@ json_out([
     'susp_tokens' => $suspTokenList,
     'susp_ips'    => $suspIpList,
 ]);
-
-function extract_request_path(string $request): string {
-    $parts = explode(' ', trim($request));
-    $target = $parts[1] ?? $request;
-    $path = parse_url($target, PHP_URL_PATH);
-    return $path ?: $target;
-}
