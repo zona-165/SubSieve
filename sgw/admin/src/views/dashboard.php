@@ -275,6 +275,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div class="radio-group">
             <label><input type="radio" name="sub-filter" value="subscribe" checked onchange="logPage=1;renderLogs()"> 仅订阅相关</label>
             <label><input type="radio" name="sub-filter" value="all" onchange="logPage=1;renderLogs()"> 显示全部</label>
+            <span id="active-subscribe-path" class="top-sub"></span>
           </div>
           <div style="display:flex;gap:4px;margin-left:8px">
             <button class="mode-btn" id="limit-btn-50"  onclick="setLogLimit(50)">50条</button>
@@ -578,7 +579,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
 <script>
 // ── 状态 ─────────────────────────────────────────────────────
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
-const SUBSCRIBE_PATH = <?= json_encode($_preSg['subscribe_path'] ?? '/api/v1/client/subscribe') ?>;
+let activeSubscribePath = <?= json_encode($_preSg['subscribe_path'] ?? '/api/v1/client/subscribe') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
 let logLimit = 100;      // 0=瀑布流（无限制）
@@ -807,6 +808,7 @@ async function loadLogs() {
 }
 
 function renderLogs() {
+  updateSubscribePathLabel();
   const fIp     = document.getElementById('filter-ip').value.trim().toLowerCase();
   const fStatus = document.getElementById('filter-status').value.trim();
   const fToken  = document.getElementById('filter-token').value.trim().toLowerCase();
@@ -814,7 +816,7 @@ function renderLogs() {
   const subOnly = document.querySelector('input[name="sub-filter"][value="subscribe"]').checked;
 
   let rows = allLogs.filter(l => {
-    if (subOnly && SUBSCRIBE_PATH && !l.request.includes(SUBSCRIBE_PATH)) return false;
+    if (subOnly && activeSubscribePath && !l.request.includes(activeSubscribePath)) return false;
     if (fIp     && !l.ip.toLowerCase().includes(fIp)) return false;
     if (fStatus && String(l.status) !== fStatus) return false;
     if (fToken  && !l.token.toLowerCase().includes(fToken)) return false;
@@ -869,6 +871,11 @@ function renderLogs() {
     }
     renderLogRows(rows);
   }
+}
+
+function updateSubscribePathLabel() {
+  const el = document.getElementById('active-subscribe-path');
+  if (el) el.textContent = activeSubscribePath ? `路径：${activeSubscribePath}` : '';
 }
 
 // ── 行内备注编辑（通用）──────────────────────────────────────
@@ -1736,6 +1743,8 @@ async function loadSettings() {
   const data = await apiFetch('/api/settings.php');
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
   currentSettings = data.settings || {};
+  activeSubscribePath = currentSettings.subscribe_path || activeSubscribePath || '/api/v1/client/subscribe';
+  updateSubscribePathLabel();
   // 填充界面设置
   document.getElementById('cfg-site-title').value   = currentSettings.site_title || '';
   document.getElementById('cfg-page-title').value   = currentSettings.page_title || '';
@@ -1859,7 +1868,9 @@ async function saveUpstreamSettings() {
   });
   if (d.ok) {
     toast('✅ ' + (d.msg || '上游配置已更新'));
-    loadSettings();
+    if (path) activeSubscribePath = path;
+    await loadSettings();
+    renderLogs();
   } else {
     toast(d.error || '保存失败', 'err');
   }
