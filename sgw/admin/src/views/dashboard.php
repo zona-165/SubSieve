@@ -162,6 +162,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .risk-evidence{font-size:11px;color:var(--text2);line-height:1.65;padding:0 0 8px}
 .risk-samples{margin-top:5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .risk-samples code{font-size:10px;color:#93c5fd}
+.scanner-report{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:rgba(100,116,139,.08)}
+.scanner-report pre{white-space:pre-wrap;word-break:break-word;color:var(--text2);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:8px}
+.scanner-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
@@ -413,6 +416,19 @@ tr:hover td{background:rgba(99,102,241,.04)}
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">脚本/扫描器拉取订阅</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-scanners-10" onclick="setStatsLimit('scanners',10)">10</button>
+              <button class="mode-btn" id="stats-scanners-25" onclick="setStatsLimit('scanners',25)">25</button>
+              <button class="mode-btn" id="stats-scanners-50" onclick="setStatsLimit('scanners',50)">50</button>
+              <button class="mode-btn" id="stats-scanners-0" onclick="setStatsLimit('scanners',0)">全部</button>
+            </div>
+          </div>
+          <div id="scanner-reports"><div class="loading">加载中…</div></div>
+          <div id="stats-scanners-pg" class="page-controls" style="display:none;margin-top:10px"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">UA TOP</div>
             <div style="display:flex;gap:4px">
               <button class="mode-btn active" id="stats-uas-10" onclick="setStatsLimit('uas',10)">10</button>
@@ -634,8 +650,8 @@ let blacklistIpSet = new Set();
 let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
-let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10};
-let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1};
+let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10};
+let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1};
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
 let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
@@ -1108,7 +1124,7 @@ async function quickAddWhitelistFromLog(ip) {
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
   if (!data.ok) {
-    ['top-ips','top-tokens','bad-uas','susp-tokens','susp-ips'].forEach(id => {
+    ['top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
@@ -1274,6 +1290,61 @@ function renderStats() {
       </details>
     </div>`;
   }).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
+
+  // 脚本/扫描器拉取订阅
+  const allScanners = data.scanner_reports || [];
+  const scannersLimit = statsLimits.scanners;
+  const scannersPage  = statsPages.scanners;
+  const scanners = scannersLimit > 0 ? allScanners.slice((scannersPage-1)*scannersLimit, scannersPage*scannersLimit) : allScanners;
+  renderStatsPagination('scanners', allScanners.length, scannersLimit);
+  document.getElementById('scanner-reports').innerHTML = scanners.length ? scanners.map(r => {
+    const report = scannerReportText(r);
+    return `
+    <div class="scanner-report">
+      <div class="scanner-actions">
+        <span class="risk-badge" style="color:#ef4444">${esc(r.risk || '高危')} ${r.score || 90}</span>
+        <span class="top-val" style="padding:0">${esc(r.ip)}</span>
+        <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)">复制报告</button>
+        <button class="add-btn-sm" onclick="banScannerIp(${jsArg(r.ip)}, ${jsArg(r.token)})">封禁IP</button>
+      </div>
+      <pre>${esc(report)}</pre>
+    </div>`;
+  }).join('') : '<div class="empty">暂无脚本/扫描器拉取订阅记录</div>';
+}
+
+function scannerReportText(r) {
+  return `脚本/扫描器拉取订阅
+━━━━━━━━━━━━━━
+结论：已读取到订阅Token，但未映射到邮箱。
+建议：复制 Token 到后台查询用户；是否写入token:owner映射。
+风险：${r.risk || '高危'}｜评分 ${r.score || 90}
+定位：邮箱 ${r.email || '未映射'}｜用户ID ${r.user_id || '未映射'}
+Token：${r.token || ''}
+来源：${r.ip || ''}｜${r.location || '未查询'}
+ASN：${r.asn || '未查询'}
+查询：${r.query_source || '本地日志'}
+路径 ${r.path || ''}
+UA：${r.ua || '（空UA）'}
+证据：原因 ${r.reason || 'unknown'}
+时间：${r.time || ''}
+
+操作建议：确认后可封禁 IP ${r.ip || ''}`;
+}
+
+async function banScannerIp(ip, token) {
+  if (!confirm(`是否封禁脚本/扫描器 IP ${ip}？`)) return;
+  const d = await apiFetch('/api/blacklist.php', {
+    method:'POST',
+    body:JSON.stringify({ip, comment:`脚本/扫描器拉取订阅 token=${token || ''}`}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok || (d.error && d.error.includes('已在黑名单'))) {
+    toast(`✅ 已封禁 IP ${ip}`);
+    blacklistIpSet.add(ip);
+    loadStats();
+  } else {
+    toast(d.error || '封禁失败', 'err');
+  }
 }
 
 // ── 从分析页加入白名单（不要求先在黑名单）──────────────────────

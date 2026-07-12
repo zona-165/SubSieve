@@ -5,6 +5,7 @@ $today  = date('d/M/Y');
 $ips    = [];   // ip => [total,200,403,429,444]  (today only)
 $tokens = [];   // token => [count, last_time]     (today only)
 $badUas = [];   // ua => count (403 only, today)
+$scannerReports = []; // latest suspicious subscription pulls
 
 // 全量日志用于可疑分析
 $suspTokenIps = [];  // token => {ip => true}
@@ -78,6 +79,26 @@ if (file_exists(LOG_FILE)) {
                 if (!isset($tokenBlacklist[$tok])) {
                     $suspTokenIps[$tok][$ip] = true;
                     $suspIpTokens[$ip][$tok]  = true;
+                    $scannerReason = scanner_reason($ua);
+                    if ($scannerReason !== '') {
+                        $key = $ip . '|' . $tok;
+                        $path = extract_request_path($request);
+                        $scannerReports[$key] = [
+                            'ip' => $ip,
+                            'token' => $tok,
+                            'path' => $path,
+                            'ua' => $ua,
+                            'reason' => $scannerReason,
+                            'time' => format_log_time($time),
+                            'risk' => '高危',
+                            'score' => 90,
+                            'email' => '',
+                            'user_id' => '',
+                            'location' => '未查询',
+                            'asn' => '未查询',
+                            'query_source' => '本地日志',
+                        ];
+                    }
                 }
             }
         }
@@ -150,6 +171,10 @@ foreach ($suspIpTokens as $ip => $tokSet) {
 }
 usort($suspIpList, fn($a,$b) => ($b['score'] <=> $a['score']) ?: ($b['token_count'] <=> $a['token_count']));
 
+$scannerList = array_values($scannerReports);
+usort($scannerList, fn($a,$b) => strcmp($b['time'], $a['time']));
+$scannerList = array_slice($scannerList, 0, 100);
+
 json_out([
     'ok'          => true,
     'top_ips'     => $topIps,
@@ -157,4 +182,38 @@ json_out([
     'bad_uas'     => $badUaList,
     'susp_tokens' => $suspTokenList,
     'susp_ips'    => $suspIpList,
+    'scanner_reports' => $scannerList,
 ]);
+
+function scanner_reason(string $ua): string {
+    $u = strtolower(trim($ua));
+    if ($u === '' || $u === '-') return 'empty_or_invalid_user_agent';
+    $patterns = [
+        'clash' => 'proxy_client_user_agent',
+        'curl' => 'script_user_agent',
+        'wget' => 'script_user_agent',
+        'python' => 'script_user_agent',
+        'go-http-client' => 'script_user_agent',
+        'java' => 'script_user_agent',
+        'node-fetch' => 'script_user_agent',
+        'okhttp' => 'script_user_agent',
+        'httpclient' => 'script_user_agent',
+        'postman' => 'tool_user_agent',
+    ];
+    foreach ($patterns as $needle => $reason) {
+        if (str_contains($u, $needle)) return $reason;
+    }
+    return '';
+}
+
+function extract_request_path(string $request): string {
+    $parts = explode(' ', trim($request));
+    $target = $parts[1] ?? $request;
+    $path = parse_url($target, PHP_URL_PATH);
+    return $path ?: $target;
+}
+
+function format_log_time(string $time): string {
+    $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $time);
+    return $dt ? $dt->format('Y/m/d H:i:s') : preg_replace('/ \+\d+$/', '', $time);
+}
