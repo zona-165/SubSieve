@@ -140,7 +140,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .copy-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Stats */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .top-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #13161f}
 .top-row:last-child{border-bottom:none}
 .top-rank{color:#64748b;font-size:11px;width:18px}
@@ -149,6 +149,19 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .top-sub{color:#64748b;font-size:11px}
 .add-btn-sm{background:#6366f1;color:#fff;border:none;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;transition:opacity .15s;flex-shrink:0}
 .add-btn-sm:hover{opacity:.8}
+.risk-row{display:block;padding:9px 0}
+.risk-main{display:grid;grid-template-columns:minmax(92px,1fr) auto;gap:8px;align-items:start}
+.risk-ip{font-family:monospace;font-size:12px;font-weight:600;color:var(--text);word-break:normal;overflow-wrap:anywhere;line-height:1.35}
+.risk-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.risk-badge{font-size:11px;font-weight:700;white-space:nowrap}
+.risk-actions{display:flex;gap:5px;justify-content:flex-end}
+.risk-actions .add-btn-sm{margin-left:0;padding:3px 9px}
+.risk-detail{margin-top:7px;border:1px solid var(--border);border-radius:8px;background:rgba(100,116,139,.10);padding:0 9px}
+.risk-detail summary{cursor:pointer;color:var(--text3);font-size:11px;padding:7px 0;list-style:none}
+.risk-detail summary::-webkit-details-marker{display:none}
+.risk-evidence{font-size:11px;color:var(--text2);line-height:1.65;padding:0 0 8px}
+.risk-samples{margin-top:5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.risk-samples code{font-size:10px;color:#93c5fd}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
@@ -1178,29 +1191,33 @@ function renderStats() {
       ? `<button class="bl-badge-btn" onclick="quickUnblockIp(${jsArg(r.ip)})">黑名单</button>`
       : `<button class="add-btn-sm" onclick="quickBlacklist(${jsArg(r.ip)})">封</button>`;
     const riskColor = (r.score || 0) >= 90 ? '#ef4444' : ((r.score || 0) >= 75 ? '#eab308' : '#38bdf8');
-    const paths = (r.paths || []).map(p => `<code style="color:#93c5fd">${esc(p)}</code>`).join(' ');
-    const uas = (r.uas || []).map(ua => `<div style="font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(ua)}">${esc(ua)}</div>`).join('');
+    const paths = (r.paths || []).map(p => `<code>${esc(p)}</code>`).join(' ');
+    const uas = (r.uas || []).map(ua => `<div title="${esc(ua)}">${esc(ua)}</div>`).join('');
     const tokens = (r.tokens || []).map(t => `<code title="${esc(t)}">${esc(t)}</code>`).join(' ');
     const reasons = (r.reasons || []).map((reason, idx) => `<div>${idx + 1}. ${esc(reason)}</div>`).join('');
     const reqSummary = r.request_count ? `${r.token_count} 个Token / ${r.request_count} 次` : `${r.token_count} 个Token`;
     return `
-    <div class="top-row" style="display:block">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span class="top-val">${esc(r.ip)}</span>
-        <span style="color:${riskColor};font-weight:700;font-size:12px">${esc(r.risk || '可疑')} ${r.score || 0}</span>
-        <span class="top-count" style="white-space:nowrap">${reqSummary}</span>
-        ${r.max_per_second ? `<span class="top-sub">1秒峰值 ${r.max_per_second}</span>` : ''}
-        ${r.last_time ? `<span class="top-sub">最后 ${esc(r.last_time)}</span>` : ''}
-        ${suspBtn}
-        <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>
+    <div class="top-row risk-row">
+      <div class="risk-main">
+        <div class="risk-ip">${esc(r.ip)}</div>
+        <div>
+          <div class="risk-meta">
+            <span class="risk-badge" style="color:${riskColor}">${esc(r.risk || '可疑')} ${r.score || 0}</span>
+            <span class="top-count">${reqSummary}</span>
+          </div>
+          <div class="risk-actions">
+            ${suspBtn}
+            <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>
+          </div>
+        </div>
       </div>
-      <div style="margin-top:8px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(15,23,42,.24)">
-        <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">高危成立依据</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7">${reasons || '暂无详细依据'}</div>
-        ${paths ? `<div style="margin-top:6px;font-size:11px;color:var(--text3)">路径：${paths}</div>` : ''}
-        ${tokens ? `<div style="margin-top:6px;font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis">Token样本：${tokens}</div>` : ''}
+      <details class="risk-detail">
+        <summary>高危成立依据</summary>
+        <div class="risk-evidence">${reasons || '暂无详细依据'}</div>
+        ${paths ? `<div class="risk-samples">路径：${paths}</div>` : ''}
+        ${tokens ? `<div class="risk-samples">Token样本：${tokens}</div>` : ''}
         ${uas ? `<div style="margin-top:6px">${uas}</div>` : ''}
-      </div>
+      </details>
     </div>`;
   }).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
 }
