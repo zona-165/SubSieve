@@ -669,12 +669,15 @@ async function apiFetch(url, opts={}) {
     const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
     const ct = r.headers.get('Content-Type') || '';
     if (!ct.includes('application/json')) {
-      return {ok: false, error: '服务器内部错误，请检查日志'};
+      return {ok: false, error: `HTTP ${r.status}：服务器未返回 JSON`};
     }
-    const json = await r.json();
-    return json;
+    try {
+      return await r.json();
+    } catch(e) {
+      return {ok: false, error: `HTTP ${r.status}：JSON 解析失败`};
+    }
   } catch(e) {
-    return {ok: false, error: '网络请求失败'};
+    return {ok: false, error: `请求失败：${e.message || '网络连接被中断'}`};
   }
 }
 
