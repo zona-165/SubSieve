@@ -61,7 +61,7 @@ sgw/
 ### 一键部署
 
 ```bash
-git clone https://github.com/Null404-0/SubSieve.git
+git clone https://github.com/zona-165/SubSieve.git
 cd SubSieve/sgw
 chmod +x setup.sh
 ./setup.sh
@@ -131,6 +131,16 @@ cd SubSieve/sgw
 
 > **注意**：如果在后台修改了**网关端口**，需要在宿主机执行一次 `./update.sh` 才能让新端口生效（`.env` 中的 `GATEWAY_PORT` 由该脚本同步更新）。
 
+如果你是从原仓库 `Null404-0/SubSieve` 部署的旧实例，先把远端切到本维护仓库：
+
+```bash
+cd SubSieve
+git remote set-url origin https://github.com/zona-165/SubSieve.git
+git pull origin main
+cd sgw
+./update.sh
+```
+
 ---
 
 ## 访问后台
@@ -147,13 +157,13 @@ https://你的域名或IP:64444/<随机路径>
 
 | 选项卡 | 功能 |
 |--------|------|
-| 日志 | 今日/全部日志切换，按 IP / 状态码 / Token 过滤，仅显示订阅相关请求，Token 全文展示并支持一键复制，一键封禁 IP，删除7日前旧日志 |
-| 分析 | Top10 IP、Top10 Token（支持复制）、可疑 UA 列表（可一键封禁 UA） |
+| 日志 | 今日/全部日志切换，按 IP / 状态码 / Token / UA 过滤；“仅订阅相关”会自动读取系统设置里的订阅路径；Token 全文展示并支持一键复制，一键封禁 IP，删除7日前旧日志 |
+| 分析 | Top IP、Top Token（支持复制）、可疑 Token、可疑 IP、可疑 UA；可疑 IP 会显示风险评分和高危成立依据，并支持一键封禁/白名单 |
 | 封禁UA | 添加/删除自定义封禁 UA 关键词，大小写不敏感，立即 reload nginx 生效 |
 | 白名单 | 增删、导入白名单 IP，立即生效；白名单 IP 跳过所有拦截 |
 | 黑名单 | 增删黑名单 IP（nginx deny 444），增删后立即生效 |
 | Token黑名单 | 封禁指定订阅 Token，命中后返回 403，支持添加备注 |
-| 设置 | 修改机场上游地址、订阅路径、网关对外端口、管理员密码 |
+| 设置 | 修改网站标题、后台账号密码、机场上游地址、订阅路径、网关对外端口；订阅路径变更后日志筛选会同步更新 |
 
 ---
 
@@ -194,4 +204,8 @@ docker exec -it subscribe-gateway sh
 
 ## 更新日志
 
+- 2026-07-12：维护仓库切换为 `zona-165/SubSieve`，README 部署地址同步更新。
+- 2026-07-12：日志页“仅订阅相关”改为读取系统设置里的订阅路径，支持后台修改路径后同步过滤。
+- 2026-07-12：分析页增强可疑 IP 展示，新增风险评分、高危成立依据、紧凑排版和一键封禁/白名单操作。
+- 2026-07-12：前端 API 请求失败提示更细化，便于定位 HTTP 500、JSON 解析失败等后台问题。
 - 2026-06-13：修复存储型 XSS 与 Nginx 配置注入两处高危漏洞，加固后台输入过滤与转义。
