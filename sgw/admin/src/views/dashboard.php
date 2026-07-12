@@ -1174,13 +1174,29 @@ function renderStats() {
     const suspBtn = suspBanned
       ? `<button class="bl-badge-btn" onclick="quickUnblockIp(${jsArg(r.ip)})">黑名单</button>`
       : `<button class="add-btn-sm" onclick="quickBlacklist(${jsArg(r.ip)})">封</button>`;
+    const riskColor = (r.score || 0) >= 90 ? '#ef4444' : ((r.score || 0) >= 75 ? '#eab308' : '#38bdf8');
+    const paths = (r.paths || []).map(p => `<code style="color:#93c5fd">${esc(p)}</code>`).join(' ');
+    const uas = (r.uas || []).map(ua => `<div style="font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(ua)}">${esc(ua)}</div>`).join('');
+    const tokens = (r.tokens || []).map(t => `<code title="${esc(t)}">${esc(t)}</code>`).join(' ');
+    const reasons = (r.reasons || []).map((reason, idx) => `<div>${idx + 1}. ${esc(reason)}</div>`).join('');
     return `
-    <div class="top-row">
-      <span class="top-val">${esc(r.ip)}
+    <div class="top-row" style="display:block">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="top-val">${esc(r.ip)}</span>
+        <span style="color:${riskColor};font-weight:700;font-size:12px">${esc(r.risk || '可疑')} ${r.score || 0}</span>
+        <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token / ${r.request_count || 0} 次</span>
+        <span class="top-sub">1秒峰值 ${r.max_per_second || 0}</span>
+        ${r.last_time ? `<span class="top-sub">最后 ${esc(r.last_time)}</span>` : ''}
         ${suspBtn}
-        <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4);margin-left:4px" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>
-      </span>
-      <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token</span>
+        <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>
+      </div>
+      <div style="margin-top:8px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(15,23,42,.24)">
+        <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">高危成立依据</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7">${reasons || '暂无详细依据'}</div>
+        ${paths ? `<div style="margin-top:6px;font-size:11px;color:var(--text3)">路径：${paths}</div>` : ''}
+        ${tokens ? `<div style="margin-top:6px;font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis">Token样本：${tokens}</div>` : ''}
+        ${uas ? `<div style="margin-top:6px">${uas}</div>` : ''}
+      </div>
     </div>`;
   }).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
 }
