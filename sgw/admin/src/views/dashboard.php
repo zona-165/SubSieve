@@ -109,11 +109,12 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 /* Content */
 .content{padding:24px;flex:1;overflow:auto;background:linear-gradient(135deg,rgba(99,102,241,.035),transparent 28%),linear-gradient(315deg,rgba(8,145,178,.035),transparent 32%)}
 .tab-panel{display:none}
+.tab-panel{min-width:0}
 .tab-panel.active{display:block}
 .tab-panel.active{animation:panelIn var(--motion-med) ease both}
 
 /* Cards */
-.card{position:relative;background:linear-gradient(180deg,var(--bg3),color-mix(in srgb,var(--bg3) 94%,var(--accent) 6%));border:1px solid color-mix(in srgb,var(--border) 82%,var(--accent) 18%);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 14px 34px rgba(15,23,42,.06);overflow:hidden}
+.card{position:relative;max-width:100%;background:linear-gradient(180deg,var(--bg3),color-mix(in srgb,var(--bg3) 94%,var(--accent) 6%));border:1px solid color-mix(in srgb,var(--border) 82%,var(--accent) 18%);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 14px 34px rgba(15,23,42,.06);overflow:hidden}
 .card{animation:itemIn var(--motion-med) ease both}
 .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,rgba(99,102,241,.85),rgba(8,145,178,.65),transparent)}
 .card-title{position:relative;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text);margin-bottom:14px;text-transform:none;letter-spacing:0}
@@ -141,7 +142,9 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .badge-429{background:rgba(234,179,8,.12);color:#eab308}
 .badge-444{background:rgba(100,116,139,.12);color:#64748b}
 .badge-other{background:rgba(99,102,241,.12);color:#6366f1}
-.log-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.045);padding:0 10px}
+.log-table-wrap,.table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.045);padding:0 10px}
+.table-wrap{margin-top:10px}
+.table-wrap table{min-width:680px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:left;padding:10px;color:var(--text3);border-bottom:1px solid var(--border);position:sticky;top:0;background:color-mix(in srgb,var(--bg3) 92%,var(--accent) 8%);white-space:nowrap;z-index:1}
 td{padding:7px 10px;border-bottom:1px solid var(--bg);vertical-align:middle}
@@ -305,8 +308,9 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .log-table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px}
+  .log-table-wrap,.table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:0 8px}
   .log-table-wrap table{min-width:920px}
+  .table-wrap table{min-width:640px}
   th,td{padding:7px 8px}
   .req-cell-wrap{max-width:220px}
   .ua-cell-wrap{max-width:190px}
@@ -1652,6 +1656,7 @@ function renderUaBlacklist() {
   }
   const uaListEl = document.getElementById('ua-list');
   uaListEl.innerHTML = `
+    <div class="table-wrap">
     <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
@@ -1660,7 +1665,8 @@ function renderUaBlacklist() {
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="uaDel(${jsArg(e.ua)})">移除</button></td>
       </tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table>
+    </div>`;
   attachCommentCells(uaListEl);
 }
 
@@ -1672,6 +1678,7 @@ function renderUaWhitelist() {
   }
   const uaWlListEl = document.getElementById('ua-wl-list');
   uaWlListEl.innerHTML = `
+    <div class="table-wrap">
     <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
@@ -1680,7 +1687,8 @@ function renderUaWhitelist() {
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="uaWlDel(${jsArg(e.ua)})">移除</button></td>
       </tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table>
+    </div>`;
   attachCommentCells(uaWlListEl);
 }
 
@@ -1767,6 +1775,7 @@ async function loadWhitelist() {
       <label><input type="checkbox" id="wl-check-all" onchange="toggleAllWl(this)"> 全选</label>
       <button class="btn-danger" onclick="wlBatchDel()">批量删除选中</button>
     </div>
+    <div class="table-wrap">
     <table><thead><tr><th style="width:30px"></th><th>IP / CIDR</th><th>备注</th><th>操作</th></tr></thead>
     <tbody>${allWlEntries.map(e => `
       <tr>
@@ -1775,7 +1784,8 @@ async function loadWhitelist() {
         ${makeCommentCell('/api/whitelist.php', 'ip', e.ip, e.comment||'')}
         <td><button class="btn-danger" onclick="wlDel(${jsArg(e.ip)})">删除</button></td>
       </tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table>
+    </div>`;
   attachCommentCells(document.getElementById('wl-list'));
 }
 
@@ -1884,6 +1894,7 @@ async function loadBlacklist() {
       <label><input type="checkbox" id="bl-check-all" onchange="toggleAllBl(this)"> 全选</label>
       <button class="btn-danger" onclick="blBatchDel()">批量解封选中</button>
     </div>
+    <div class="table-wrap">
     <table><thead><tr><th style="width:30px"></th><th>IP / CIDR</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
@@ -1893,7 +1904,8 @@ async function loadBlacklist() {
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="blDel(${jsArg(e.ip)})">解封</button></td>
       </tr>`).join('')}
-    </tbody></table>`;
+    </tbody></table>
+    </div>`;
   } else {
     html += '<div class="empty">手动黑名单为空</div>';
   }
@@ -1901,6 +1913,7 @@ async function loadBlacklist() {
   if (idcSummary.length) {
     html += `<div class="idc-section">
       <div class="card-title">系统内置IDC封禁（自动拦截，共 ${idcSummary.reduce((s,r)=>s+r.count,0)} 条CIDR）</div>
+      <div class="table-wrap">
       <table><thead><tr><th>云服务商 / IDC</th><th>CIDR数量</th></tr></thead>
       <tbody>${idcSummary.map(s => `
         <tr>
@@ -1908,6 +1921,7 @@ async function loadBlacklist() {
           <td style="color:#6366f1;font-weight:600">${s.count} 条</td>
         </tr>`).join('')}
       </tbody></table>
+      </div>
     </div>`;
   }
 
@@ -2013,6 +2027,7 @@ async function loadTokenBlacklist() {
     return;
   }
   document.getElementById('tb-list').innerHTML = `
+    <div class="table-wrap">
     <table><thead><tr><th>Token</th><th>今日拉取</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => {
       const pullsHtml = e.today_pulls && e.today_pulls.length
@@ -2028,7 +2043,8 @@ async function loadTokenBlacklist() {
         <td><button class="btn-danger" style="font-size:12px;padding:2px 8px" onclick="tbDel(${jsArg(tok)})">移除</button></td>
       </tr>`;
     }).join('')}
-    </tbody></table>`;
+    </tbody></table>
+    </div>`;
   attachCommentCells(document.getElementById('tb-list'));
 }
 
