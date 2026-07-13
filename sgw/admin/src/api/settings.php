@@ -630,17 +630,21 @@ function read_uploaded_alert_history(): array {
         json_err('JSON 格式无效');
     }
     $history = is_array($data['history'] ?? null) ? $data['history'] : $data;
-    if (!is_array($history['status'] ?? null) || !is_array($history['entries'] ?? null)) {
+    $context = is_array($data['context'] ?? null) ? $data['context'] : (is_array($history['context'] ?? null) ? $history['context'] : null);
+    if (!is_array($history['entries'] ?? null)) {
         json_err('不是有效的告警历史文件');
     }
+    $status = is_array($history['status'] ?? null) ? $history['status'] : [];
     $historyMax = alert_history_max_setting();
     $entries = array_slice(array_values(array_filter($history['entries'], 'is_array')), 0, $historyMax);
-    return [
-        'status' => $history['status'],
+    $result = [
+        'status' => $status,
         'entries' => $entries,
         'original_entries' => count(array_filter($history['entries'], 'is_array')),
         'history_max' => $historyMax,
     ];
+    if ($context !== null) $result['context'] = $context;
+    return $result;
 }
 
 function alert_history_max_setting(): int {
@@ -664,6 +668,9 @@ function summarize_alert_history(array $history): array {
         'original_total' => (int)($history['original_entries'] ?? count($entries)),
         'history_max' => (int)($history['history_max'] ?? count($entries)),
     ];
+    if (is_array($history['context'] ?? null)) {
+        $summary['context'] = $history['context'];
+    }
     $times = [];
     foreach ($entries as $entry) {
         if (!is_array($entry)) continue;
@@ -690,6 +697,9 @@ function import_alert_history(): void {
         'status' => $history['status'],
         'entries' => $history['entries'],
     ];
+    if (is_array($history['context'] ?? null)) {
+        $safeHistory['context'] = $history['context'];
+    }
     if (!file_put_contents(ALERT_HISTORY_JSON, json_encode($safeHistory, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX)) {
         json_err('写入告警历史失败，请检查权限');
     }

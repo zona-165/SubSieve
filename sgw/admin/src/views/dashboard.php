@@ -3055,11 +3055,16 @@ async function importAlertHistory(input) {
       return;
     }
     const p = previewData.preview || {};
+    const ctx = p.context || {};
+    const contextLine = ctx.status_label || ctx.range_label || ctx.page
+      ? `来源筛选：状态 ${ctx.status_label || ctx.status || '-'} / 时间 ${ctx.range_label || ctx.range || '-'} / 页码 ${ctx.page || '-'} / 范围 ${ctx.range_label_text || '-'}`
+      : '';
     const lines = [
       '即将导入告警展示记录：',
       `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 ${p.history_max || p.total || 0} 条）` : ''}`,
       `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
+      ...(contextLine ? [contextLine] : []),
       '',
       '导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？',
     ];
