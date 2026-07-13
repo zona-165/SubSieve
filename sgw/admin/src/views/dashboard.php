@@ -803,6 +803,11 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
                 <input class="ip-input" id="cfg-alert-dedupe-minutes" type="number" min="1" max="1440" placeholder="60" style="width:100%">
               </div>
             </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+              <button class="mode-btn" onclick="applyAlertPreset('strict')">严格</button>
+              <button class="mode-btn" onclick="applyAlertPreset('balanced')">均衡</button>
+              <button class="mode-btn" onclick="applyAlertPreset('quiet')">安静</button>
+            </div>
             <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；阈值越低越敏感。</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
               <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
@@ -2530,6 +2535,20 @@ function getAlertSettingsPayload() {
     alert_susp_token_ips: parseInt(document.getElementById('cfg-alert-susp-token-ips').value || '3', 10),
     alert_dedupe_minutes: parseInt(document.getElementById('cfg-alert-dedupe-minutes').value || '60', 10),
   };
+}
+
+function applyAlertPreset(name) {
+  const presets = {
+    strict: {scanner: 75, ip: 80, tokenIps: 2, dedupe: 30, label: '严格'},
+    balanced: {scanner: 80, ip: 90, tokenIps: 3, dedupe: 60, label: '均衡'},
+    quiet: {scanner: 95, ip: 100, tokenIps: 5, dedupe: 180, label: '安静'},
+  };
+  const p = presets[name] || presets.balanced;
+  document.getElementById('cfg-alert-scanner-score').value = p.scanner;
+  document.getElementById('cfg-alert-susp-ip-score').value = p.ip;
+  document.getElementById('cfg-alert-susp-token-ips').value = p.tokenIps;
+  document.getElementById('cfg-alert-dedupe-minutes').value = p.dedupe;
+  toast(`已套用${p.label}预设，保存后生效`);
 }
 
 function validateAlertPayload(body, forTest = false) {
