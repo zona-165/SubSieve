@@ -389,7 +389,7 @@ function first_alert_line(string $text): string {
 function write_alert_history(array $status, array $entries): void {
     $history = read_json_file(ALERT_HISTORY_JSON);
     $oldEntries = is_array($history['entries'] ?? null) ? $history['entries'] : [];
-    $merged = array_slice(array_merge($entries, $oldEntries), 0, 50);
+    $merged = array_slice(array_merge($entries, $oldEntries), 0, ALERT_HISTORY_MAX);
     write_json_file(ALERT_HISTORY_JSON, [
         'status' => $status,
         'entries' => $merged,

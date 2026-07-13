@@ -36,6 +36,7 @@ define('NGINX_RELOAD_SIGNAL',     '/etc/nginx/subscribe/.reload');
 define('WHITELIST_RELOAD_SIGNAL', '/etc/nginx/subscribe/.reload_whitelist');
 define('GATEWAY_PORT',      (int)(getenv('GATEWAY_PORT') ?: 443));
 define('LOG_RETENTION_DAYS', (int)(getenv('LOG_RETENTION_DAYS') !== false ? getenv('LOG_RETENTION_DAYS') : 14));
+define('ALERT_HISTORY_MAX', max(50, min(1000, (int)($_sg['alert_history_max'] ?? 200))));
 define('SESSION_LIFETIME',  (int)(getenv('SESSION_LIFETIME') ?: 28800)); // 8小时
 // 后台访问路径前缀，留空则不校验（例如 ef9d1566 → 必须访问 /ef9d1566 才能进入后台）
 define('ADMIN_SECRET_PATH', trim(trim(getenv('ADMIN_SECRET_PATH') ?: ''), '/'));

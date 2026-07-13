@@ -229,6 +229,7 @@ function apply_alert_settings(array $s, array $body): array {
         'alert_susp_ip_score' => [1, 100, 90],
         'alert_susp_token_ips' => [2, 50, 3],
         'alert_dedupe_minutes' => [1, 1440, 60],
+        'alert_history_max' => [50, 1000, 200],
     ];
     foreach ($intFields as $key => [$min, $max, $default]) {
         if (array_key_exists($key, $body)) {
@@ -612,12 +613,22 @@ function read_uploaded_alert_history(): array {
     if (!is_array($history['status'] ?? null) || !is_array($history['entries'] ?? null)) {
         json_err('不是有效的告警历史文件');
     }
-    $entries = array_slice(array_values(array_filter($history['entries'], 'is_array')), 0, 50);
+    $historyMax = alert_history_max_setting();
+    $entries = array_slice(array_values(array_filter($history['entries'], 'is_array')), 0, $historyMax);
     return [
         'status' => $history['status'],
         'entries' => $entries,
         'original_entries' => count(array_filter($history['entries'], 'is_array')),
+        'history_max' => $historyMax,
     ];
+}
+
+function alert_history_max_setting(): int {
+    $settings = read_settings();
+    $value = is_numeric($settings['alert_history_max'] ?? null) ? (int)$settings['alert_history_max'] : 200;
+    if ($value < 50) $value = 50;
+    if ($value > 1000) $value = 1000;
+    return $value;
 }
 
 function summarize_alert_history(array $history): array {
@@ -631,6 +642,7 @@ function summarize_alert_history(array $history): array {
         'last_time' => '',
         'truncated' => !empty($history['original_entries']) && (int)$history['original_entries'] > count($entries),
         'original_total' => (int)($history['original_entries'] ?? count($entries)),
+        'history_max' => (int)($history['history_max'] ?? count($entries)),
     ];
     $times = [];
     foreach ($entries as $entry) {

@@ -802,6 +802,10 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
                 <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">去重分钟</label>
                 <input class="ip-input" id="cfg-alert-dedupe-minutes" type="number" min="1" max="1440" placeholder="60" style="width:100%">
               </div>
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">历史保留条数</label>
+                <input class="ip-input" id="cfg-alert-history-max" type="number" min="50" max="1000" placeholder="200" style="width:100%">
+              </div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
               <button class="mode-btn" onclick="applyAlertPreset('strict')">严格</button>
@@ -2356,6 +2360,8 @@ async function loadSettings() {
   if (alertSuspTokenIps) alertSuspTokenIps.value = currentSettings.alert_susp_token_ips || 3;
   const alertDedupeMinutes = document.getElementById('cfg-alert-dedupe-minutes');
   if (alertDedupeMinutes) alertDedupeMinutes.value = currentSettings.alert_dedupe_minutes || 60;
+  const alertHistoryMax = document.getElementById('cfg-alert-history-max');
+  if (alertHistoryMax) alertHistoryMax.value = currentSettings.alert_history_max || 200;
   const alertQuietEnabled = document.getElementById('cfg-alert-quiet-enabled');
   if (alertQuietEnabled) alertQuietEnabled.checked = !!parseInt(currentSettings.alert_quiet_enabled || 0, 10);
   const alertQuietStart = document.getElementById('cfg-alert-quiet-start');
@@ -2687,6 +2693,7 @@ function getAlertSettingsPayload() {
     alert_susp_ip_score: parseInt(document.getElementById('cfg-alert-susp-ip-score').value || '90', 10),
     alert_susp_token_ips: parseInt(document.getElementById('cfg-alert-susp-token-ips').value || '3', 10),
     alert_dedupe_minutes: parseInt(document.getElementById('cfg-alert-dedupe-minutes').value || '60', 10),
+    alert_history_max: parseInt(document.getElementById('cfg-alert-history-max').value || '200', 10),
     alert_quiet_enabled: document.getElementById('cfg-alert-quiet-enabled').checked ? 1 : 0,
     alert_quiet_start: document.getElementById('cfg-alert-quiet-start').value || '23:00',
     alert_quiet_end: document.getElementById('cfg-alert-quiet-end').value || '08:00',
@@ -2713,6 +2720,7 @@ function validateAlertPayload(body, forTest = false) {
     ['可疑 IP 评分阈值', body.alert_susp_ip_score, 1, 100],
     ['Token IP 数阈值', body.alert_susp_token_ips, 2, 50],
     ['去重分钟', body.alert_dedupe_minutes, 1, 1440],
+    ['历史保留条数', body.alert_history_max, 50, 1000],
   ];
   for (const [name, value, min, max] of checks) {
     if (!Number.isFinite(value) || value < min || value > max) {
@@ -2831,7 +2839,7 @@ async function importAlertHistory(input) {
     const p = previewData.preview || {};
     const lines = [
       '即将导入告警展示记录：',
-      `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 50 条）` : ''}`,
+      `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 ${p.history_max || p.total || 0} 条）` : ''}`,
       `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
       '',
