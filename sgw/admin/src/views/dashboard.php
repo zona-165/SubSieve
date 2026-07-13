@@ -3107,6 +3107,11 @@ async function importAlertHistory(input) {
     const d = await r.json();
     if (d.ok) {
       toast(`✅ 已导入 ${d.imported || 0} 条告警记录`);
+      alertHistoryFilter = 'all';
+      alertHistoryRange = 'all';
+      alertHistoryQuery = '';
+      alertHistoryPage = 1;
+      clearTimeout(alertHistoryQueryTimer);
       await loadSettings();
     } else {
       toast(d.error || '导入失败', 'err');
