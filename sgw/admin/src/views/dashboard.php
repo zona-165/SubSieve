@@ -2534,8 +2534,9 @@ function renderAlertHistory(history) {
     ${rows}
     ${pager}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
-      <button class="mode-btn" onclick="copyFilteredAlertHistory()">复制当前</button>
-      <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
+      <button class="mode-btn" onclick="copyFilteredAlertHistory()">复制当前页</button>
+      <button class="mode-btn" onclick="exportCurrentAlertHistoryPage()">导出当前页</button>
+      <button class="mode-btn" onclick="exportAlertHistory()">导出全部</button>
       <button class="mode-btn" onclick="document.getElementById('alert-history-import-file').click()">导入记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(true)">重置去重</button>
@@ -2850,6 +2851,33 @@ function exportAlertHistory() {
   a.href = BASE + '/api/settings.php?export_alert_history=1';
   a.download = '';
   a.click();
+}
+
+function exportCurrentAlertHistoryPage() {
+  const entries = currentFilteredAlertEntries();
+  if (!entries.length) {
+    toast('当前页没有可导出的告警记录', 'err');
+    return;
+  }
+  const payload = {
+    exported_at: new Date().toISOString(),
+    scope: 'current_page',
+    filters: {
+      status: alertHistoryFilter,
+      range: alertHistoryRange,
+      query: alertHistoryQuery,
+      page: alertHistoryPage,
+      limit: alertHistoryLimit,
+    },
+    entries,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `subsieve-alert-page-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(`✅ 已导出当前页 ${entries.length} 条`);
 }
 
 async function importAlertHistory(input) {
