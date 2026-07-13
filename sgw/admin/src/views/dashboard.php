@@ -1504,6 +1504,7 @@ function scannerReportText(r) {
 Token：${r.token || ''}
 来源：${r.ip || ''}｜${r.location || '未查询'}
 ASN：${r.asn || '未查询'}
+网络：${r.network_type || '未知网络'}${(r.intel_tags || []).length ? '｜' + (r.intel_tags || []).join('、') : ''}
 查询：${r.query_source || '本地日志'}
 路径 ${r.path || ''}
 UA：${r.ua || '（空UA）'}

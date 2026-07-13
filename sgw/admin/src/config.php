@@ -16,6 +16,7 @@ define('UA_CUSTOM_CONF',    '/etc/nginx/subscribe/ua_custom.conf');
 define('UA_WHITELIST_JSON', '/etc/nginx/subscribe/ua_whitelist.json');
 define('UA_WHITELIST_CONF',    '/etc/nginx/subscribe/ua_whitelist.conf');
 define('TOKEN_BLACKLIST_JSON', '/etc/nginx/subscribe/token_blacklist.json');
+define('IP_INTEL_CACHE_JSON', '/etc/nginx/subscribe/ip_intel_cache.json');
 define('SETTINGS_JSON',     '/etc/nginx/subscribe/admin_settings.json');
 define('PROTECT_CONF',      '/etc/nginx/subscribe/protect.conf');
 define('DEPLOY_INFO_FILE',  '/var/log/subscribe/DEPLOY_INFO.txt');

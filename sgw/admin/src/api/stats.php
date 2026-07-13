@@ -174,6 +174,7 @@ usort($suspIpList, fn($a,$b) => ($b['score'] <=> $a['score']) ?: ($b['token_coun
 $scannerList = array_values($scannerReports);
 usort($scannerList, fn($a,$b) => strcmp($b['time'], $a['time']));
 $scannerList = array_slice($scannerList, 0, 100);
+$scannerList = enrich_scanner_reports($scannerList);
 
 json_out([
     'ok'          => true,
@@ -216,4 +217,93 @@ function extract_request_path(string $request): string {
 function format_log_time(string $time): string {
     $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $time);
     return $dt ? $dt->format('Y/m/d H:i:s') : preg_replace('/ \+\d+$/', '', $time);
+}
+
+function enrich_scanner_reports(array $reports): array {
+    $cache = read_ip_intel_cache();
+    $dirty = false;
+    $lookups = 0;
+    foreach ($reports as &$report) {
+        $ip = $report['ip'] ?? '';
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) continue;
+        $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
+        if (!$cached && $lookups >= 20) continue;
+        if (!$cached) $lookups++;
+        $intel = get_ip_intel($ip, $cache, $dirty);
+        if (!$intel) continue;
+        $report['location'] = $intel['location'] ?? '未查询';
+        $report['asn'] = $intel['asn'] ?? '未查询';
+        $report['query_source'] = $intel['source'] ?? 'ip-api';
+        $report['network_type'] = $intel['network_type'] ?? '未知网络';
+        $report['intel_tags'] = $intel['tags'] ?? [];
+        if (!empty($intel['is_proxy']) || !empty($intel['is_hosting'])) {
+            $report['score'] = max((int)($report['score'] ?? 90), 95);
+            $report['risk'] = '极高危';
+        }
+    }
+    unset($report);
+    if ($dirty) write_ip_intel_cache($cache);
+    return $reports;
+}
+
+function read_ip_intel_cache(): array {
+    if (!file_exists(IP_INTEL_CACHE_JSON)) return [];
+    $data = json_decode((string)file_get_contents(IP_INTEL_CACHE_JSON), true);
+    return is_array($data) ? $data : [];
+}
+
+function write_ip_intel_cache(array $cache): void {
+    @file_put_contents(IP_INTEL_CACHE_JSON, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+
+function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
+    $now = time();
+    if (isset($cache[$ip]) && is_array($cache[$ip]) && ($now - (int)($cache[$ip]['ts'] ?? 0) < 604800)) {
+        return $cache[$ip]['data'] ?? null;
+    }
+    $intel = query_ip_api($ip);
+    if (!$intel) {
+        $intel = [
+            'location' => '查询失败',
+            'asn' => '查询失败',
+            'source' => 'ip-api',
+            'network_type' => '未知网络',
+            'tags' => ['情报查询失败'],
+            'is_proxy' => false,
+            'is_hosting' => false,
+        ];
+    }
+    $cache[$ip] = ['ts' => $now, 'data' => $intel];
+    $dirty = true;
+    return $intel;
+}
+
+function query_ip_api(string $ip): ?array {
+    $fields = 'status,message,country,regionName,city,isp,org,as,proxy,hosting,mobile';
+    $url = 'http://ip-api.com/json/' . rawurlencode($ip) . '?fields=' . rawurlencode($fields) . '&lang=zh-CN';
+    $ctx = stream_context_create([
+        'http' => [
+            'timeout' => 1.2,
+            'header' => "User-Agent: SubSieve-IP-Intel/1.0\r\n",
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $ctx);
+    if ($raw === false || $raw === '') return null;
+    $data = json_decode($raw, true);
+    if (!is_array($data) || ($data['status'] ?? '') !== 'success') return null;
+    $parts = array_filter([$data['country'] ?? '', $data['regionName'] ?? '', $data['city'] ?? '']);
+    $tags = [];
+    if (!empty($data['proxy'])) $tags[] = '代理/VPN';
+    if (!empty($data['hosting'])) $tags[] = '机房/托管';
+    if (!empty($data['mobile'])) $tags[] = '移动网络';
+    if (!$tags) $tags[] = '普通运营商网络';
+    return [
+        'location' => $parts ? implode(' / ', $parts) : '未知地区',
+        'asn' => trim(($data['as'] ?? '') . ' ' . ($data['isp'] ?? '') . ' ' . ($data['org'] ?? '')),
+        'source' => 'ip-api',
+        'network_type' => implode('、', $tags),
+        'tags' => $tags,
+        'is_proxy' => !empty($data['proxy']),
+        'is_hosting' => !empty($data['hosting']),
+    ];
 }

@@ -14,6 +14,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/ua_custom.conf" ]    || printf 'map $http_user_agent $is_custom_bad_ua {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/ua_custom.conf"
 [ -f "$SUBSCRIBE_DIR/whitelist_ips.txt" ] || touch "$SUBSCRIBE_DIR/whitelist_ips.txt"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
+[ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
 
 chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.json" \
@@ -21,7 +22,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/ua_blacklist.json" \
     "$SUBSCRIBE_DIR/ua_custom.conf" \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
-    "$SUBSCRIBE_DIR/admin_settings.json"
+    "$SUBSCRIBE_DIR/admin_settings.json" \
+    "$SUBSCRIBE_DIR/ip_intel_cache.json"
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe
