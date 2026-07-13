@@ -2491,10 +2491,12 @@ function renderAlertHistory(history) {
       </div>`;
   }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${filteredTotal ? '当前页暂无记录' : '当前条件暂无记录'}</div>`;
   const pager = totalPages > 1 ? `
-    <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:10px">
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+      <button class="mode-btn" onclick="setAlertHistoryPage(1)" ${page <= 1 ? 'disabled' : ''}>首页</button>
       <button class="mode-btn" onclick="setAlertHistoryPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>
       <span style="color:var(--text2);font-weight:800;font-size:12px">第 ${esc(page)} / ${esc(totalPages)} 页</span>
       <button class="mode-btn" onclick="setAlertHistoryPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>
+      <button class="mode-btn" onclick="setAlertHistoryPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''}>末页</button>
     </div>` : '';
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
