@@ -2463,6 +2463,7 @@ function renderAlertHistory(history) {
     ${quietSummaryHtml}
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
+      <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(true)">重置去重</button>
     </div>`;
@@ -2680,6 +2681,13 @@ async function clearAlertHistory(resetState) {
   } else {
     toast(d.error || '操作失败', 'err');
   }
+}
+
+function exportAlertHistory() {
+  const a = document.createElement('a');
+  a.href = BASE + '/api/settings.php?export_alert_history=1';
+  a.download = '';
+  a.click();
 }
 
 

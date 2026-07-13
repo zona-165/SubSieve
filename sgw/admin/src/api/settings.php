@@ -6,6 +6,9 @@ $method = $_SERVER['REQUEST_METHOD'];
 // GET — 读取当前设置
 if ($method === 'GET') {
     try {
+        if (!empty($_GET['export_alert_history'])) {
+            export_alert_history();
+        }
         $s = read_settings();
         $certInfo = get_cert_info();
         $statsCache = get_stats_cache_info();
@@ -484,6 +487,25 @@ function get_alert_history(): array {
             'latest_summary' => is_array($latestQuiet) ? ($latestQuiet['summary'] ?? '') : '',
         ],
     ];
+}
+
+function export_alert_history(): void {
+    $payload = [
+        'exported_at' => date('Y-m-d H:i:s'),
+        'history' => [],
+    ];
+    if (defined('ALERT_HISTORY_JSON') && file_exists(ALERT_HISTORY_JSON)) {
+        $raw = @file_get_contents(ALERT_HISTORY_JSON);
+        $data = $raw ? json_decode($raw, true) : null;
+        if (is_array($data)) {
+            $payload['history'] = $data;
+        }
+    }
+    $filename = 'subsieve-alert-history-' . date('Ymd-His') . '.json';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 function human_bytes(int $bytes): string {
