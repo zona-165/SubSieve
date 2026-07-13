@@ -123,6 +123,9 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 
 /* Log panel */
 .log-controls{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.06)}
+.alert-history-search{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.alert-history-search .ip-input{flex:1;min-width:0;height:34px;font-size:12px}
+.alert-history-search .mode-btn{height:34px;padding:0 10px;font-size:12px}
 .log-filter{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-size:12px;outline:none;width:160px;transition:all .15s}
 .log-filter:focus{border-color:var(--accent)}
 .log-filter:focus,.ip-input:focus,.comment-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12)}
@@ -321,6 +324,9 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .card-title{font-size:12px;margin-bottom:10px}
   .log-mode-btns,.log-controls,.page-controls,.batch-row{gap:6px}
   .log-mode-btns .mode-btn,.log-controls .mode-btn{flex:1 1 calc(50% - 6px);padding:7px 8px}
+  .alert-history-search{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .alert-history-search .ip-input{grid-column:1 / -1;height:36px}
+  .alert-history-search .mode-btn{height:34px;width:100%;padding:0 8px}
   .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2540,10 +2546,10 @@ function renderAlertHistory(history) {
       </select>
       <button class="mode-btn" onclick="resetAlertHistoryFilters()" style="height:32px;padding:0 10px;font-size:12px">重置</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-      <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="flex:1;min-width:0;height:34px;font-size:12px" oninput="setAlertHistoryQuery(this.value)" onkeydown="if(event.key==='Escape') clearAlertHistoryQuery(); if(event.key==='Enter') submitAlertHistoryQuery()">
-      <button class="mode-btn" onclick="submitAlertHistoryQuery()" style="height:34px;padding:0 10px;font-size:12px">搜索</button>
-      <button class="mode-btn" onclick="clearAlertHistoryQuery()" style="height:34px;padding:0 10px;font-size:12px" ${alertHistoryQuery ? '' : 'disabled'}>清空</button>
+    <div class="alert-history-search">
+      <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" oninput="setAlertHistoryQuery(this.value)" onkeydown="if(event.key==='Escape') clearAlertHistoryQuery(); if(event.key==='Enter') submitAlertHistoryQuery()">
+      <button class="mode-btn" onclick="submitAlertHistoryQuery()">搜索</button>
+      <button class="mode-btn" onclick="clearAlertHistoryQuery()" ${alertHistoryQuery ? '' : 'disabled'}>清空</button>
     </div>
     <div id="alert-history-query-state" style="min-height:16px;color:var(--text3);font-size:11px;margin-bottom:2px"></div>
     ${rows}
