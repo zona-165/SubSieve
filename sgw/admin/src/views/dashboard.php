@@ -3078,6 +3078,7 @@ async function importAlertHistory(input) {
     const p = previewData.preview || {};
     const ctx = p.context || {};
     const ageNote = alertImportAgeNote(p.exported_at || '');
+    const emptyNote = (p.total || 0) === 0 ? '提示：该文件没有可导入的告警记录，继续会清空当前展示历史。' : '';
     const contextLine = ctx.status_label || ctx.range_label || ctx.page || ctx.query
       ? `来源筛选：状态 ${ctx.status_label || ctx.status || '-'} / 时间 ${ctx.range_label || ctx.range || '-'} / 关键词 ${ctx.query || '-'} / 页码 ${ctx.page || '-'} / 范围 ${ctx.range_label_text || '-'}`
       : '';
@@ -3090,6 +3091,7 @@ async function importAlertHistory(input) {
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
       ...(contextLine ? [contextLine] : []),
       ...(ageNote ? [ageNote] : []),
+      ...(emptyNote ? [emptyNote] : []),
       '',
       '导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？',
     ];
