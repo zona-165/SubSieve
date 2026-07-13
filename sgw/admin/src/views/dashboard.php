@@ -3056,8 +3056,8 @@ async function importAlertHistory(input) {
     }
     const p = previewData.preview || {};
     const ctx = p.context || {};
-    const contextLine = ctx.status_label || ctx.range_label || ctx.page
-      ? `来源筛选：状态 ${ctx.status_label || ctx.status || '-'} / 时间 ${ctx.range_label || ctx.range || '-'} / 页码 ${ctx.page || '-'} / 范围 ${ctx.range_label_text || '-'}`
+    const contextLine = ctx.status_label || ctx.range_label || ctx.page || ctx.query
+      ? `来源筛选：状态 ${ctx.status_label || ctx.status || '-'} / 时间 ${ctx.range_label || ctx.range || '-'} / 关键词 ${ctx.query || '-'} / 页码 ${ctx.page || '-'} / 范围 ${ctx.range_label_text || '-'}`
       : '';
     const lines = [
       '即将导入告警展示记录：',
