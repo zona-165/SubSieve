@@ -17,6 +17,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
 [ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
 [ -f "$SUBSCRIBE_DIR/alert_state.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_state.json"
+[ -f "$SUBSCRIBE_DIR/alert_history.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_history.json"
 
 chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.json" \
@@ -27,7 +28,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/admin_settings.json" \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
     "$SUBSCRIBE_DIR/stats_cache.json" \
-    "$SUBSCRIBE_DIR/alert_state.json"
+    "$SUBSCRIBE_DIR/alert_state.json" \
+    "$SUBSCRIBE_DIR/alert_history.json"
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe

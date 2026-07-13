@@ -790,6 +790,9 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
               <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
               <button class="mode-btn" onclick="testAlertSettings()">测试推送</button>
             </div>
+            <div id="alert-history-info" style="border-top:1px solid var(--border);padding-top:12px">
+              <div class="loading">加载中…</div>
+            </div>
           </div>
         </div>
 
@@ -2314,6 +2317,7 @@ async function loadSettings() {
     certEl.innerHTML = '<div class="empty" style="color:#eab308">证书存在但无法解析（可能是非标准格式）</div>';
   }
   renderStatsCacheInfo(data.stats_cache || {});
+  renderAlertHistory(data.alert_history || {});
 }
 
 function renderStatsCacheInfo(cache) {
@@ -2344,6 +2348,52 @@ function formatDuration(seconds) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} 小时前`;
   return `${Math.floor(hours / 24)} 天前`;
+}
+
+function renderAlertHistory(history) {
+  const el = document.getElementById('alert-history-info');
+  if (!el) return;
+  const status = history.status || {};
+  const entries = history.entries || [];
+  const enabled = !!status.enabled;
+  const ok = !status.errors || status.errors.length === 0;
+  const badgeColor = enabled ? (ok ? '#22c55e' : '#ef4444') : '#94a3b8';
+  const stateText = enabled ? (ok ? '运行中' : '有错误') : '未开启';
+  const lastCheck = status.last_check || '尚未检查';
+  const noteMap = {
+    disabled: '告警未开启',
+    missing_cache: '统计缓存尚未生成',
+    empty_cache: '统计缓存为空',
+  };
+  const note = status.note ? `<div style="color:var(--text3);font-size:12px;margin-top:4px">${esc(noteMap[status.note] || status.note)}</div>` : '';
+  const rows = entries.length ? entries.map(e => {
+    const color = e.status === 'error' ? '#ef4444' : '#22c55e';
+    const label = e.status === 'error' ? '失败' : '已推送';
+    return `
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+        <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
+        <div style="min-width:0">
+          <div style="font-weight:700;color:var(--text);font-size:12px;word-break:break-word">${esc(e.title || '告警')}</div>
+          <div style="color:var(--text3);font-size:11px;line-height:1.45;word-break:break-all">${esc(e.summary || '')}</div>
+          <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(e.time || '-')} · ${esc(e.channel || '-')}</div>
+        </div>
+      </div>`;
+  }).join('') : '<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">暂无推送记录</div>';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+      <div>
+        <div style="font-weight:800;color:var(--text)">告警状态</div>
+        <div style="color:var(--text3);font-size:12px;margin-top:3px">最近检查：${esc(lastCheck)}</div>
+        ${note}
+      </div>
+      <span style="color:${badgeColor};font-weight:900;white-space:nowrap">${stateText}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">事件</div><div style="font-weight:900">${esc(status.events ?? 0)}</div></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">推送</div><div style="font-weight:900">${esc(status.sent ?? 0)}</div></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">去重</div><div style="font-weight:900">${esc(status.skipped ?? 0)}</div></div>
+    </div>
+    ${rows}`;
 }
 
 

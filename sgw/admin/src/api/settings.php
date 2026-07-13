@@ -9,6 +9,7 @@ if ($method === 'GET') {
         $s = read_settings();
         $certInfo = get_cert_info();
         $statsCache = get_stats_cache_info();
+        $alertHistory = get_alert_history();
         if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
             $parsed = parse_protect_conf();
             if ($parsed) {
@@ -21,7 +22,7 @@ if ($method === 'GET') {
         if (empty($s['gateway_port'])) {
             $s['gateway_port'] = GATEWAY_PORT;
         }
-        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo, 'stats_cache' => $statsCache]);
+        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo, 'stats_cache' => $statsCache, 'alert_history' => $alertHistory]);
     } catch (Throwable $e) {
         json_err('PHP错误: ' . $e->getMessage());
     }
@@ -375,6 +376,23 @@ function get_stats_cache_info(): array {
         }
     }
     return $info;
+}
+
+function get_alert_history(): array {
+    if (!defined('ALERT_HISTORY_JSON') || !file_exists(ALERT_HISTORY_JSON)) {
+        return ['exists' => false, 'status' => [], 'entries' => []];
+    }
+    $raw = @file_get_contents(ALERT_HISTORY_JSON);
+    $data = $raw ? json_decode($raw, true) : null;
+    if (!is_array($data)) {
+        return ['exists' => true, 'status' => [], 'entries' => []];
+    }
+    $entries = is_array($data['entries'] ?? null) ? array_slice($data['entries'], 0, 10) : [];
+    return [
+        'exists' => true,
+        'status' => is_array($data['status'] ?? null) ? $data['status'] : [],
+        'entries' => $entries,
+    ];
 }
 
 function human_bytes(int $bytes): string {

@@ -92,17 +92,47 @@ function extract_log_date_ts(string $line): ?int {
 function check_alerts(): array {
     $settings = read_json_file(SETTINGS_JSON);
     if (empty($settings['alert_enabled'])) {
+        write_alert_history([
+            'last_check' => date('Y-m-d H:i:s'),
+            'enabled' => false,
+            'channel' => $settings['alert_channel'] ?? 'webhook',
+            'events' => 0,
+            'sent' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'note' => 'disabled',
+        ], []);
         return ['ok' => true, 'disabled' => true, 'time' => date('Y-m-d H:i:s')];
     }
 
     $cacheFile = dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json';
     if (!file_exists($cacheFile)) {
+        write_alert_history([
+            'last_check' => date('Y-m-d H:i:s'),
+            'enabled' => true,
+            'channel' => $settings['alert_channel'] ?? 'webhook',
+            'events' => 0,
+            'sent' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'note' => 'missing_cache',
+        ], []);
         return ['ok' => true, 'sent' => 0, 'missing_cache' => true, 'time' => date('Y-m-d H:i:s')];
     }
 
     $cache = read_json_file($cacheFile);
     $data = $cache['data'] ?? [];
     if (!is_array($data) || !$data) {
+        write_alert_history([
+            'last_check' => date('Y-m-d H:i:s'),
+            'enabled' => true,
+            'channel' => $settings['alert_channel'] ?? 'webhook',
+            'events' => 0,
+            'sent' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'note' => 'empty_cache',
+        ], []);
         return ['ok' => true, 'sent' => 0, 'empty_cache' => true, 'time' => date('Y-m-d H:i:s')];
     }
 
@@ -110,30 +140,60 @@ function check_alerts(): array {
     $state = read_json_file(ALERT_STATE_JSON);
     $now = time();
     $sent = 0;
+    $skipped = 0;
     $errors = [];
+    $historyEntries = [];
 
     foreach ($events as $event) {
         $key = $event['key'];
         $lastSent = (int)($state[$key] ?? 0);
         if ($lastSent > 0 && ($now - $lastSent) < 3600) {
+            $skipped++;
             continue;
         }
         $result = send_alert_message_maintenance($settings, $event['text']);
         if ($result['ok']) {
             $state[$key] = $now;
             $sent++;
+            $historyEntries[] = [
+                'time' => date('Y-m-d H:i:s', $now),
+                'key' => $key,
+                'title' => $event['title'] ?? '高危告警',
+                'summary' => $event['summary'] ?? first_alert_line($event['text']),
+                'channel' => $settings['alert_channel'] ?? 'webhook',
+                'status' => 'sent',
+            ];
         } else {
-            $errors[] = $result['error'] ?? 'unknown';
+            $error = $result['error'] ?? 'unknown';
+            $errors[] = $error;
+            $historyEntries[] = [
+                'time' => date('Y-m-d H:i:s', $now),
+                'key' => $key,
+                'title' => $event['title'] ?? '高危告警',
+                'summary' => $error,
+                'channel' => $settings['alert_channel'] ?? 'webhook',
+                'status' => 'error',
+            ];
         }
     }
 
     prune_alert_state($state, $now);
     write_json_file(ALERT_STATE_JSON, $state);
+    write_alert_history([
+        'last_check' => date('Y-m-d H:i:s', $now),
+        'enabled' => true,
+        'channel' => $settings['alert_channel'] ?? 'webhook',
+        'events' => count($events),
+        'sent' => $sent,
+        'skipped' => $skipped,
+        'errors' => $errors,
+    ], $historyEntries);
 
     return [
         'ok' => count($errors) === 0,
         'events' => count($events),
         'sent' => $sent,
+        'skipped' => $skipped,
         'errors' => $errors,
         'time' => date('Y-m-d H:i:s'),
     ];
@@ -145,6 +205,8 @@ function build_alert_events(array $data, array $cache): array {
     if ($cacheTs > 0 && time() - $cacheTs > 180) {
         $events[] = [
             'key' => 'stats_cache_stale',
+            'title' => '统计缓存可能停滞',
+            'summary' => '缓存超过 3 分钟未更新',
             'text' => "SubSieve 统计缓存可能停滞\n缓存超过 3 分钟未更新，请检查 admin 容器或维护日志。",
         ];
     }
@@ -157,6 +219,8 @@ function build_alert_events(array $data, array $cache): array {
         if ($ip === '' || $score < 80) continue;
         $events[] = [
             'key' => 'scanner:' . $ip . ':' . substr(hash('sha1', $token . $ua), 0, 12),
+            'title' => '脚本/扫描器拉取订阅',
+            'summary' => $ip . '｜评分 ' . $score . '｜' . ($ua ?: '空 UA'),
             'text' => alert_text('脚本/扫描器拉取订阅', $ip, $score, [
                 'Token' => short_token($token),
                 'UA' => $ua ?: '-',
@@ -172,6 +236,8 @@ function build_alert_events(array $data, array $cache): array {
         if ($ip === '' || $score < 90) continue;
         $events[] = [
             'key' => 'susp_ip:' . $ip . ':' . (int)($row['token_count'] ?? 0),
+            'title' => '可疑 IP 拉取多 Token',
+            'summary' => $ip . '｜评分 ' . $score . '｜' . (string)($row['token_count'] ?? 0) . ' 个 Token',
             'text' => alert_text('可疑 IP 拉取多 Token', $ip, $score, [
                 'Token 数' => (string)($row['token_count'] ?? 0),
                 '来源' => (string)($row['country'] ?? '未查询') . ' / ' . (string)($row['city'] ?? '本地日志'),
@@ -186,6 +252,8 @@ function build_alert_events(array $data, array $cache): array {
         if ($token === '' || $ipCount < 3) continue;
         $events[] = [
             'key' => 'susp_token:' . hash('sha1', $token) . ':' . $ipCount,
+            'title' => '可疑 Token 被多 IP 拉取',
+            'summary' => short_token($token) . '｜' . $ipCount . ' 个 IP',
             'text' => "SubSieve 告警\n类型：可疑 Token 被多 IP 拉取\n风险：高危\nToken：" . short_token($token) . "\nIP 数：" . $ipCount . "\n操作建议：进入分析页复核后再处理。",
         ];
     }
@@ -237,6 +305,24 @@ function prune_alert_state(array &$state, int $now): void {
 function short_token(string $token): string {
     if ($token === '') return '-';
     return strlen($token) <= 16 ? $token : substr($token, 0, 12) . '...' . substr($token, -6);
+}
+
+function first_alert_line(string $text): string {
+    foreach (explode("\n", $text) as $line) {
+        $line = trim($line);
+        if ($line !== '' && $line !== 'SubSieve 告警') return $line;
+    }
+    return '高危事件';
+}
+
+function write_alert_history(array $status, array $entries): void {
+    $history = read_json_file(ALERT_HISTORY_JSON);
+    $oldEntries = is_array($history['entries'] ?? null) ? $history['entries'] : [];
+    $merged = array_slice(array_merge($entries, $oldEntries), 0, 50);
+    write_json_file(ALERT_HISTORY_JSON, [
+        'status' => $status,
+        'entries' => $merged,
+    ]);
 }
 
 function send_alert_message_maintenance(array $settings, string $text): array {
