@@ -882,6 +882,7 @@ let alertHistoryLimit = 10;
 let alertHistoryPage = 1;
 let alertHistoryRange = 'all';
 let lastAlertHistory = null;
+let alertHistoryQueryTimer = null;
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -2562,7 +2563,8 @@ function setAlertHistoryFilter(value) {
 function setAlertHistoryQuery(value) {
   alertHistoryQuery = value || '';
   alertHistoryPage = 1;
-  loadSettings();
+  clearTimeout(alertHistoryQueryTimer);
+  alertHistoryQueryTimer = setTimeout(() => loadSettings(), 350);
 }
 
 function setAlertHistoryRange(value) {
@@ -2576,6 +2578,7 @@ function resetAlertHistoryFilters() {
   alertHistoryRange = 'all';
   alertHistoryQuery = '';
   alertHistoryPage = 1;
+  clearTimeout(alertHistoryQueryTimer);
   loadSettings();
 }
 
