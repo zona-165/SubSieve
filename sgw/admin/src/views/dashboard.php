@@ -141,6 +141,18 @@ tr:hover td{background:rgba(99,102,241,.04)}
 
 /* Stats */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.stats-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.stats-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;min-height:118px;text-align:left;color:var(--text);font:inherit}
+.stats-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.stats-card-title{display:flex;align-items:center;justify-content:space-between;color:var(--text2);font-size:12px;font-weight:700;margin-bottom:10px}
+.stats-card-main{font-size:24px;font-weight:700;color:var(--text);line-height:1.2}
+.stats-card-sub{margin-top:8px;color:var(--text3);font-size:12px;line-height:1.45}
+.stats-detail-head{display:none;align-items:center;gap:10px;margin-bottom:12px}
+.stats-detail-title{font-size:15px;font-weight:700;color:var(--text)}
+.stats-detail-grid{display:none}
+.stats-detail-grid.active{display:grid}
+.stats-detail-card{display:none}
+.stats-detail-card.active{display:block}
 .top-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #13161f}
 .top-row:last-child{border-bottom:none}
 .top-rank{color:#64748b;font-size:11px;width:18px}
@@ -235,6 +247,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
   .req-cell-wrap{max-width:220px}
   .ua-cell-wrap{max-width:190px}
   .stats-grid{grid-template-columns:1fr!important;gap:10px}
+  .stats-overview{grid-template-columns:1fr;gap:10px}
+  .stats-card{min-height:auto;padding:14px}
+  .stats-detail-head{flex-wrap:wrap}
   .stats-grid .card > div:first-child{gap:8px;align-items:flex-start!important;flex-wrap:wrap}
   .stats-grid .card > div:first-child > div:last-child{display:flex;gap:4px;flex-wrap:wrap}
   .mode-btn{padding:6px 10px}
@@ -358,8 +373,15 @@ tr:hover td{background:rgba(99,102,241,.04)}
 
     <!-- ─── 分析 ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-stats">
-      <div class="stats-grid">
-        <div class="card">
+      <div id="stats-overview" class="stats-overview">
+        <div class="loading">加载中…</div>
+      </div>
+      <div id="stats-detail-head" class="stats-detail-head">
+        <button class="mode-btn" onclick="showStatsOverview()">返回分类</button>
+        <div class="stats-detail-title" id="stats-detail-title"></div>
+      </div>
+      <div id="stats-detail-grid" class="stats-grid stats-detail-grid">
+        <div class="card stats-detail-card" data-stats-detail="ips">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div class="card-title" style="margin-bottom:0">今日 Top IP</div>
             <div style="display:flex;gap:4px">
@@ -375,7 +397,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div id="top-ips"><div class="loading">加载中…</div></div>
           <div id="stats-ips-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card">
+        <div class="card stats-detail-card" data-stats-detail="tokens">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">今日 Top Token</div>
             <div style="display:flex;gap:4px">
@@ -388,7 +410,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div id="top-tokens"><div class="loading">加载中…</div></div>
           <div id="stats-tokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card">
+        <div class="card stats-detail-card" data-stats-detail="suspTokens">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">可疑 Token（被多IP拉取）</div>
             <div style="display:flex;gap:4px">
@@ -401,7 +423,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div id="susp-tokens"><div class="loading">加载中…</div></div>
           <div id="stats-suspTokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card">
+        <div class="card stats-detail-card" data-stats-detail="suspIps">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">可疑 IP（拉取多Token）</div>
             <div style="display:flex;gap:4px">
@@ -414,7 +436,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div id="susp-ips"><div class="loading">加载中…</div></div>
           <div id="stats-suspIps-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card">
+        <div class="card stats-detail-card" data-stats-detail="scanners">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">脚本/扫描器拉取订阅</div>
             <div style="display:flex;gap:4px">
@@ -427,7 +449,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div id="scanner-reports"><div class="loading">加载中…</div></div>
           <div id="stats-scanners-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card">
+        <div class="card stats-detail-card" data-stats-detail="uas">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">UA TOP</div>
             <div style="display:flex;gap:4px">
@@ -652,6 +674,7 @@ let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10};
 let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1};
+let activeStatsDetail = '';
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
 let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
@@ -1124,7 +1147,7 @@ async function quickAddWhitelistFromLog(ip) {
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
   if (!data.ok) {
-    ['top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports'].forEach(id => {
+    ['stats-overview','top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
@@ -1165,6 +1188,8 @@ function renderStatsPagination(key, total, pageSize) {
 function renderStats() {
   if (!allStatsData) return;
   const data = allStatsData;
+  renderStatsOverview(data);
+  updateStatsView();
 
   // Top IP
   const allIps = data.top_ips || [];
@@ -1310,6 +1335,95 @@ function renderStats() {
       <pre>${esc(report)}</pre>
     </div>`;
   }).join('') : '<div class="empty">暂无脚本/扫描器拉取订阅记录</div>';
+}
+
+function renderStatsOverview(data) {
+  const cards = [
+    {
+      key: 'ips',
+      title: '今日 Top IP',
+      main: `${(data.top_ips || []).length} 个IP`,
+      sub: topSummary(data.top_ips, 'ip', 'total', '暂无请求记录'),
+    },
+    {
+      key: 'tokens',
+      title: '今日 Top Token',
+      main: `${(data.top_tokens || []).length} 个Token`,
+      sub: topSummary(data.top_tokens, 'token_full', 'count', '暂无 Token 拉取'),
+    },
+    {
+      key: 'suspTokens',
+      title: '可疑 Token',
+      main: `${(data.susp_tokens || []).length} 个`,
+      sub: (data.susp_tokens || [])[0] ? `${esc((data.susp_tokens || [])[0].ip_count)} 个不同IP拉取` : '暂无多 IP 拉取',
+    },
+    {
+      key: 'suspIps',
+      title: '可疑 IP',
+      main: `${(data.susp_ips || []).length} 个`,
+      sub: (data.susp_ips || [])[0] ? `${esc((data.susp_ips || [])[0].risk || '可疑')} ${esc((data.susp_ips || [])[0].score || '')}` : '暂无多 Token 拉取',
+    },
+    {
+      key: 'scanners',
+      title: '脚本/扫描器',
+      main: `${(data.scanner_reports || []).length} 条`,
+      sub: (data.scanner_reports || [])[0] ? `${esc((data.scanner_reports || [])[0].ip)}｜${esc((data.scanner_reports || [])[0].ua || '空UA')}` : '暂无脚本拉取记录',
+    },
+    {
+      key: 'uas',
+      title: 'UA TOP',
+      main: `${(data.bad_uas || []).length} 个UA`,
+      sub: topSummary(data.bad_uas, 'ua', 'count', '今日暂无可疑UA'),
+    },
+  ];
+  const el = document.getElementById('stats-overview');
+  if (!el) return;
+  el.innerHTML = cards.map(c => `
+    <button class="stats-card" onclick="showStatsDetail('${c.key}')">
+      <div class="stats-card-title"><span>${esc(c.title)}</span><span>查看</span></div>
+      <div class="stats-card-main">${esc(c.main)}</div>
+      <div class="stats-card-sub">${c.sub}</div>
+    </button>`).join('');
+}
+
+function topSummary(rows, labelKey, countKey, emptyText) {
+  const first = (rows || [])[0];
+  if (!first) return esc(emptyText);
+  const label = String(first[labelKey] || '').slice(0, 28);
+  return `${esc(label)} · ${esc(first[countKey] || 0)} 次`;
+}
+
+function showStatsDetail(key) {
+  activeStatsDetail = key;
+  updateStatsView();
+}
+
+function showStatsOverview() {
+  activeStatsDetail = '';
+  updateStatsView();
+}
+
+function updateStatsView() {
+  const overview = document.getElementById('stats-overview');
+  const detailHead = document.getElementById('stats-detail-head');
+  const detailGrid = document.getElementById('stats-detail-grid');
+  if (!overview || !detailHead || !detailGrid) return;
+  const titles = {
+    ips: '今日 Top IP',
+    tokens: '今日 Top Token',
+    suspTokens: '可疑 Token',
+    suspIps: '可疑 IP',
+    scanners: '脚本/扫描器拉取订阅',
+    uas: 'UA TOP',
+  };
+  const inDetail = !!activeStatsDetail;
+  overview.style.display = inDetail ? 'none' : 'grid';
+  detailHead.style.display = inDetail ? 'flex' : 'none';
+  detailGrid.classList.toggle('active', inDetail);
+  document.getElementById('stats-detail-title').textContent = titles[activeStatsDetail] || '';
+  document.querySelectorAll('.stats-detail-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.statsDetail === activeStatsDetail);
+  });
 }
 
 function scannerReportText(r) {
