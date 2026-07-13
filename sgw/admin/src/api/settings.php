@@ -20,7 +20,8 @@ if ($method === 'GET') {
         $s = read_settings();
         $certInfo = get_cert_info();
         $statsCache = get_stats_cache_info();
-        $alertHistory = get_alert_history();
+        $historyLimit = isset($_GET['alert_history_limit']) ? (int)$_GET['alert_history_limit'] : 10;
+        $alertHistory = get_alert_history($historyLimit);
         if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
             $parsed = parse_protect_conf();
             if ($parsed) {
@@ -471,7 +472,8 @@ function get_stats_cache_info(): array {
     return $info;
 }
 
-function get_alert_history(): array {
+function get_alert_history(int $limit = 10): array {
+    if (!in_array($limit, [10, 25, 50], true)) $limit = 10;
     if (!defined('ALERT_HISTORY_JSON') || !file_exists(ALERT_HISTORY_JSON)) {
         return ['exists' => false, 'status' => [], 'entries' => []];
     }
@@ -481,13 +483,15 @@ function get_alert_history(): array {
         return ['exists' => true, 'status' => [], 'entries' => []];
     }
     $allEntries = is_array($data['entries'] ?? null) ? $data['entries'] : [];
-    $entries = array_slice($allEntries, 0, 10);
+    $entries = array_slice($allEntries, 0, $limit);
     $quietEntries = array_values(array_filter($allEntries, fn($e) => is_array($e) && ($e['status'] ?? '') === 'muted'));
     $latestQuiet = $quietEntries[0] ?? null;
     return [
         'exists' => true,
         'status' => is_array($data['status'] ?? null) ? $data['status'] : [],
         'entries' => $entries,
+        'limit' => $limit,
+        'total' => count($allEntries),
         'quiet_summary' => [
             'count' => count($quietEntries),
             'latest_time' => is_array($latestQuiet) ? ($latestQuiet['time'] ?? '') : '',

@@ -874,6 +874,7 @@ let preloadStarted = false;
 let suppressToasts = 0;
 let alertHistoryFilter = 'all';
 let alertHistoryQuery = '';
+let alertHistoryLimit = 10;
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -2300,7 +2301,7 @@ async function tbDel(token) {
 let currentSettings = {};
 
 async function loadSettings() {
-  const data = await apiFetch('/api/settings.php');
+  const data = await apiFetch(`/api/settings.php?alert_history_limit=${encodeURIComponent(alertHistoryLimit)}`);
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
   currentSettings = data.settings || {};
   activeSubscribePath = currentSettings.subscribe_path || activeSubscribePath || '/api/v1/client/subscribe';
@@ -2450,6 +2451,7 @@ function renderAlertHistory(history) {
     ['muted', '静默'],
     ['error', '失败'],
   ].map(([value, label]) => `<option value="${value}"${alertHistoryFilter === value ? ' selected' : ''}>${label}</option>`).join('');
+  const limitOptions = [10, 25, 50].map(n => `<option value="${n}"${alertHistoryLimit === n ? ' selected' : ''}>${n}条</option>`).join('');
   const rows = filteredEntries.length ? filteredEntries.map(e => {
     const color = e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
     const label = e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
@@ -2481,8 +2483,11 @@ function renderAlertHistory(history) {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(status.muted ?? 0)}</div></div>
     </div>
     ${quietSummaryHtml}
-    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:6px">
-      <div style="font-weight:800;color:var(--text);font-size:12px">最近记录</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
+      <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(filteredEntries.length)} / ${esc(entries.length)} 条</div>
+      <select class="ip-input" style="width:auto;min-width:82px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryLimit(this.value)">
+        ${limitOptions}
+      </select>
       <select class="ip-input" style="width:auto;min-width:92px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryFilter(this.value)">
         ${filterOptions}
       </select>
@@ -2504,6 +2509,12 @@ function setAlertHistoryFilter(value) {
 
 function setAlertHistoryQuery(value) {
   alertHistoryQuery = value || '';
+  loadSettings();
+}
+
+function setAlertHistoryLimit(value) {
+  const n = parseInt(value, 10);
+  alertHistoryLimit = [10, 25, 50].includes(n) ? n : 10;
   loadSettings();
 }
 
