@@ -2528,6 +2528,7 @@ function renderAlertHistory(history) {
       <select class="ip-input" style="width:auto;min-width:104px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryRange(this.value)">
         ${rangeOptions}
       </select>
+      <button class="mode-btn" onclick="resetAlertHistoryFilters()" style="height:32px;padding:0 10px;font-size:12px">重置</button>
     </div>
     <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
     ${rows}
@@ -2555,6 +2556,14 @@ function setAlertHistoryQuery(value) {
 
 function setAlertHistoryRange(value) {
   alertHistoryRange = ['all', 'today', '24h', '7d'].includes(value) ? value : 'all';
+  alertHistoryPage = 1;
+  loadSettings();
+}
+
+function resetAlertHistoryFilters() {
+  alertHistoryFilter = 'all';
+  alertHistoryRange = 'all';
+  alertHistoryQuery = '';
   alertHistoryPage = 1;
   loadSettings();
 }
