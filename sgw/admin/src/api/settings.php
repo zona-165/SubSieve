@@ -50,6 +50,11 @@ if ($method === 'POST') {
 
     $s = read_settings();
 
+    if (!empty($body['_clear_alert_history'])) {
+        clear_alert_history(!empty($body['reset_state']));
+        json_out(['ok' => true, 'msg' => !empty($body['reset_state']) ? '告警历史和去重状态已重置' : '告警历史已清空']);
+    }
+
     if (!empty($body['_test_alert'])) {
         $testSettings = apply_alert_settings($s, $body);
         $result = send_alert_message($testSettings, "SubSieve 测试告警\n这是一条后台测试通知。");
@@ -273,6 +278,28 @@ function run_alert_check_now(): array {
         return ['ok' => false, 'error' => implode('; ', $parsed['errors'] ?? []) ?: ($parsed['error'] ?? 'unknown'), 'result' => $parsed];
     }
     return ['ok' => true, 'result' => $parsed];
+}
+
+function clear_alert_history(bool $resetState = false): void {
+    $history = [
+        'status' => [
+            'last_check' => date('Y-m-d H:i:s'),
+            'enabled' => false,
+            'channel' => '',
+            'events' => 0,
+            'sent' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'note' => $resetState ? 'reset' : 'history_cleared',
+        ],
+        'entries' => [],
+    ];
+    @file_put_contents(ALERT_HISTORY_JSON, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod(ALERT_HISTORY_JSON, 0666);
+    if ($resetState) {
+        @file_put_contents(ALERT_STATE_JSON, "{}", LOCK_EX);
+        @chmod(ALERT_STATE_JSON, 0666);
+    }
 }
 
 /**

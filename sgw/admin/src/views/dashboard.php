@@ -2365,6 +2365,8 @@ function renderAlertHistory(history) {
     disabled: '告警未开启',
     missing_cache: '统计缓存尚未生成',
     empty_cache: '统计缓存为空',
+    history_cleared: '告警记录已清空',
+    reset: '告警记录和去重状态已重置',
   };
   const note = status.note ? `<div style="color:var(--text3);font-size:12px;margin-top:4px">${esc(noteMap[status.note] || status.note)}</div>` : '';
   const rows = entries.length ? entries.map(e => {
@@ -2394,7 +2396,11 @@ function renderAlertHistory(history) {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">推送</div><div style="font-weight:900">${esc(status.sent ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">去重</div><div style="font-weight:900">${esc(status.skipped ?? 0)}</div></div>
     </div>
-    ${rows}`;
+    ${rows}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
+      <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
+      <button class="mode-btn" onclick="clearAlertHistory(true)">重置去重</button>
+    </div>`;
 }
 
 
@@ -2553,6 +2559,24 @@ async function runAlertCheckNow() {
   } else {
     toast(d.error || '检查失败', 'err');
     await loadSettings();
+  }
+}
+
+async function clearAlertHistory(resetState) {
+  const msg = resetState
+    ? '重置去重后，同一高危事件可以再次推送。确定继续？'
+    : '确定清空告警展示记录？';
+  if (!confirm(msg)) return;
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST',
+    body: JSON.stringify({_clear_alert_history: 1, reset_state: resetState ? 1 : 0}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ ' + (d.msg || '已处理'));
+    await loadSettings();
+  } else {
+    toast(d.error || '操作失败', 'err');
   }
 }
 
