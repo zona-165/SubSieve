@@ -786,9 +786,10 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
               <input class="ip-input" id="cfg-alert-telegram-chat" placeholder="-1001234567890" style="width:100%">
             </div>
             <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；同一事件 1 小时内只推送一次。</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
               <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
               <button class="mode-btn" onclick="testAlertSettings()">测试推送</button>
+              <button class="mode-btn" onclick="runAlertCheckNow()">立即检查</button>
             </div>
             <div id="alert-history-info" style="border-top:1px solid var(--border);padding-top:12px">
               <div class="loading">加载中…</div>
@@ -2536,6 +2537,23 @@ async function testAlertSettings() {
   });
   if (d.ok) toast('✅ 测试推送已发送');
   else toast(d.error || '测试失败', 'err');
+}
+
+async function runAlertCheckNow() {
+  toast('正在检查告警…');
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST',
+    body: JSON.stringify({_run_alert_check: 1}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    const r = d.result || {};
+    toast(`✅ 检查完成：事件 ${r.events || 0}，推送 ${r.sent || 0}，去重 ${r.skipped || 0}`);
+    await loadSettings();
+  } else {
+    toast(d.error || '检查失败', 'err');
+    await loadSettings();
+  }
 }
 
 

@@ -40,6 +40,14 @@ if ($method === 'POST') {
         json_out(['ok' => true]);
     }
 
+    if (!empty($body['_run_alert_check'])) {
+        $result = run_alert_check_now();
+        if (!$result['ok']) {
+            json_err('告警检查失败: ' . ($result['error'] ?? 'unknown'));
+        }
+        json_out(['ok' => true, 'result' => $result['result'] ?? []]);
+    }
+
     $s = read_settings();
 
     if (!empty($body['_test_alert'])) {
@@ -241,6 +249,30 @@ function http_json_post(string $url, string $payload): array {
         return ['ok' => false, 'error' => 'HTTP ' . $status . ': ' . substr($raw, 0, 160)];
     }
     return ['ok' => true, 'status' => $status, 'body' => $raw];
+}
+
+function run_alert_check_now(): array {
+    if (!function_exists('exec')) {
+        return ['ok' => false, 'error' => 'exec 函数不可用'];
+    }
+    $php = PHP_BINARY ?: 'php';
+    $script = dirname(__DIR__) . '/maintenance.php';
+    $cmd = escapeshellarg($php) . ' ' . escapeshellarg($script) . ' check-alerts 2>&1';
+    $lines = [];
+    $code = 0;
+    @exec($cmd, $lines, $code);
+    $raw = trim(implode("\n", $lines));
+    $parsed = $raw !== '' ? json_decode($raw, true) : null;
+    if ($code !== 0) {
+        return ['ok' => false, 'error' => $raw ?: ('exit ' . $code)];
+    }
+    if (!is_array($parsed)) {
+        return ['ok' => false, 'error' => '维护脚本未返回 JSON: ' . substr($raw, 0, 160)];
+    }
+    if (empty($parsed['ok'])) {
+        return ['ok' => false, 'error' => implode('; ', $parsed['errors'] ?? []) ?: ($parsed['error'] ?? 'unknown'), 'result' => $parsed];
+    }
+    return ['ok' => true, 'result' => $parsed];
 }
 
 /**
