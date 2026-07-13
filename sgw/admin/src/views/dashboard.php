@@ -2450,6 +2450,9 @@ function renderAlertHistory(history) {
   const page = Math.max(1, parseInt(history.page || alertHistoryPage || 1, 10));
   const totalPages = Math.max(1, parseInt(history.total_pages || 1, 10));
   const filteredTotal = parseInt(history.filtered_total ?? entries.length, 10);
+  const pageStart = filteredEntries.length ? ((page - 1) * alertHistoryLimit + 1) : 0;
+  const pageEnd = filteredEntries.length ? Math.min(pageStart + filteredEntries.length - 1, filteredTotal) : 0;
+  const pageRangeText = filteredEntries.length ? `第 ${pageStart}-${pageEnd} 条` : '暂无记录';
   alertHistoryPage = page;
   const historySummary = history.summary || {};
   const quietSummary = history.quiet_summary || {};
@@ -2557,7 +2560,7 @@ function renderAlertHistory(history) {
     ${historyRangeText ? `<div style="color:var(--text3);font-size:11px;line-height:1.5;margin:-4px 0 10px">历史范围：${esc(historyRangeText)}</div>` : ''}
     ${quietSummaryHtml}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
-      <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(filteredEntries.length)} / ${esc(filteredTotal)} 条</div>
+      <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(pageRangeText)} · 共 ${esc(filteredTotal)} 条</div>
       <select class="ip-input" style="width:auto;min-width:82px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryLimit(this.value)">
         ${limitOptions}
       </select>
