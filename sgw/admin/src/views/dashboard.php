@@ -873,6 +873,7 @@ let tabLoading = {};
 let preloadStarted = false;
 let suppressToasts = 0;
 let alertHistoryFilter = 'all';
+let alertHistoryQuery = '';
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -2409,7 +2410,17 @@ function renderAlertHistory(history) {
   if (!el) return;
   const status = history.status || {};
   const entries = history.entries || [];
-  const filteredEntries = alertHistoryFilter === 'all' ? entries : entries.filter(e => (e.status || 'sent') === alertHistoryFilter);
+  const query = alertHistoryQuery.trim().toLowerCase();
+  let filteredEntries = alertHistoryFilter === 'all' ? entries : entries.filter(e => (e.status || 'sent') === alertHistoryFilter);
+  if (query) {
+    filteredEntries = filteredEntries.filter(e => [
+      e.title || '',
+      e.summary || '',
+      e.time || '',
+      e.channel || '',
+      e.key || '',
+    ].join(' ').toLowerCase().includes(query));
+  }
   const quietSummary = history.quiet_summary || {};
   const enabled = !!status.enabled;
   const ok = !status.errors || status.errors.length === 0;
@@ -2451,7 +2462,7 @@ function renderAlertHistory(history) {
           <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(e.time || '-')} · ${esc(e.channel || '-')}</div>
         </div>
       </div>`;
-  }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${entries.length ? '当前筛选暂无记录' : '暂无推送记录'}</div>`;
+  }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${entries.length ? '当前条件暂无记录' : '暂无推送记录'}</div>`;
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
       <div>
@@ -2470,12 +2481,13 @@ function renderAlertHistory(history) {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(status.muted ?? 0)}</div></div>
     </div>
     ${quietSummaryHtml}
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:6px">
       <div style="font-weight:800;color:var(--text);font-size:12px">最近记录</div>
       <select class="ip-input" style="width:auto;min-width:92px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryFilter(this.value)">
         ${filterOptions}
       </select>
     </div>
+    <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
       <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
@@ -2487,6 +2499,11 @@ function renderAlertHistory(history) {
 
 function setAlertHistoryFilter(value) {
   alertHistoryFilter = ['all', 'sent', 'muted', 'error'].includes(value) ? value : 'all';
+  loadSettings();
+}
+
+function setAlertHistoryQuery(value) {
+  alertHistoryQuery = value || '';
   loadSettings();
 }
 
