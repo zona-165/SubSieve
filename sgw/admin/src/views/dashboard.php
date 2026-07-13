@@ -2497,6 +2497,8 @@ function renderAlertHistory(history) {
       <span style="color:var(--text2);font-weight:800;font-size:12px">第 ${esc(page)} / ${esc(totalPages)} 页</span>
       <button class="mode-btn" onclick="setAlertHistoryPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>
       <button class="mode-btn" onclick="setAlertHistoryPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''}>末页</button>
+      <input class="ip-input" id="alert-history-page-jump" type="number" min="1" max="${esc(totalPages)}" placeholder="页码" style="width:72px;height:32px;padding:4px 8px;font-size:12px" onkeydown="if(event.key==='Enter') jumpAlertHistoryPage(${totalPages})">
+      <button class="mode-btn" onclick="jumpAlertHistoryPage(${totalPages})" style="height:32px;padding:0 10px;font-size:12px">跳转</button>
     </div>` : '';
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
@@ -2587,6 +2589,13 @@ function setAlertHistoryLimit(value) {
 function setAlertHistoryPage(page) {
   alertHistoryPage = Math.max(1, parseInt(page, 10) || 1);
   loadSettings();
+}
+
+function jumpAlertHistoryPage(totalPages) {
+  const input = document.getElementById('alert-history-page-jump');
+  const maxPage = Math.max(1, parseInt(totalPages, 10) || 1);
+  const page = Math.min(maxPage, Math.max(1, parseInt(input?.value || '1', 10) || 1));
+  setAlertHistoryPage(page);
 }
 
 function alertEntryStatusLabel(e) {
