@@ -103,6 +103,5 @@ function nginx_ua_pattern(string $ua): string {
     return str_replace(['\\', '"'], ['\\\\', '\\"'], $p);
 }
 
-// ── V2B 数据库接口（预留，后续填充）─────────────────────────
-// TODO: 连接 V2B MySQL 查询 token 对应用户信息
-// function v2b_get_user_by_token(string $token): ?array { return null; }
+// 出于安全考虑，后台默认不直连机场数据库。
+// 如需定位 Token 对应用户，建议在机场后台手动查询或使用最小权限的独立审计接口。
