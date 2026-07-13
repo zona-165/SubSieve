@@ -782,6 +782,10 @@ let uaWlLimit = 50;      // UA白名单显示数量
 let allUaBlEntries = []; // UA封禁列表完整数据缓存
 let allUaWlEntries = []; // UA白名单完整数据缓存
 let autoTimer, countdown = 300;
+let tabLoaded = {};
+let tabLoading = {};
+let preloadStarted = false;
+let suppressToasts = 0;
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -823,6 +827,45 @@ const TABS = {
 };
 let currentTab = 'logs';
 
+async function loadTab(name, opts={}) {
+  const {force=false, silent=false} = opts;
+  if (!TABS[name]) return;
+  if (!force && tabLoaded[name]) return;
+  if (tabLoading[name]) return tabLoading[name];
+  if (silent) suppressToasts++;
+  tabLoading[name] = (async () => {
+    try {
+      await TABS[name].loader();
+      if (name === 'stats' && !allStatsData) return;
+      tabLoaded[name] = true;
+    } catch (e) {
+      if (!silent) toast('加载失败：' + (e.message || '未知错误'), 'err');
+      throw e;
+    } finally {
+      delete tabLoading[name];
+      if (silent) suppressToasts = Math.max(0, suppressToasts - 1);
+    }
+  })();
+  return tabLoading[name];
+}
+
+function scheduleBackgroundPreload() {
+  if (preloadStarted) return;
+  preloadStarted = true;
+  const run = async () => {
+    const names = Object.keys(TABS).filter(name => name !== 'logs');
+    for (const name of names) {
+      await loadTab(name, {silent:true}).catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 120));
+    }
+  };
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(run, {timeout: 1500});
+  } else {
+    setTimeout(run, 600);
+  }
+}
+
 // ── Tab 切换 ──────────────────────────────────────────────────
 function switchTab(name, el) {
   currentTab = name;
@@ -834,7 +877,7 @@ function switchTab(name, el) {
   restartAnimation(panel);
   document.getElementById('tab-title').textContent = TABS[name].title;
   resetCountdown();
-  TABS[name].loader();
+  loadTab(name);
 }
 
 function restartAnimation(el) {
@@ -854,7 +897,7 @@ function resetCountdown() {
     updateTimerLabel();
     if (countdown <= 0) {
       resetCountdown();
-      TABS[currentTab].loader();
+      loadTab(currentTab, {force:true});
     }
   }, 1000);
 }
@@ -867,7 +910,7 @@ function updateTimerLabel() {
 
 function manualRefresh() {
   resetCountdown();
-  TABS[currentTab].loader();
+  loadTab(currentTab, {force:true});
 }
 
 // ── 工具 ──────────────────────────────────────────────────────
@@ -889,6 +932,7 @@ async function apiFetch(url, opts={}) {
 }
 
 function toast(msg, type='ok') {
+  if (suppressToasts > 0) return;
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className = 'show ' + type;
@@ -2366,8 +2410,12 @@ async function importLogs(input) {
 }
 
 // ── 初始化 ────────────────────────────────────────────────────
-loadLogs();
-resetCountdown();
+async function initDashboard() {
+  resetCountdown();
+  await loadTab('logs', {force:true}).catch(() => {});
+  scheduleBackgroundPreload();
+}
+initDashboard();
 </script>
 </body>
 </html>
