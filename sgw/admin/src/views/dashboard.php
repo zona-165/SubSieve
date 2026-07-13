@@ -749,6 +749,15 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
           </div>
         </div>
 
+        <!-- 分析统计缓存 -->
+        <div class="card">
+          <div class="card-title">分析统计缓存</div>
+          <div id="stats-cache-info"><div class="loading">加载中…</div></div>
+          <div class="apply-hint" style="margin-top:12px;color:var(--text3)">
+            admin 容器会每分钟后台预热统计缓存，分析页优先读取缓存，减少大日志场景下的等待。
+          </div>
+        </div>
+
 
       </div>
     </div>
@@ -2259,6 +2268,37 @@ async function loadSettings() {
   } else {
     certEl.innerHTML = '<div class="empty" style="color:#eab308">证书存在但无法解析（可能是非标准格式）</div>';
   }
+  renderStatsCacheInfo(data.stats_cache || {});
+}
+
+function renderStatsCacheInfo(cache) {
+  const el = document.getElementById('stats-cache-info');
+  if (!el) return;
+  if (!cache.exists) {
+    el.innerHTML = '<div class="empty" style="color:#eab308">统计缓存尚未生成，后台预热完成后会自动出现</div>';
+    return;
+  }
+  const age = cache.age_seconds == null ? '未知' : formatDuration(cache.age_seconds);
+  const color = cache.fresh ? '#22c55e' : '#eab308';
+  const status = cache.fresh ? '正常' : '待更新';
+  el.innerHTML = `
+    <table style="font-size:12px;width:100%">
+      <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">状态</td><td style="color:${color};font-weight:700;padding:4px 0 4px 10px">${status}</td></tr>
+      <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">更新时间</td><td style="color:var(--text);padding:4px 0 4px 10px">${esc(cache.mtime || '-')}</td></tr>
+      <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">距今</td><td style="padding:4px 0 4px 10px">${esc(age)}</td></tr>
+      <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">缓存大小</td><td style="padding:4px 0 4px 10px">${esc(cache.size_text || '-')}</td></tr>
+      <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">扫描范围</td><td style="padding:4px 0 4px 10px">最近 ${esc(cache.scan_limit || 30000)} 行日志</td></tr>
+    </table>`;
+}
+
+function formatDuration(seconds) {
+  seconds = Math.max(0, parseInt(seconds || 0, 10));
+  if (seconds < 60) return `${seconds} 秒前`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
 }
 
 

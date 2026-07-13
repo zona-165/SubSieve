@@ -8,6 +8,7 @@ if ($method === 'GET') {
     try {
         $s = read_settings();
         $certInfo = get_cert_info();
+        $statsCache = get_stats_cache_info();
         if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
             $parsed = parse_protect_conf();
             if ($parsed) {
@@ -20,7 +21,7 @@ if ($method === 'GET') {
         if (empty($s['gateway_port'])) {
             $s['gateway_port'] = GATEWAY_PORT;
         }
-        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo]);
+        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo, 'stats_cache' => $statsCache]);
     } catch (Throwable $e) {
         json_err('PHP错误: ' . $e->getMessage());
     }
@@ -243,6 +244,56 @@ function get_cert_info(): array {
         $info['days_left'] = $daysLeft;
     }
     return $info;
+}
+
+function get_stats_cache_info(): array {
+    $file = dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json';
+    $info = [
+        'exists' => file_exists($file),
+        'path' => $file,
+        'size' => 0,
+        'size_text' => '0 B',
+        'mtime' => '',
+        'age_seconds' => null,
+        'fresh' => false,
+        'scan_limit' => 30000,
+        'cached' => false,
+    ];
+    if (!$info['exists']) return $info;
+    $size = (int)@filesize($file);
+    $mtime = (int)@filemtime($file);
+    $info['size'] = $size;
+    $info['size_text'] = human_bytes($size);
+    if ($mtime > 0) {
+        $info['mtime'] = date('Y-m-d H:i:s', $mtime);
+        $info['age_seconds'] = max(0, time() - $mtime);
+        $info['fresh'] = $info['age_seconds'] <= 180;
+    }
+    $raw = @file_get_contents($file);
+    $data = $raw ? json_decode($raw, true) : null;
+    if (is_array($data)) {
+        $payload = is_array($data['data'] ?? null) ? $data['data'] : $data;
+        $info['cached'] = isset($data['ts']);
+        if (isset($payload['scan_limit'])) $info['scan_limit'] = (int)$payload['scan_limit'];
+        if (!empty($data['ts'])) {
+            $info['mtime'] = date('Y-m-d H:i:s', (int)$data['ts']);
+            $info['age_seconds'] = max(0, time() - (int)$data['ts']);
+            $info['fresh'] = $info['age_seconds'] <= 180;
+        }
+    }
+    return $info;
+}
+
+function human_bytes(int $bytes): string {
+    $units = ['B', 'KB', 'MB', 'GB'];
+    $value = (float)$bytes;
+    foreach ($units as $unit) {
+        if ($value < 1024 || $unit === 'GB') {
+            return ($unit === 'B' ? (string)(int)$value : number_format($value, 1)) . ' ' . $unit;
+        }
+        $value /= 1024;
+    }
+    return $bytes . ' B';
 }
 
 /**
