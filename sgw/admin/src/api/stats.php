@@ -6,6 +6,7 @@ $ips    = [];   // ip => [total,200,403,429,444]  (today only)
 $tokens = [];   // token => [count, last_time]     (today only)
 $badUas = [];   // ua => count (403 only, today)
 $scannerReports = []; // latest suspicious subscription pulls
+$profileSegments = []; // /24 segment => observed IP profile cells
 
 // 全量日志用于可疑分析
 $suspTokenIps = [];  // token => {ip => true}
@@ -45,6 +46,7 @@ if (file_exists(LOG_FILE)) {
 
             [, $ip, $time, $request, $status, , $ua] = $m;
             $status = (int)$status;
+            collect_profile_segment($profileSegments, $ip, $time, $request, $status, $ua);
 
             // ── 今日统计 ──────────────────────────────────────────
             if (str_contains($line, "[$today:")) {
@@ -175,6 +177,7 @@ $scannerList = array_values($scannerReports);
 usort($scannerList, fn($a,$b) => strcmp($b['time'], $a['time']));
 $scannerList = array_slice($scannerList, 0, 100);
 $scannerList = enrich_scanner_reports($scannerList);
+$userProfiles = build_user_profiles($profileSegments);
 
 json_out([
     'ok'          => true,
@@ -184,7 +187,112 @@ json_out([
     'susp_tokens' => $suspTokenList,
     'susp_ips'    => $suspIpList,
     'scanner_reports' => $scannerList,
+    'user_profiles' => $userProfiles,
 ]);
+
+function collect_profile_segment(array &$segments, string $ip, string $time, string $request, int $status, string $ua): void {
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return;
+    $long = ip2long($ip);
+    if ($long === false) return;
+    $baseLong = $long & 0xFFFFFF00;
+    $segment = long2ip($baseLong);
+    $lastOctet = $long & 0xFF;
+    if (!isset($segments[$segment])) {
+        $segments[$segment] = [
+            'base' => $segment,
+            'range' => $segment . ' - ' . long2ip($baseLong + 255),
+            'ips' => [],
+            'total' => 0,
+            'last_time' => '',
+        ];
+    }
+    if (!isset($segments[$segment]['ips'][$ip])) {
+        $segments[$segment]['ips'][$ip] = [
+            'ip' => $ip,
+            'last_octet' => $lastOctet,
+            'count' => 0,
+            'bad' => 0,
+            'ok' => 0,
+            'tokens' => [],
+            'uas' => [],
+            'scanner' => false,
+            'last_time' => '',
+        ];
+    }
+    $segments[$segment]['total']++;
+    $segments[$segment]['last_time'] = format_log_time($time);
+    $cell =& $segments[$segment]['ips'][$ip];
+    $cell['count']++;
+    $cell['last_time'] = format_log_time($time);
+    if ($status === 200) $cell['ok']++;
+    if (in_array($status, [403, 429, 444], true)) $cell['bad']++;
+    if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) $cell['tokens'][$tm[1]] = true;
+    $u = trim($ua);
+    if ($u !== '' && $u !== '-') $cell['uas'][$u] = true;
+    if (scanner_reason($ua) !== '') $cell['scanner'] = true;
+}
+
+function build_user_profiles(array $segments): array {
+    if (!$segments) return [];
+    uasort($segments, fn($a, $b) => ($b['total'] <=> $a['total']) ?: strcmp($a['base'], $b['base']));
+    $cache = read_ip_intel_cache();
+    $dirty = false;
+    $lookups = 0;
+    $profiles = [];
+    foreach (array_slice($segments, 0, 8, true) as $segment) {
+        $cells = [];
+        $summary = ['V'=>0, 'O'=>0, 'T'=>0, 'P'=>0, 'B'=>0, 'N'=>0];
+        uasort($segment['ips'], fn($a, $b) => $a['last_octet'] <=> $b['last_octet']);
+        foreach ($segment['ips'] as $ip => $cell) {
+            $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
+            $intel = null;
+            if ($cached || $lookups < 40) {
+                if (!$cached) $lookups++;
+                $intel = get_ip_intel($ip, $cache, $dirty);
+            }
+            $kind = profile_cell_kind($cell, $intel);
+            $summary[$kind]++;
+            $cells[] = [
+                'ip' => $ip,
+                'octet' => $cell['last_octet'],
+                'kind' => $kind,
+                'label' => $kind === 'N' ? '·' : $kind,
+                'count' => $cell['count'],
+                'token_count' => count($cell['tokens']),
+                'ua_count' => count($cell['uas']),
+                'last_time' => $cell['last_time'],
+                'location' => $intel['location'] ?? '未查询',
+                'asn' => $intel['asn'] ?? '未查询',
+                'network_type' => $intel['network_type'] ?? '本地日志',
+            ];
+        }
+        $profiles[] = [
+            'range' => $segment['range'],
+            'total' => $segment['total'],
+            'ip_count' => count($segment['ips']),
+            'last_time' => $segment['last_time'],
+            'summary' => $summary,
+            'cells' => array_slice($cells, 0, 256),
+        ];
+    }
+    if ($dirty) write_ip_intel_cache($cache);
+    return $profiles;
+}
+
+function profile_cell_kind(array $cell, ?array $intel): string {
+    $tags = $intel['tags'] ?? [];
+    $network = $intel['network_type'] ?? '';
+    $asn = strtolower($intel['asn'] ?? '');
+    if (!empty($cell['scanner']) || (int)($cell['bad'] ?? 0) > 0) return 'B';
+    if (str_contains($network, 'Tor') || str_contains($asn, 'tor')) return 'T';
+    if (!empty($intel['is_proxy']) || str_contains($network, '代理') || str_contains($network, 'VPN')) return 'P';
+    if (!empty($intel['is_hosting']) || str_contains($network, '机房') || str_contains($network, '托管')) return 'O';
+    foreach ($tags as $tag) {
+        if (str_contains($tag, '代理') || str_contains($tag, 'VPN')) return 'P';
+        if (str_contains($tag, '机房') || str_contains($tag, '托管')) return 'O';
+    }
+    return 'N';
+}
 
 function scanner_reason(string $ua): string {
     $u = strtolower(trim($ua));

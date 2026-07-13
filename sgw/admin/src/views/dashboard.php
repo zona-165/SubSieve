@@ -75,6 +75,7 @@ function _val(string $v): string { return htmlspecialchars($v, ENT_QUOTES); }
 [data-theme="dark"] .tone-rose{--tone-bg:rgba(225,29,72,.16);--tone-border:rgba(225,29,72,.30)}
 [data-theme="dark"] .tone-cyan{--tone-bg:rgba(8,145,178,.16);--tone-border:rgba(8,145,178,.30)}
 [data-theme="dark"] .tone-emerald{--tone-bg:rgba(5,150,105,.16);--tone-border:rgba(5,150,105,.30)}
+[data-theme="dark"] .tone-sky{--tone-bg:rgba(2,132,199,.16);--tone-border:rgba(2,132,199,.30)}
 body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;display:flex;min-height:100vh}
 
 /* Sidebar */
@@ -179,6 +180,7 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .tone-rose{--tone:#e11d48;--tone-soft:rgba(225,29,72,.12);--tone-bg:rgba(225,29,72,.08);--tone-border:rgba(225,29,72,.22)}
 .tone-cyan{--tone:#0891b2;--tone-soft:rgba(8,145,178,.13);--tone-bg:rgba(8,145,178,.08);--tone-border:rgba(8,145,178,.22)}
 .tone-emerald{--tone:#059669;--tone-soft:rgba(5,150,105,.13);--tone-bg:rgba(5,150,105,.08);--tone-border:rgba(5,150,105,.22)}
+.tone-sky{--tone:#0284c7;--tone-soft:rgba(2,132,199,.13);--tone-bg:rgba(2,132,199,.08);--tone-border:rgba(2,132,199,.22)}
 .stats-detail-head{position:relative;display:none;align-items:center;gap:12px;margin-bottom:14px;padding:12px 14px;border:1px solid var(--tone-border,var(--border));border-radius:12px;background:linear-gradient(135deg,var(--tone-bg,rgba(99,102,241,.08)),var(--bg3) 68%);overflow:hidden;box-shadow:0 10px 26px rgba(15,23,42,.06)}
 .stats-detail-head::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--tone,var(--accent))}
 .stats-detail-title{font-size:16px;font-weight:800;color:var(--text);line-height:1.25}
@@ -228,6 +230,20 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .scanner-report{animation:listIn var(--motion-med) ease both}
 .scanner-report pre{white-space:pre-wrap;word-break:break-word;color:var(--text2);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:8px}
 .scanner-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.profile-segment{border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.07);padding:14px;margin-bottom:12px;overflow:hidden}
+.profile-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.profile-range{font-weight:800;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.profile-meta{color:var(--text3);font-size:12px}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(22px,1fr));gap:7px;max-width:760px}
+.profile-cell{height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;box-shadow:inset 0 -1px 0 rgba(0,0,0,.15)}
+.profile-n{background:#10b981}
+.profile-p{background:#f97316}
+.profile-b{background:#ef4444}
+.profile-o{background:#f43f5e}
+.profile-v{background:#6366f1}
+.profile-t{background:#a855f7}
+.profile-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);color:var(--text2);font-size:12px}
+.profile-dot{display:inline-block;width:9px;height:9px;border-radius:999px;margin-right:5px;vertical-align:-1px}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.055)}
@@ -518,6 +534,19 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
           <div id="scanner-reports"><div class="loading">加载中…</div></div>
           <div id="stats-scanners-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
+        <div class="card stats-detail-card" data-stats-detail="profiles">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">用户画像</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-profiles-10" onclick="setStatsLimit('profiles',10)">10</button>
+              <button class="mode-btn" id="stats-profiles-25" onclick="setStatsLimit('profiles',25)">25</button>
+              <button class="mode-btn" id="stats-profiles-50" onclick="setStatsLimit('profiles',50)">50</button>
+              <button class="mode-btn" id="stats-profiles-0" onclick="setStatsLimit('profiles',0)">全部</button>
+            </div>
+          </div>
+          <div id="user-profiles"><div class="loading">加载中…</div></div>
+          <div id="stats-profiles-pg" class="page-controls" style="display:none;margin-top:10px"></div>
+        </div>
         <div class="card stats-detail-card" data-stats-detail="uas">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div class="card-title" style="margin-bottom:0">UA TOP</div>
@@ -741,8 +770,8 @@ let blacklistIpSet = new Set();
 let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
-let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10};
-let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1};
+let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10, profiles: 10};
+let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1, profiles: 1};
 let activeStatsDetail = '';
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
@@ -1225,7 +1254,7 @@ async function quickAddWhitelistFromLog(ip) {
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
   if (!data.ok) {
-    ['stats-overview','top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports'].forEach(id => {
+    ['stats-overview','top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports','user-profiles'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
@@ -1413,6 +1442,42 @@ function renderStats() {
       <pre>${esc(report)}</pre>
     </div>`;
   }).join('') : '<div class="empty">暂无脚本/扫描器拉取订阅记录</div>';
+
+  // 用户画像
+  const allProfiles = data.user_profiles || [];
+  const profilesLimit = statsLimits.profiles;
+  const profilesPage  = statsPages.profiles;
+  const profiles = profilesLimit > 0 ? allProfiles.slice((profilesPage-1)*profilesLimit, profilesPage*profilesLimit) : allProfiles;
+  renderStatsPagination('profiles', allProfiles.length, profilesLimit);
+  document.getElementById('user-profiles').innerHTML = profiles.length ? profiles.map(renderUserProfileSegment).join('') : '<div class="empty">暂无用户画像数据</div>';
+}
+
+function renderUserProfileSegment(seg) {
+  const summary = seg.summary || {};
+  const cells = seg.cells || [];
+  const cellHtml = cells.map(c => {
+    const kind = String(c.kind || 'N').toLowerCase();
+    const title = `${c.ip || ''}｜请求 ${c.count || 0} 次｜Token ${c.token_count || 0} 个｜${c.location || '未查询'}｜${c.network_type || '本地日志'}`;
+    return `<div class="profile-cell profile-${esc(kind)}" title="${esc(title)}">${esc(c.label || c.kind || '·')}</div>`;
+  }).join('');
+  return `
+    <div class="profile-segment">
+      <div class="profile-head">
+        <div>
+          <div class="profile-range">${esc(seg.range || '')}</div>
+          <div class="profile-meta">日志画像｜${esc(seg.ip_count || 0)} 个IP｜${esc(seg.total || 0)} 次请求｜最后 ${esc(seg.last_time || '-')}</div>
+        </div>
+        <span class="top-count">${esc(seg.ip_count || 0)} IP</span>
+      </div>
+      <div class="profile-grid">${cellHtml}</div>
+      <div class="profile-legend">
+        <span><i class="profile-dot profile-v"></i>VPN(V): ${esc(summary.V || 0)}</span>
+        <span><i class="profile-dot profile-o"></i>公共代理(O): ${esc(summary.O || 0)}</span>
+        <span><i class="profile-dot profile-t"></i>Tor(T): ${esc(summary.T || 0)}</span>
+        <span><i class="profile-dot profile-p"></i>代理(P): ${esc(summary.P || 0)}</span>
+        <span><i class="profile-dot profile-b"></i>恶意/滥用IP(B): ${esc(summary.B || 0)}</span>
+      </div>
+    </div>`;
 }
 
 function renderStatsOverview(data) {
@@ -1456,6 +1521,14 @@ function renderStatsOverview(data) {
       title: '脚本/扫描器',
       main: `${(data.scanner_reports || []).length} 条`,
       sub: (data.scanner_reports || [])[0] ? `${esc((data.scanner_reports || [])[0].ip)}｜${esc((data.scanner_reports || [])[0].ua || '空UA')}` : '暂无脚本拉取记录',
+    },
+    {
+      key: 'profiles',
+      tone: 'sky',
+      icon: '▦',
+      title: '用户画像',
+      main: `${(data.user_profiles || []).length} 个IP段`,
+      sub: (data.user_profiles || [])[0] ? `${esc((data.user_profiles || [])[0].range)}｜${esc((data.user_profiles || [])[0].ip_count)} 个IP` : '暂无画像数据',
     },
     {
       key: 'uas',
@@ -1509,6 +1582,7 @@ function updateStatsView() {
     suspTokens: '可疑 Token',
     suspIps: '可疑 IP',
     scanners: '脚本/扫描器拉取订阅',
+    profiles: '用户画像',
     uas: 'UA TOP',
   };
   const tones = {
@@ -1517,6 +1591,7 @@ function updateStatsView() {
     suspTokens: 'tone-amber',
     suspIps: 'tone-rose',
     scanners: 'tone-cyan',
+    profiles: 'tone-sky',
     uas: 'tone-emerald',
   };
   const inDetail = !!activeStatsDetail;
