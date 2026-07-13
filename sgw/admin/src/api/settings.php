@@ -182,9 +182,18 @@ function apply_alert_settings(array $s, array $body): array {
         $channel = trim((string)$body['alert_channel']);
         $s['alert_channel'] = in_array($channel, ['webhook', 'telegram'], true) ? $channel : 'webhook';
     }
+    if (array_key_exists('alert_quiet_enabled', $body)) {
+        $s['alert_quiet_enabled'] = !empty($body['alert_quiet_enabled']) ? 1 : 0;
+    }
     foreach (['alert_webhook_url', 'alert_telegram_bot_token', 'alert_telegram_chat_id'] as $key) {
         if (array_key_exists($key, $body)) {
             $s[$key] = trim((string)$body[$key]);
+        }
+    }
+    foreach (['alert_quiet_start', 'alert_quiet_end'] as $key) {
+        if (array_key_exists($key, $body)) {
+            $value = trim((string)$body[$key]);
+            $s[$key] = preg_match('/^\d{2}:\d{2}$/', $value) ? $value : '';
         }
     }
     $intFields = [

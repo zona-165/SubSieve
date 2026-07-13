@@ -142,14 +142,29 @@ function check_alerts(): array {
     $now = time();
     $sent = 0;
     $skipped = 0;
+    $muted = 0;
     $errors = [];
     $historyEntries = [];
+    $quiet = is_alert_quiet_time($settings, $now);
 
     foreach ($events as $event) {
         $key = $event['key'];
         $lastSent = (int)($state[$key] ?? 0);
         if ($lastSent > 0 && ($now - $lastSent) < $rules['dedupe_seconds']) {
             $skipped++;
+            continue;
+        }
+        if ($quiet['active']) {
+            $state[$key] = $now;
+            $muted++;
+            $historyEntries[] = [
+                'time' => date('Y-m-d H:i:s', $now),
+                'key' => $key,
+                'title' => $event['title'] ?? '高危告警',
+                'summary' => ($event['summary'] ?? first_alert_line($event['text'])) . '｜静默时段',
+                'channel' => $settings['alert_channel'] ?? 'webhook',
+                'status' => 'muted',
+            ];
             continue;
         }
         $result = send_alert_message_maintenance($settings, $event['text']);
@@ -187,6 +202,9 @@ function check_alerts(): array {
         'events' => count($events),
         'sent' => $sent,
         'skipped' => $skipped,
+        'muted' => $muted,
+        'quiet_active' => $quiet['active'],
+        'quiet_window' => $quiet['window'],
         'dedupe_seconds' => $rules['dedupe_seconds'],
         'errors' => $errors,
     ], $historyEntries);
@@ -196,6 +214,9 @@ function check_alerts(): array {
         'events' => count($events),
         'sent' => $sent,
         'skipped' => $skipped,
+        'muted' => $muted,
+        'quiet_active' => $quiet['active'],
+        'quiet_window' => $quiet['window'],
         'dedupe_seconds' => $rules['dedupe_seconds'],
         'errors' => $errors,
         'time' => date('Y-m-d H:i:s'),
@@ -279,6 +300,36 @@ function clamp_int($value, int $min, int $max, int $default): int {
     if ($num < $min) return $min;
     if ($num > $max) return $max;
     return $num;
+}
+
+function is_alert_quiet_time(array $settings, ?int $now = null): array {
+    if (empty($settings['alert_quiet_enabled'])) {
+        return ['active' => false, 'window' => ''];
+    }
+    $start = normalize_hhmm((string)($settings['alert_quiet_start'] ?? ''));
+    $end = normalize_hhmm((string)($settings['alert_quiet_end'] ?? ''));
+    if ($start === '' || $end === '' || $start === $end) {
+        return ['active' => false, 'window' => ''];
+    }
+    $now = $now ?? time();
+    $minute = ((int)date('G', $now) * 60) + (int)date('i', $now);
+    [$sh, $sm] = array_map('intval', explode(':', $start));
+    [$eh, $em] = array_map('intval', explode(':', $end));
+    $startMinute = $sh * 60 + $sm;
+    $endMinute = $eh * 60 + $em;
+    $active = $startMinute < $endMinute
+        ? ($minute >= $startMinute && $minute < $endMinute)
+        : ($minute >= $startMinute || $minute < $endMinute);
+    return ['active' => $active, 'window' => $start . '-' . $end];
+}
+
+function normalize_hhmm(string $value): string {
+    $value = trim($value);
+    if (!preg_match('/^(\d{1,2}):(\d{2})$/', $value, $m)) return '';
+    $hour = (int)$m[1];
+    $minute = (int)$m[2];
+    if ($hour < 0 || $hour > 23 || $minute < 0 || $minute > 59) return '';
+    return sprintf('%02d:%02d', $hour, $minute);
 }
 
 function alert_text(string $type, string $ip, int $score, array $fields): string {

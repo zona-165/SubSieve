@@ -808,6 +808,20 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
               <button class="mode-btn" onclick="applyAlertPreset('balanced')">均衡</button>
               <button class="mode-btn" onclick="applyAlertPreset('quiet')">安静</button>
             </div>
+            <label style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px">
+              <input id="cfg-alert-quiet-enabled" type="checkbox" style="width:18px;height:18px">
+              开启静默时段
+            </label>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">静默开始</label>
+                <input class="ip-input" id="cfg-alert-quiet-start" type="time" value="23:00" style="width:100%">
+              </div>
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">静默结束</label>
+                <input class="ip-input" id="cfg-alert-quiet-end" type="time" value="08:00" style="width:100%">
+              </div>
+            </div>
             <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；阈值越低越敏感。</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
               <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
@@ -2330,6 +2344,12 @@ async function loadSettings() {
   if (alertSuspTokenIps) alertSuspTokenIps.value = currentSettings.alert_susp_token_ips || 3;
   const alertDedupeMinutes = document.getElementById('cfg-alert-dedupe-minutes');
   if (alertDedupeMinutes) alertDedupeMinutes.value = currentSettings.alert_dedupe_minutes || 60;
+  const alertQuietEnabled = document.getElementById('cfg-alert-quiet-enabled');
+  if (alertQuietEnabled) alertQuietEnabled.checked = !!parseInt(currentSettings.alert_quiet_enabled || 0, 10);
+  const alertQuietStart = document.getElementById('cfg-alert-quiet-start');
+  if (alertQuietStart) alertQuietStart.value = currentSettings.alert_quiet_start || '23:00';
+  const alertQuietEnd = document.getElementById('cfg-alert-quiet-end');
+  if (alertQuietEnd) alertQuietEnd.value = currentSettings.alert_quiet_end || '08:00';
   // 显示证书信息
   const cert = data.cert || {};
   const certEl = document.getElementById('cert-info');
@@ -2393,6 +2413,7 @@ function renderAlertHistory(history) {
   const stateText = enabled ? (ok ? '运行中' : '有错误') : '未开启';
   const lastCheck = status.last_check || '尚未检查';
   const dedupeText = status.dedupe_seconds ? `${Math.round(status.dedupe_seconds / 60)} 分钟` : '按设置';
+  const quietText = status.quiet_active ? `静默中 ${status.quiet_window || ''}` : (status.quiet_window ? `未静默 ${status.quiet_window}` : '未设置');
   const noteMap = {
     disabled: '告警未开启',
     missing_cache: '统计缓存尚未生成',
@@ -2402,8 +2423,8 @@ function renderAlertHistory(history) {
   };
   const note = status.note ? `<div style="color:var(--text3);font-size:12px;margin-top:4px">${esc(noteMap[status.note] || status.note)}</div>` : '';
   const rows = entries.length ? entries.map(e => {
-    const color = e.status === 'error' ? '#ef4444' : '#22c55e';
-    const label = e.status === 'error' ? '失败' : '已推送';
+    const color = e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
+    const label = e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
     return `
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
@@ -2420,14 +2441,16 @@ function renderAlertHistory(history) {
         <div style="font-weight:800;color:var(--text)">告警状态</div>
         <div style="color:var(--text3);font-size:12px;margin-top:3px">最近检查：${esc(lastCheck)}</div>
         <div style="color:var(--text3);font-size:12px;margin-top:3px">去重窗口：${esc(dedupeText)}</div>
+        <div style="color:var(--text3);font-size:12px;margin-top:3px">静默状态：${esc(quietText)}</div>
         ${note}
       </div>
       <span style="color:${badgeColor};font-weight:900;white-space:nowrap">${stateText}</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;margin-bottom:10px">
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">事件</div><div style="font-weight:900">${esc(status.events ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">推送</div><div style="font-weight:900">${esc(status.sent ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">去重</div><div style="font-weight:900">${esc(status.skipped ?? 0)}</div></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(status.muted ?? 0)}</div></div>
     </div>
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
@@ -2534,6 +2557,9 @@ function getAlertSettingsPayload() {
     alert_susp_ip_score: parseInt(document.getElementById('cfg-alert-susp-ip-score').value || '90', 10),
     alert_susp_token_ips: parseInt(document.getElementById('cfg-alert-susp-token-ips').value || '3', 10),
     alert_dedupe_minutes: parseInt(document.getElementById('cfg-alert-dedupe-minutes').value || '60', 10),
+    alert_quiet_enabled: document.getElementById('cfg-alert-quiet-enabled').checked ? 1 : 0,
+    alert_quiet_start: document.getElementById('cfg-alert-quiet-start').value || '23:00',
+    alert_quiet_end: document.getElementById('cfg-alert-quiet-end').value || '08:00',
   };
 }
 
@@ -2563,6 +2589,10 @@ function validateAlertPayload(body, forTest = false) {
       toast(`${name}需在 ${min}-${max} 之间`, 'err');
       return false;
     }
+  }
+  if (body.alert_quiet_enabled && (!/^\d{2}:\d{2}$/.test(body.alert_quiet_start) || !/^\d{2}:\d{2}$/.test(body.alert_quiet_end))) {
+    toast('静默时段格式无效', 'err');
+    return false;
   }
   if (!body.alert_enabled && forTest) body.alert_enabled = 1;
   if (!body.alert_enabled && !forTest) return true;
