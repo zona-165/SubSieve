@@ -32,7 +32,8 @@ if ($method === 'GET') {
         $historyPage = isset($_GET['alert_history_page']) ? (int)$_GET['alert_history_page'] : 1;
         $historyFilter = (string)($_GET['alert_history_filter'] ?? 'all');
         $historyQuery = (string)($_GET['alert_history_query'] ?? '');
-        $alertHistory = get_alert_history($historyLimit, $historyPage, $historyFilter, $historyQuery);
+        $historyRange = (string)($_GET['alert_history_range'] ?? 'all');
+        $alertHistory = get_alert_history($historyLimit, $historyPage, $historyFilter, $historyQuery, $historyRange);
         if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
             $parsed = parse_protect_conf();
             if ($parsed) {
@@ -521,10 +522,11 @@ function get_stats_cache_info(): array {
     return $info;
 }
 
-function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all', string $query = ''): array {
+function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all', string $query = '', string $range = 'all'): array {
     if (!in_array($limit, [10, 25, 50], true)) $limit = 10;
     if ($page < 1) $page = 1;
     if (!in_array($filter, ['all', 'sent', 'muted', 'error'], true)) $filter = 'all';
+    if (!in_array($range, ['all', 'today', '24h', '7d'], true)) $range = 'all';
     $query = strtolower(trim($query));
     if (!defined('ALERT_HISTORY_JSON') || !file_exists(ALERT_HISTORY_JSON)) {
         return ['exists' => false, 'status' => [], 'entries' => []];
@@ -539,10 +541,15 @@ function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all
         'entries' => $allEntries,
         'history_max' => alert_history_max_setting(),
     ]);
-    $filteredEntries = array_values(array_filter($allEntries, function ($entry) use ($filter, $query) {
+    $rangeStart = alert_history_range_start($range);
+    $filteredEntries = array_values(array_filter($allEntries, function ($entry) use ($filter, $query, $rangeStart) {
         if (!is_array($entry)) return false;
         $status = (string)($entry['status'] ?? 'sent');
         if ($filter !== 'all' && $status !== $filter) return false;
+        if ($rangeStart !== null) {
+            $ts = strtotime((string)($entry['time'] ?? ''));
+            if (!$ts || $ts < $rangeStart) return false;
+        }
         if ($query === '') return true;
         $haystack = strtolower(implode(' ', [
             (string)($entry['title'] ?? ''),
@@ -570,6 +577,7 @@ function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all
         'filtered_total' => $filteredTotal,
         'filter' => $filter,
         'query' => $query,
+        'range' => $range,
         'summary' => $historySummary,
         'quiet_summary' => [
             'count' => count($quietEntries),
@@ -578,6 +586,13 @@ function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all
             'latest_summary' => is_array($latestQuiet) ? ($latestQuiet['summary'] ?? '') : '',
         ],
     ];
+}
+
+function alert_history_range_start(string $range): ?int {
+    if ($range === 'today') return strtotime(date('Y-m-d 00:00:00')) ?: null;
+    if ($range === '24h') return time() - 86400;
+    if ($range === '7d') return time() - 7 * 86400;
+    return null;
 }
 
 function export_alert_history(): void {

@@ -880,6 +880,7 @@ let alertHistoryFilter = 'all';
 let alertHistoryQuery = '';
 let alertHistoryLimit = 10;
 let alertHistoryPage = 1;
+let alertHistoryRange = 'all';
 let lastAlertHistory = null;
 
 // ── 主题 ──────────────────────────────────────────────────────
@@ -2312,6 +2313,7 @@ async function loadSettings() {
     alert_history_page: alertHistoryPage,
     alert_history_filter: alertHistoryFilter,
     alert_history_query: alertHistoryQuery,
+    alert_history_range: alertHistoryRange,
   });
   const data = await apiFetch(`/api/settings.php?${params.toString()}`);
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
@@ -2461,6 +2463,12 @@ function renderAlertHistory(history) {
     ['muted', '静默'],
     ['error', '失败'],
   ].map(([value, label]) => `<option value="${value}"${alertHistoryFilter === value ? ' selected' : ''}>${label}</option>`).join('');
+  const rangeOptions = [
+    ['all', '全部时间'],
+    ['today', '今天'],
+    ['24h', '近24小时'],
+    ['7d', '近7天'],
+  ].map(([value, label]) => `<option value="${value}"${alertHistoryRange === value ? ' selected' : ''}>${label}</option>`).join('');
   const limitOptions = [10, 25, 50].map(n => `<option value="${n}"${alertHistoryLimit === n ? ' selected' : ''}>${n}条</option>`).join('');
   const rows = filteredEntries.length ? filteredEntries.map(e => {
     const label = alertEntryStatusLabel(e);
@@ -2517,6 +2525,9 @@ function renderAlertHistory(history) {
       <select class="ip-input" style="width:auto;min-width:92px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryFilter(this.value)">
         ${filterOptions}
       </select>
+      <select class="ip-input" style="width:auto;min-width:104px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryRange(this.value)">
+        ${rangeOptions}
+      </select>
     </div>
     <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
     ${rows}
@@ -2538,6 +2549,12 @@ function setAlertHistoryFilter(value) {
 
 function setAlertHistoryQuery(value) {
   alertHistoryQuery = value || '';
+  alertHistoryPage = 1;
+  loadSettings();
+}
+
+function setAlertHistoryRange(value) {
+  alertHistoryRange = ['all', 'today', '24h', '7d'].includes(value) ? value : 'all';
   alertHistoryPage = 1;
   loadSettings();
 }
