@@ -187,6 +187,20 @@ function apply_alert_settings(array $s, array $body): array {
             $s[$key] = trim((string)$body[$key]);
         }
     }
+    $intFields = [
+        'alert_scanner_score' => [1, 100, 80],
+        'alert_susp_ip_score' => [1, 100, 90],
+        'alert_susp_token_ips' => [2, 50, 3],
+        'alert_dedupe_minutes' => [1, 1440, 60],
+    ];
+    foreach ($intFields as $key => [$min, $max, $default]) {
+        if (array_key_exists($key, $body)) {
+            $value = is_numeric($body[$key]) ? (int)$body[$key] : $default;
+            if ($value < $min) $value = $min;
+            if ($value > $max) $value = $max;
+            $s[$key] = $value;
+        }
+    }
     return $s;
 }
 

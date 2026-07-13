@@ -136,7 +136,8 @@ function check_alerts(): array {
         return ['ok' => true, 'sent' => 0, 'empty_cache' => true, 'time' => date('Y-m-d H:i:s')];
     }
 
-    $events = build_alert_events($data, $cache);
+    $rules = alert_rules_from_settings($settings);
+    $events = build_alert_events($data, $cache, $rules);
     $state = read_json_file(ALERT_STATE_JSON);
     $now = time();
     $sent = 0;
@@ -147,7 +148,7 @@ function check_alerts(): array {
     foreach ($events as $event) {
         $key = $event['key'];
         $lastSent = (int)($state[$key] ?? 0);
-        if ($lastSent > 0 && ($now - $lastSent) < 3600) {
+        if ($lastSent > 0 && ($now - $lastSent) < $rules['dedupe_seconds']) {
             $skipped++;
             continue;
         }
@@ -186,6 +187,7 @@ function check_alerts(): array {
         'events' => count($events),
         'sent' => $sent,
         'skipped' => $skipped,
+        'dedupe_seconds' => $rules['dedupe_seconds'],
         'errors' => $errors,
     ], $historyEntries);
 
@@ -194,12 +196,13 @@ function check_alerts(): array {
         'events' => count($events),
         'sent' => $sent,
         'skipped' => $skipped,
+        'dedupe_seconds' => $rules['dedupe_seconds'],
         'errors' => $errors,
         'time' => date('Y-m-d H:i:s'),
     ];
 }
 
-function build_alert_events(array $data, array $cache): array {
+function build_alert_events(array $data, array $cache, array $rules): array {
     $events = [];
     $cacheTs = (int)($cache['ts'] ?? 0);
     if ($cacheTs > 0 && time() - $cacheTs > 180) {
@@ -216,7 +219,7 @@ function build_alert_events(array $data, array $cache): array {
         $token = (string)($row['token'] ?? '');
         $ua = (string)($row['ua'] ?? '');
         $score = (int)($row['score'] ?? 0);
-        if ($ip === '' || $score < 80) continue;
+        if ($ip === '' || $score < $rules['scanner_score']) continue;
         $events[] = [
             'key' => 'scanner:' . $ip . ':' . substr(hash('sha1', $token . $ua), 0, 12),
             'title' => '脚本/扫描器拉取订阅',
@@ -233,7 +236,7 @@ function build_alert_events(array $data, array $cache): array {
     foreach (array_slice($data['susp_ips'] ?? [], 0, 5) as $row) {
         $ip = (string)($row['ip'] ?? '');
         $score = (int)($row['score'] ?? 0);
-        if ($ip === '' || $score < 90) continue;
+        if ($ip === '' || $score < $rules['susp_ip_score']) continue;
         $events[] = [
             'key' => 'susp_ip:' . $ip . ':' . (int)($row['token_count'] ?? 0),
             'title' => '可疑 IP 拉取多 Token',
@@ -249,7 +252,7 @@ function build_alert_events(array $data, array $cache): array {
     foreach (array_slice($data['susp_tokens'] ?? [], 0, 5) as $row) {
         $token = (string)($row['token'] ?? '');
         $ipCount = (int)($row['ip_count'] ?? 0);
-        if ($token === '' || $ipCount < 3) continue;
+        if ($token === '' || $ipCount < $rules['susp_token_ips']) continue;
         $events[] = [
             'key' => 'susp_token:' . hash('sha1', $token) . ':' . $ipCount,
             'title' => '可疑 Token 被多 IP 拉取',
@@ -259,6 +262,23 @@ function build_alert_events(array $data, array $cache): array {
     }
 
     return $events;
+}
+
+function alert_rules_from_settings(array $settings): array {
+    return [
+        'scanner_score' => clamp_int($settings['alert_scanner_score'] ?? 80, 1, 100, 80),
+        'susp_ip_score' => clamp_int($settings['alert_susp_ip_score'] ?? 90, 1, 100, 90),
+        'susp_token_ips' => clamp_int($settings['alert_susp_token_ips'] ?? 3, 2, 50, 3),
+        'dedupe_seconds' => clamp_int($settings['alert_dedupe_minutes'] ?? 60, 1, 1440, 60) * 60,
+    ];
+}
+
+function clamp_int($value, int $min, int $max, int $default): int {
+    if (!is_numeric($value)) return $default;
+    $num = (int)$value;
+    if ($num < $min) return $min;
+    if ($num > $max) return $max;
+    return $num;
 }
 
 function alert_text(string $type, string $ip, int $score, array $fields): string {

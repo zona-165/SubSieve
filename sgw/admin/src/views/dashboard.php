@@ -785,7 +785,25 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">Telegram Chat ID</label>
               <input class="ip-input" id="cfg-alert-telegram-chat" placeholder="-1001234567890" style="width:100%">
             </div>
-            <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；同一事件 1 小时内只推送一次。</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">扫描器评分 ≥</label>
+                <input class="ip-input" id="cfg-alert-scanner-score" type="number" min="1" max="100" placeholder="80" style="width:100%">
+              </div>
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">可疑 IP 评分 ≥</label>
+                <input class="ip-input" id="cfg-alert-susp-ip-score" type="number" min="1" max="100" placeholder="90" style="width:100%">
+              </div>
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">Token IP 数 ≥</label>
+                <input class="ip-input" id="cfg-alert-susp-token-ips" type="number" min="2" max="50" placeholder="3" style="width:100%">
+              </div>
+              <div>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">去重分钟</label>
+                <input class="ip-input" id="cfg-alert-dedupe-minutes" type="number" min="1" max="1440" placeholder="60" style="width:100%">
+              </div>
+            </div>
+            <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；阈值越低越敏感。</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
               <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
               <button class="mode-btn" onclick="testAlertSettings()">测试推送</button>
@@ -2299,6 +2317,14 @@ async function loadSettings() {
   if (alertTelegramToken) alertTelegramToken.value = currentSettings.alert_telegram_bot_token || '';
   const alertTelegramChat = document.getElementById('cfg-alert-telegram-chat');
   if (alertTelegramChat) alertTelegramChat.value = currentSettings.alert_telegram_chat_id || '';
+  const alertScannerScore = document.getElementById('cfg-alert-scanner-score');
+  if (alertScannerScore) alertScannerScore.value = currentSettings.alert_scanner_score || 80;
+  const alertSuspIpScore = document.getElementById('cfg-alert-susp-ip-score');
+  if (alertSuspIpScore) alertSuspIpScore.value = currentSettings.alert_susp_ip_score || 90;
+  const alertSuspTokenIps = document.getElementById('cfg-alert-susp-token-ips');
+  if (alertSuspTokenIps) alertSuspTokenIps.value = currentSettings.alert_susp_token_ips || 3;
+  const alertDedupeMinutes = document.getElementById('cfg-alert-dedupe-minutes');
+  if (alertDedupeMinutes) alertDedupeMinutes.value = currentSettings.alert_dedupe_minutes || 60;
   // 显示证书信息
   const cert = data.cert || {};
   const certEl = document.getElementById('cert-info');
@@ -2361,6 +2387,7 @@ function renderAlertHistory(history) {
   const badgeColor = enabled ? (ok ? '#22c55e' : '#ef4444') : '#94a3b8';
   const stateText = enabled ? (ok ? '运行中' : '有错误') : '未开启';
   const lastCheck = status.last_check || '尚未检查';
+  const dedupeText = status.dedupe_seconds ? `${Math.round(status.dedupe_seconds / 60)} 分钟` : '按设置';
   const noteMap = {
     disabled: '告警未开启',
     missing_cache: '统计缓存尚未生成',
@@ -2387,6 +2414,7 @@ function renderAlertHistory(history) {
       <div>
         <div style="font-weight:800;color:var(--text)">告警状态</div>
         <div style="color:var(--text3);font-size:12px;margin-top:3px">最近检查：${esc(lastCheck)}</div>
+        <div style="color:var(--text3);font-size:12px;margin-top:3px">去重窗口：${esc(dedupeText)}</div>
         ${note}
       </div>
       <span style="color:${badgeColor};font-weight:900;white-space:nowrap">${stateText}</span>
@@ -2497,10 +2525,26 @@ function getAlertSettingsPayload() {
     alert_webhook_url: document.getElementById('cfg-alert-webhook-url').value.trim(),
     alert_telegram_bot_token: document.getElementById('cfg-alert-telegram-token').value.trim(),
     alert_telegram_chat_id: document.getElementById('cfg-alert-telegram-chat').value.trim(),
+    alert_scanner_score: parseInt(document.getElementById('cfg-alert-scanner-score').value || '80', 10),
+    alert_susp_ip_score: parseInt(document.getElementById('cfg-alert-susp-ip-score').value || '90', 10),
+    alert_susp_token_ips: parseInt(document.getElementById('cfg-alert-susp-token-ips').value || '3', 10),
+    alert_dedupe_minutes: parseInt(document.getElementById('cfg-alert-dedupe-minutes').value || '60', 10),
   };
 }
 
 function validateAlertPayload(body, forTest = false) {
+  const checks = [
+    ['扫描器评分阈值', body.alert_scanner_score, 1, 100],
+    ['可疑 IP 评分阈值', body.alert_susp_ip_score, 1, 100],
+    ['Token IP 数阈值', body.alert_susp_token_ips, 2, 50],
+    ['去重分钟', body.alert_dedupe_minutes, 1, 1440],
+  ];
+  for (const [name, value, min, max] of checks) {
+    if (!Number.isFinite(value) || value < min || value > max) {
+      toast(`${name}需在 ${min}-${max} 之间`, 'err');
+      return false;
+    }
+  }
   if (!body.alert_enabled && forTest) body.alert_enabled = 1;
   if (!body.alert_enabled && !forTest) return true;
   if (body.alert_channel === 'telegram') {
