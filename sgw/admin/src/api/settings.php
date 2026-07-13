@@ -67,6 +67,11 @@ if ($method === 'POST') {
         json_out(['ok' => true, 'msg' => !empty($body['reset_state']) ? '告警历史和去重状态已重置' : '告警历史已清空']);
     }
 
+    if (!empty($body['_delete_alert_history_entry'])) {
+        $deleted = delete_alert_history_entry($body);
+        json_out(['ok' => true, 'deleted' => $deleted, 'msg' => '告警记录已删除']);
+    }
+
     if (!empty($body['_test_alert'])) {
         $testSettings = apply_alert_settings($s, $body);
         $result = send_alert_message($testSettings, "SubSieve 测试告警\n这是一条后台测试通知。");
@@ -335,6 +340,38 @@ function clear_alert_history(bool $resetState = false): void {
         @file_put_contents(ALERT_STATE_JSON, "{}", LOCK_EX);
         @chmod(ALERT_STATE_JSON, 0666);
     }
+}
+
+function delete_alert_history_entry(array $body): int {
+    $key = trim((string)($body['key'] ?? ''));
+    $time = trim((string)($body['time'] ?? ''));
+    $status = trim((string)($body['status'] ?? ''));
+    if ($key === '' || $time === '' || $status === '') {
+        json_err('缺少告警记录标识');
+    }
+    if (!defined('ALERT_HISTORY_JSON') || !file_exists(ALERT_HISTORY_JSON)) {
+        json_err('告警历史不存在');
+    }
+    $raw = @file_get_contents(ALERT_HISTORY_JSON);
+    $data = $raw ? json_decode($raw, true) : null;
+    if (!is_array($data)) {
+        json_err('告警历史格式无效');
+    }
+    $entries = is_array($data['entries'] ?? null) ? $data['entries'] : [];
+    $before = count($entries);
+    $data['entries'] = array_values(array_filter($entries, function ($entry) use ($key, $time, $status) {
+        if (!is_array($entry)) return false;
+        return !(trim((string)($entry['key'] ?? '')) === $key
+            && trim((string)($entry['time'] ?? '')) === $time
+            && trim((string)($entry['status'] ?? '')) === $status);
+    }));
+    $deleted = $before - count($data['entries']);
+    if ($deleted < 1) {
+        json_err('未找到对应告警记录');
+    }
+    @file_put_contents(ALERT_HISTORY_JSON, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod(ALERT_HISTORY_JSON, 0666);
+    return $deleted;
 }
 
 /**

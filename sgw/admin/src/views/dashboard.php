@@ -2459,7 +2459,7 @@ function renderAlertHistory(history) {
     const color = alertEntryStatusColor(e);
     const report = formatAlertEntryText(e);
     return `
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
         <div style="min-width:0">
           <div style="font-weight:700;color:var(--text);font-size:12px;word-break:break-word">${esc(e.title || '告警')}</div>
@@ -2467,6 +2467,7 @@ function renderAlertHistory(history) {
           <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(e.time || '-')} · ${esc(e.channel || '-')}</div>
         </div>
         <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)" style="align-self:start">复制</button>
+        <button class="copy-btn" data-key="${esc(e.key || '')}" data-time="${esc(e.time || '')}" data-status="${esc(e.status || '')}" onclick="deleteAlertHistoryEntry(this.dataset.key,this.dataset.time,this.dataset.status)" style="align-self:start;color:#ef4444">删除</button>
       </div>`;
   }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${entries.length ? '当前条件暂无记录' : '暂无推送记录'}</div>`;
   el.innerHTML = `
@@ -2566,6 +2567,21 @@ function copyFilteredAlertHistory() {
   }
   const text = rows.map((e, idx) => `#${idx + 1}\n${formatAlertEntryText(e)}`).join('\n\n');
   copyText(text);
+}
+
+async function deleteAlertHistoryEntry(key, time, status) {
+  if (!confirm('确定删除这条告警记录？不会影响去重状态。')) return;
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST',
+    body: JSON.stringify({_delete_alert_history_entry: 1, key, time, status}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ 已删除告警记录');
+    await loadSettings();
+  } else {
+    toast(d.error || '删除失败', 'err');
+  }
 }
 
 
