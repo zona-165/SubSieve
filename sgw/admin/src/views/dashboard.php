@@ -2540,7 +2540,10 @@ function renderAlertHistory(history) {
       </select>
       <button class="mode-btn" onclick="resetAlertHistoryFilters()" style="height:32px;padding:0 10px;font-size:12px">重置</button>
     </div>
-    <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+      <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="flex:1;min-width:0;height:34px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
+      <button class="mode-btn" onclick="clearAlertHistoryQuery()" style="height:34px;padding:0 10px;font-size:12px" ${alertHistoryQuery ? '' : 'disabled'}>清空</button>
+    </div>
     <div id="alert-history-query-state" style="min-height:16px;color:var(--text3);font-size:11px;margin-bottom:2px"></div>
     ${rows}
     ${pager}
@@ -2575,6 +2578,14 @@ function setAlertHistoryQuery(value) {
 function setAlertHistoryQueryState(text) {
   const el = document.getElementById('alert-history-query-state');
   if (el) el.textContent = text || '';
+}
+
+function clearAlertHistoryQuery() {
+  alertHistoryQuery = '';
+  alertHistoryPage = 1;
+  clearTimeout(alertHistoryQueryTimer);
+  setAlertHistoryQueryState('');
+  loadSettings();
 }
 
 function setAlertHistoryRange(value) {
