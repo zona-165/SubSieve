@@ -875,6 +875,7 @@ let suppressToasts = 0;
 let alertHistoryFilter = 'all';
 let alertHistoryQuery = '';
 let alertHistoryLimit = 10;
+let alertHistoryPage = 1;
 let lastAlertHistory = null;
 
 // ── 主题 ──────────────────────────────────────────────────────
@@ -2302,7 +2303,13 @@ async function tbDel(token) {
 let currentSettings = {};
 
 async function loadSettings() {
-  const data = await apiFetch(`/api/settings.php?alert_history_limit=${encodeURIComponent(alertHistoryLimit)}`);
+  const params = new URLSearchParams({
+    alert_history_limit: alertHistoryLimit,
+    alert_history_page: alertHistoryPage,
+    alert_history_filter: alertHistoryFilter,
+    alert_history_query: alertHistoryQuery,
+  });
+  const data = await apiFetch(`/api/settings.php?${params.toString()}`);
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
   currentSettings = data.settings || {};
   activeSubscribePath = currentSettings.subscribe_path || activeSubscribePath || '/api/v1/client/subscribe';
@@ -2413,17 +2420,11 @@ function renderAlertHistory(history) {
   lastAlertHistory = history || {};
   const status = history.status || {};
   const entries = history.entries || [];
-  const query = alertHistoryQuery.trim().toLowerCase();
-  let filteredEntries = alertHistoryFilter === 'all' ? entries : entries.filter(e => (e.status || 'sent') === alertHistoryFilter);
-  if (query) {
-    filteredEntries = filteredEntries.filter(e => [
-      e.title || '',
-      e.summary || '',
-      e.time || '',
-      e.channel || '',
-      e.key || '',
-    ].join(' ').toLowerCase().includes(query));
-  }
+  const filteredEntries = entries;
+  const page = Math.max(1, parseInt(history.page || alertHistoryPage || 1, 10));
+  const totalPages = Math.max(1, parseInt(history.total_pages || 1, 10));
+  const filteredTotal = parseInt(history.filtered_total ?? entries.length, 10);
+  alertHistoryPage = page;
   const quietSummary = history.quiet_summary || {};
   const enabled = !!status.enabled;
   const ok = !status.errors || status.errors.length === 0;
@@ -2469,7 +2470,13 @@ function renderAlertHistory(history) {
         <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)" style="align-self:start">复制</button>
         <button class="copy-btn" data-key="${esc(e.key || '')}" data-time="${esc(e.time || '')}" data-status="${esc(e.status || '')}" onclick="deleteAlertHistoryEntry(this.dataset.key,this.dataset.time,this.dataset.status)" style="align-self:start;color:#ef4444">删除</button>
       </div>`;
-  }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${entries.length ? '当前条件暂无记录' : '暂无推送记录'}</div>`;
+  }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${filteredTotal ? '当前页暂无记录' : '当前条件暂无记录'}</div>`;
+  const pager = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:10px">
+      <button class="mode-btn" onclick="setAlertHistoryPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+      <span style="color:var(--text2);font-weight:800;font-size:12px">第 ${esc(page)} / ${esc(totalPages)} 页</span>
+      <button class="mode-btn" onclick="setAlertHistoryPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>
+    </div>` : '';
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
       <div>
@@ -2489,7 +2496,7 @@ function renderAlertHistory(history) {
     </div>
     ${quietSummaryHtml}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
-      <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(filteredEntries.length)} / ${esc(entries.length)} 条</div>
+      <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(filteredEntries.length)} / ${esc(filteredTotal)} 条</div>
       <select class="ip-input" style="width:auto;min-width:82px;height:32px;padding:4px 8px;font-size:12px" onchange="setAlertHistoryLimit(this.value)">
         ${limitOptions}
       </select>
@@ -2499,6 +2506,7 @@ function renderAlertHistory(history) {
     </div>
     <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
     ${rows}
+    ${pager}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
       <button class="mode-btn" onclick="copyFilteredAlertHistory()">复制当前</button>
       <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
@@ -2510,17 +2518,25 @@ function renderAlertHistory(history) {
 
 function setAlertHistoryFilter(value) {
   alertHistoryFilter = ['all', 'sent', 'muted', 'error'].includes(value) ? value : 'all';
+  alertHistoryPage = 1;
   loadSettings();
 }
 
 function setAlertHistoryQuery(value) {
   alertHistoryQuery = value || '';
+  alertHistoryPage = 1;
   loadSettings();
 }
 
 function setAlertHistoryLimit(value) {
   const n = parseInt(value, 10);
   alertHistoryLimit = [10, 25, 50].includes(n) ? n : 10;
+  alertHistoryPage = 1;
+  loadSettings();
+}
+
+function setAlertHistoryPage(page) {
+  alertHistoryPage = Math.max(1, parseInt(page, 10) || 1);
   loadSettings();
 }
 
@@ -2545,18 +2561,7 @@ function formatAlertEntryText(e) {
 
 function currentFilteredAlertEntries() {
   const entries = (lastAlertHistory && lastAlertHistory.entries) || [];
-  const query = alertHistoryQuery.trim().toLowerCase();
-  let filtered = alertHistoryFilter === 'all' ? entries : entries.filter(e => (e.status || 'sent') === alertHistoryFilter);
-  if (query) {
-    filtered = filtered.filter(e => [
-      e.title || '',
-      e.summary || '',
-      e.time || '',
-      e.channel || '',
-      e.key || '',
-    ].join(' ').toLowerCase().includes(query));
-  }
-  return filtered;
+  return entries;
 }
 
 function copyFilteredAlertHistory() {

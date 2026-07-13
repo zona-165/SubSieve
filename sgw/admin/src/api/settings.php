@@ -21,7 +21,10 @@ if ($method === 'GET') {
         $certInfo = get_cert_info();
         $statsCache = get_stats_cache_info();
         $historyLimit = isset($_GET['alert_history_limit']) ? (int)$_GET['alert_history_limit'] : 10;
-        $alertHistory = get_alert_history($historyLimit);
+        $historyPage = isset($_GET['alert_history_page']) ? (int)$_GET['alert_history_page'] : 1;
+        $historyFilter = (string)($_GET['alert_history_filter'] ?? 'all');
+        $historyQuery = (string)($_GET['alert_history_query'] ?? '');
+        $alertHistory = get_alert_history($historyLimit, $historyPage, $historyFilter, $historyQuery);
         if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
             $parsed = parse_protect_conf();
             if ($parsed) {
@@ -509,8 +512,11 @@ function get_stats_cache_info(): array {
     return $info;
 }
 
-function get_alert_history(int $limit = 10): array {
+function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all', string $query = ''): array {
     if (!in_array($limit, [10, 25, 50], true)) $limit = 10;
+    if ($page < 1) $page = 1;
+    if (!in_array($filter, ['all', 'sent', 'muted', 'error'], true)) $filter = 'all';
+    $query = strtolower(trim($query));
     if (!defined('ALERT_HISTORY_JSON') || !file_exists(ALERT_HISTORY_JSON)) {
         return ['exists' => false, 'status' => [], 'entries' => []];
     }
@@ -520,7 +526,24 @@ function get_alert_history(int $limit = 10): array {
         return ['exists' => true, 'status' => [], 'entries' => []];
     }
     $allEntries = is_array($data['entries'] ?? null) ? $data['entries'] : [];
-    $entries = array_slice($allEntries, 0, $limit);
+    $filteredEntries = array_values(array_filter($allEntries, function ($entry) use ($filter, $query) {
+        if (!is_array($entry)) return false;
+        $status = (string)($entry['status'] ?? 'sent');
+        if ($filter !== 'all' && $status !== $filter) return false;
+        if ($query === '') return true;
+        $haystack = strtolower(implode(' ', [
+            (string)($entry['title'] ?? ''),
+            (string)($entry['summary'] ?? ''),
+            (string)($entry['time'] ?? ''),
+            (string)($entry['channel'] ?? ''),
+            (string)($entry['key'] ?? ''),
+        ]));
+        return strpos($haystack, $query) !== false;
+    }));
+    $filteredTotal = count($filteredEntries);
+    $totalPages = max(1, (int)ceil($filteredTotal / $limit));
+    if ($page > $totalPages) $page = $totalPages;
+    $entries = array_slice($filteredEntries, ($page - 1) * $limit, $limit);
     $quietEntries = array_values(array_filter($allEntries, fn($e) => is_array($e) && ($e['status'] ?? '') === 'muted'));
     $latestQuiet = $quietEntries[0] ?? null;
     return [
@@ -528,7 +551,12 @@ function get_alert_history(int $limit = 10): array {
         'status' => is_array($data['status'] ?? null) ? $data['status'] : [],
         'entries' => $entries,
         'limit' => $limit,
+        'page' => $page,
+        'total_pages' => $totalPages,
         'total' => count($allEntries),
+        'filtered_total' => $filteredTotal,
+        'filter' => $filter,
+        'query' => $query,
         'quiet_summary' => [
             'count' => count($quietEntries),
             'latest_time' => is_array($latestQuiet) ? ($latestQuiet['time'] ?? '') : '',
