@@ -2734,6 +2734,17 @@ function alertExportSlug(value) {
   return String(value || 'all').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'all';
 }
 
+function formatFileSize(bytes) {
+  const units = ['B', 'KB', 'MB'];
+  let value = Math.max(0, Number(bytes) || 0);
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
 function copyFilteredAlertHistory() {
   const rows = currentFilteredAlertEntries();
   if (!rows.length) {
@@ -3061,6 +3072,7 @@ async function importAlertHistory(input) {
       : '';
     const lines = [
       '即将导入告警展示记录：',
+      `文件：${file.name || '-'}（${formatFileSize(file.size)}）`,
       `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 ${p.history_max || p.total || 0} 条）` : ''}`,
       `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
