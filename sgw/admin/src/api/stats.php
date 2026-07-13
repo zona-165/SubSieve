@@ -1,6 +1,22 @@
 <?php
 require_once __DIR__ . '/_auth.php';
 
+if (!defined('STATS_CACHE_JSON')) {
+    define('STATS_CACHE_JSON', dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
+}
+
+$cacheTtl = 45;
+$forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
+    $cacheRaw = @file_get_contents(STATS_CACHE_JSON);
+    $cache = $cacheRaw ? json_decode($cacheRaw, true) : null;
+    if (is_array($cache) && isset($cache['ts'], $cache['data']) && time() - (int)$cache['ts'] <= $cacheTtl) {
+        $data = is_array($cache['data']) ? $cache['data'] : [];
+        $data['cached'] = true;
+        json_out($data);
+    }
+}
+
 $today  = date('d/M/Y');
 $ips    = [];   // ip => [total,200,403,429,444]  (today only)
 $tokens = [];   // token => [count, last_time]     (today only)
@@ -183,7 +199,7 @@ try {
     $userProfiles = [];
 }
 
-json_out([
+$payload = [
     'ok'          => true,
     'top_ips'     => $topIps,
     'top_tokens'  => $topTokens,
@@ -192,7 +208,11 @@ json_out([
     'susp_ips'    => $suspIpList,
     'scanner_reports' => $scannerList,
     'user_profiles' => $userProfiles,
-]);
+    'cached' => false,
+];
+
+@file_put_contents(STATS_CACHE_JSON, json_encode(['ts' => time(), 'data' => $payload], JSON_UNESCAPED_UNICODE), LOCK_EX);
+json_out($payload);
 
 function collect_profile_segment(array &$segments, string $ip, string $time, string $request, int $status, string $ua): void {
     if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return;
@@ -330,15 +350,12 @@ function format_log_time(string $time): string {
 
 function enrich_scanner_reports(array $reports): array {
     $cache = read_ip_intel_cache();
-    $dirty = false;
-    $lookups = 0;
     foreach ($reports as &$report) {
         $ip = $report['ip'] ?? '';
         if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) continue;
         $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
-        if (!$cached && $lookups >= 20) continue;
-        if (!$cached) $lookups++;
-        $intel = get_ip_intel($ip, $cache, $dirty);
+        if (!$cached) continue;
+        $intel = $cache[$ip]['data'] ?? null;
         if (!$intel) continue;
         $report['location'] = $intel['location'] ?? '未查询';
         $report['asn'] = $intel['asn'] ?? '未查询';
@@ -351,7 +368,6 @@ function enrich_scanner_reports(array $reports): array {
         }
     }
     unset($report);
-    if ($dirty) write_ip_intel_cache($cache);
     return $reports;
 }
 

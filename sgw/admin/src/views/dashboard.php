@@ -835,7 +835,7 @@ async function loadTab(name, opts={}) {
   if (silent) suppressToasts++;
   tabLoading[name] = (async () => {
     try {
-      await TABS[name].loader();
+      await TABS[name].loader({force});
       if (name === 'stats' && !allStatsData) return;
       tabLoaded[name] = true;
     } catch (e) {
@@ -1295,8 +1295,8 @@ async function quickAddWhitelistFromLog(ip) {
 }
 
 // ── 分析 ──────────────────────────────────────────────────────
-async function loadStats() {
-  const data = await apiFetch('/api/stats.php');
+async function loadStats(opts={}) {
+  const data = await apiFetch('/api/stats.php' + (opts.force ? '?refresh=1' : ''));
   if (!data.ok) {
     ['stats-overview','top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports','user-profiles'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
