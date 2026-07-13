@@ -469,11 +469,20 @@ function get_alert_history(): array {
     if (!is_array($data)) {
         return ['exists' => true, 'status' => [], 'entries' => []];
     }
-    $entries = is_array($data['entries'] ?? null) ? array_slice($data['entries'], 0, 10) : [];
+    $allEntries = is_array($data['entries'] ?? null) ? $data['entries'] : [];
+    $entries = array_slice($allEntries, 0, 10);
+    $quietEntries = array_values(array_filter($allEntries, fn($e) => is_array($e) && ($e['status'] ?? '') === 'muted'));
+    $latestQuiet = $quietEntries[0] ?? null;
     return [
         'exists' => true,
         'status' => is_array($data['status'] ?? null) ? $data['status'] : [],
         'entries' => $entries,
+        'quiet_summary' => [
+            'count' => count($quietEntries),
+            'latest_time' => is_array($latestQuiet) ? ($latestQuiet['time'] ?? '') : '',
+            'latest_title' => is_array($latestQuiet) ? ($latestQuiet['title'] ?? '') : '',
+            'latest_summary' => is_array($latestQuiet) ? ($latestQuiet['summary'] ?? '') : '',
+        ],
     ];
 }
 

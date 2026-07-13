@@ -2407,6 +2407,7 @@ function renderAlertHistory(history) {
   if (!el) return;
   const status = history.status || {};
   const entries = history.entries || [];
+  const quietSummary = history.quiet_summary || {};
   const enabled = !!status.enabled;
   const ok = !status.errors || status.errors.length === 0;
   const badgeColor = enabled ? (ok ? '#22c55e' : '#ef4444') : '#94a3b8';
@@ -2422,6 +2423,13 @@ function renderAlertHistory(history) {
     reset: '告警记录和去重状态已重置',
   };
   const note = status.note ? `<div style="color:var(--text3);font-size:12px;margin-top:4px">${esc(noteMap[status.note] || status.note)}</div>` : '';
+  const quietSummaryHtml = quietSummary.count ? `
+    <div style="background:rgba(234,179,8,.10);border:1px solid rgba(234,179,8,.28);border-radius:8px;padding:9px 10px;margin-bottom:10px">
+      <div style="color:#eab308;font-weight:800;font-size:12px">静默摘要 · ${esc(quietSummary.count)} 条</div>
+      <div style="color:var(--text);font-weight:700;font-size:12px;margin-top:4px;word-break:break-word">${esc(quietSummary.latest_title || '静默事件')}</div>
+      <div style="color:var(--text3);font-size:11px;line-height:1.45;margin-top:3px;word-break:break-all">${esc(quietSummary.latest_summary || '')}</div>
+      <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(quietSummary.latest_time || '')}</div>
+    </div>` : '';
   const rows = entries.length ? entries.map(e => {
     const color = e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
     const label = e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
@@ -2452,6 +2460,7 @@ function renderAlertHistory(history) {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">去重</div><div style="font-weight:900">${esc(status.skipped ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(status.muted ?? 0)}</div></div>
     </div>
+    ${quietSummaryHtml}
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
       <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
