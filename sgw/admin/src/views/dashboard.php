@@ -2701,13 +2701,30 @@ function currentFilteredAlertEntries() {
   return entries;
 }
 
+function alertHistoryContextText(rows) {
+  const statusMap = {all: '全部', sent: '已推送', muted: '静默', error: '失败'};
+  const rangeMap = {all: '全部时间', today: '今天', '24h': '近24小时', '7d': '近7天'};
+  const total = parseInt((lastAlertHistory && lastAlertHistory.filtered_total) ?? rows.length, 10);
+  const start = rows.length ? ((alertHistoryPage - 1) * alertHistoryLimit + 1) : 0;
+  const end = rows.length ? Math.min(start + rows.length - 1, total) : 0;
+  return [
+    `筛选：状态 ${statusMap[alertHistoryFilter] || alertHistoryFilter}｜时间 ${rangeMap[alertHistoryRange] || alertHistoryRange}｜关键词 ${alertHistoryQuery || '-'}`,
+    `页码：第 ${alertHistoryPage} 页｜每页 ${alertHistoryLimit} 条｜范围 ${rows.length ? `第 ${start}-${end} 条` : '暂无记录'}｜共 ${total} 条`,
+  ];
+}
+
 function copyFilteredAlertHistory() {
   const rows = currentFilteredAlertEntries();
   if (!rows.length) {
     toast('当前没有可复制的告警记录', 'err');
     return;
   }
-  const text = rows.map((e, idx) => `#${idx + 1}\n${formatAlertEntryText(e)}`).join('\n\n');
+  const text = [
+    'SubSieve 告警历史当前页',
+    ...alertHistoryContextText(rows),
+    '',
+    ...rows.map((e, idx) => `#${idx + 1}\n${formatAlertEntryText(e)}`),
+  ].join('\n\n');
   copyText(text);
 }
 
@@ -2718,8 +2735,6 @@ function copyAlertHistorySummary() {
     return;
   }
   const summary = (lastAlertHistory && lastAlertHistory.summary) || {};
-  const statusMap = {all: '全部', sent: '已推送', muted: '静默', error: '失败'};
-  const rangeMap = {all: '全部时间', today: '今天', '24h': '近24小时', '7d': '近7天'};
   const statusCounts = rows.reduce((acc, e) => {
     const key = e.status || 'sent';
     acc[key] = (acc[key] || 0) + 1;
@@ -2727,8 +2742,7 @@ function copyAlertHistorySummary() {
   }, {});
   const lines = [
     'SubSieve 告警历史摘要',
-    `筛选：状态 ${statusMap[alertHistoryFilter] || alertHistoryFilter}｜时间 ${rangeMap[alertHistoryRange] || alertHistoryRange}｜关键词 ${alertHistoryQuery || '-'}`,
-    `页码：第 ${alertHistoryPage} 页｜每页 ${alertHistoryLimit} 条｜当前页 ${rows.length} 条`,
+    ...alertHistoryContextText(rows),
     `全量历史：${summary.total ?? '-'} 条｜已推送 ${summary.sent ?? 0}｜静默 ${summary.muted ?? 0}｜失败 ${summary.error ?? 0}`,
     `当前页分布：已推送 ${statusCounts.sent || 0}｜静默 ${statusCounts.muted || 0}｜失败 ${statusCounts.error || 0}`,
     '',
