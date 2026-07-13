@@ -2701,15 +2701,32 @@ function currentFilteredAlertEntries() {
   return entries;
 }
 
-function alertHistoryContextText(rows) {
+function alertHistoryContextData(rows) {
   const statusMap = {all: '全部', sent: '已推送', muted: '静默', error: '失败'};
   const rangeMap = {all: '全部时间', today: '今天', '24h': '近24小时', '7d': '近7天'};
   const total = parseInt((lastAlertHistory && lastAlertHistory.filtered_total) ?? rows.length, 10);
   const start = rows.length ? ((alertHistoryPage - 1) * alertHistoryLimit + 1) : 0;
   const end = rows.length ? Math.min(start + rows.length - 1, total) : 0;
+  return {
+    status: alertHistoryFilter,
+    status_label: statusMap[alertHistoryFilter] || alertHistoryFilter,
+    range: alertHistoryRange,
+    range_label: rangeMap[alertHistoryRange] || alertHistoryRange,
+    query: alertHistoryQuery,
+    page: alertHistoryPage,
+    limit: alertHistoryLimit,
+    start,
+    end,
+    total,
+    range_label_text: rows.length ? `第 ${start}-${end} 条` : '暂无记录',
+  };
+}
+
+function alertHistoryContextText(rows) {
+  const ctx = alertHistoryContextData(rows);
   return [
-    `筛选：状态 ${statusMap[alertHistoryFilter] || alertHistoryFilter}｜时间 ${rangeMap[alertHistoryRange] || alertHistoryRange}｜关键词 ${alertHistoryQuery || '-'}`,
-    `页码：第 ${alertHistoryPage} 页｜每页 ${alertHistoryLimit} 条｜范围 ${rows.length ? `第 ${start}-${end} 条` : '暂无记录'}｜共 ${total} 条`,
+    `筛选：状态 ${ctx.status_label}｜时间 ${ctx.range_label}｜关键词 ${ctx.query || '-'}`,
+    `页码：第 ${ctx.page} 页｜每页 ${ctx.limit} 条｜范围 ${ctx.range_label_text}｜共 ${ctx.total} 条`,
   ];
 }
 
@@ -2999,13 +3016,7 @@ function exportCurrentAlertHistoryPage() {
   const payload = {
     exported_at: new Date().toISOString(),
     scope: 'current_page',
-    filters: {
-      status: alertHistoryFilter,
-      range: alertHistoryRange,
-      query: alertHistoryQuery,
-      page: alertHistoryPage,
-      limit: alertHistoryLimit,
-    },
+    context: alertHistoryContextData(entries),
     entries,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json;charset=utf-8'});
