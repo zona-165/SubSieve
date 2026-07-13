@@ -68,6 +68,13 @@ function _val(string $v): string { return htmlspecialchars($v, ENT_QUOTES); }
   --text:#1e293b;--text2:#475569;--text3:#94a3b8;
   --accent:#6366f1;
 }
+[data-theme="dark"] .stats-card{box-shadow:0 12px 30px rgba(0,0,0,.22)}
+[data-theme="dark"] .stats-card.tone-blue{--tone-bg:rgba(37,99,235,.16);--tone-border:rgba(37,99,235,.28)}
+[data-theme="dark"] .stats-card.tone-violet{--tone-bg:rgba(124,58,237,.16);--tone-border:rgba(124,58,237,.28)}
+[data-theme="dark"] .stats-card.tone-amber{--tone-bg:rgba(217,119,6,.16);--tone-border:rgba(217,119,6,.30)}
+[data-theme="dark"] .stats-card.tone-rose{--tone-bg:rgba(225,29,72,.16);--tone-border:rgba(225,29,72,.30)}
+[data-theme="dark"] .stats-card.tone-cyan{--tone-bg:rgba(8,145,178,.16);--tone-border:rgba(8,145,178,.30)}
+[data-theme="dark"] .stats-card.tone-emerald{--tone-bg:rgba(5,150,105,.16);--tone-border:rgba(5,150,105,.30)}
 body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;display:flex;min-height:100vh}
 
 /* Sidebar */
@@ -146,12 +153,23 @@ tr:hover td{background:rgba(99,102,241,.04)}
 /* Stats */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .stats-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.stats-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;min-height:118px;text-align:left;color:var(--text);font:inherit}
-.stats-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.stats-card{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--tone-bg),var(--bg3) 58%);border:1px solid var(--tone-border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;min-height:128px;text-align:left;color:var(--text);font:inherit;box-shadow:0 10px 28px rgba(15,23,42,.06)}
+.stats-card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--tone);opacity:.9}
+.stats-card::after{content:"";position:absolute;right:-28px;top:-28px;width:96px;height:96px;border-radius:50%;background:var(--tone);opacity:.10;pointer-events:none}
+.stats-card:hover{border-color:var(--tone);transform:translateY(-2px);box-shadow:0 14px 34px rgba(15,23,42,.14)}
 .stats-card:active{transform:translateY(0) scale(.99)}
 .stats-card-title{display:flex;align-items:center;justify-content:space-between;color:var(--text2);font-size:12px;font-weight:700;margin-bottom:10px}
+.stats-card-kicker{display:flex;align-items:center;gap:8px}
+.stats-card-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--tone-soft);color:var(--tone);font-size:15px}
+.stats-card-action{color:var(--tone);font-weight:700}
 .stats-card-main{font-size:24px;font-weight:700;color:var(--text);line-height:1.2}
 .stats-card-sub{margin-top:8px;color:var(--text3);font-size:12px;line-height:1.45}
+.stats-card.tone-blue{--tone:#2563eb;--tone-soft:rgba(37,99,235,.12);--tone-bg:rgba(37,99,235,.08);--tone-border:rgba(37,99,235,.20)}
+.stats-card.tone-violet{--tone:#7c3aed;--tone-soft:rgba(124,58,237,.12);--tone-bg:rgba(124,58,237,.08);--tone-border:rgba(124,58,237,.20)}
+.stats-card.tone-amber{--tone:#d97706;--tone-soft:rgba(217,119,6,.13);--tone-bg:rgba(217,119,6,.08);--tone-border:rgba(217,119,6,.22)}
+.stats-card.tone-rose{--tone:#e11d48;--tone-soft:rgba(225,29,72,.12);--tone-bg:rgba(225,29,72,.08);--tone-border:rgba(225,29,72,.22)}
+.stats-card.tone-cyan{--tone:#0891b2;--tone-soft:rgba(8,145,178,.13);--tone-bg:rgba(8,145,178,.08);--tone-border:rgba(8,145,178,.22)}
+.stats-card.tone-emerald{--tone:#059669;--tone-soft:rgba(5,150,105,.13);--tone-bg:rgba(5,150,105,.08);--tone-border:rgba(5,150,105,.22)}
 .stats-detail-head{display:none;align-items:center;gap:10px;margin-bottom:12px}
 .stats-detail-title{font-size:15px;font-weight:700;color:var(--text)}
 .stats-detail-grid{display:none}
@@ -1374,36 +1392,48 @@ function renderStatsOverview(data) {
   const cards = [
     {
       key: 'ips',
+      tone: 'blue',
+      icon: '⌁',
       title: '今日 Top IP',
       main: `${(data.top_ips || []).length} 个IP`,
       sub: topSummary(data.top_ips, 'ip', 'total', '暂无请求记录'),
     },
     {
       key: 'tokens',
+      tone: 'violet',
+      icon: '#',
       title: '今日 Top Token',
       main: `${(data.top_tokens || []).length} 个Token`,
       sub: topSummary(data.top_tokens, 'token_full', 'count', '暂无 Token 拉取'),
     },
     {
       key: 'suspTokens',
+      tone: 'amber',
+      icon: '!',
       title: '可疑 Token',
       main: `${(data.susp_tokens || []).length} 个`,
       sub: (data.susp_tokens || [])[0] ? `${esc((data.susp_tokens || [])[0].ip_count)} 个不同IP拉取` : '暂无多 IP 拉取',
     },
     {
       key: 'suspIps',
+      tone: 'rose',
+      icon: '!',
       title: '可疑 IP',
       main: `${(data.susp_ips || []).length} 个`,
       sub: (data.susp_ips || [])[0] ? `${esc((data.susp_ips || [])[0].risk || '可疑')} ${esc((data.susp_ips || [])[0].score || '')}` : '暂无多 Token 拉取',
     },
     {
       key: 'scanners',
+      tone: 'cyan',
+      icon: '⌘',
       title: '脚本/扫描器',
       main: `${(data.scanner_reports || []).length} 条`,
       sub: (data.scanner_reports || [])[0] ? `${esc((data.scanner_reports || [])[0].ip)}｜${esc((data.scanner_reports || [])[0].ua || '空UA')}` : '暂无脚本拉取记录',
     },
     {
       key: 'uas',
+      tone: 'emerald',
+      icon: 'A',
       title: 'UA TOP',
       main: `${(data.bad_uas || []).length} 个UA`,
       sub: topSummary(data.bad_uas, 'ua', 'count', '今日暂无可疑UA'),
@@ -1412,8 +1442,11 @@ function renderStatsOverview(data) {
   const el = document.getElementById('stats-overview');
   if (!el) return;
   el.innerHTML = cards.map(c => `
-    <button class="stats-card" onclick="showStatsDetail('${c.key}')">
-      <div class="stats-card-title"><span>${esc(c.title)}</span><span>查看</span></div>
+    <button class="stats-card tone-${esc(c.tone)}" onclick="showStatsDetail('${c.key}')">
+      <div class="stats-card-title">
+        <span class="stats-card-kicker"><span class="stats-card-icon">${esc(c.icon)}</span>${esc(c.title)}</span>
+        <span class="stats-card-action">查看</span>
+      </div>
       <div class="stats-card-main">${esc(c.main)}</div>
       <div class="stats-card-sub">${c.sub}</div>
     </button>`).join('');
