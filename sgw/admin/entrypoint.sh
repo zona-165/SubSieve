@@ -15,6 +15,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/whitelist_ips.txt" ] || touch "$SUBSCRIBE_DIR/whitelist_ips.txt"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
+[ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
 
 chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.json" \
@@ -23,13 +24,19 @@ chmod 666 \
     "$SUBSCRIBE_DIR/ua_custom.conf" \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
     "$SUBSCRIBE_DIR/admin_settings.json" \
-    "$SUBSCRIBE_DIR/ip_intel_cache.json"
+    "$SUBSCRIBE_DIR/ip_intel_cache.json" \
+    "$SUBSCRIBE_DIR/stats_cache.json"
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe
 chmod 777 /var/log/subscribe
 touch /var/log/subscribe/access.log
 chmod 666 /var/log/subscribe/access.log
+
+(while true; do
+    php /var/www/html/api/stats.php >/dev/null 2>&1 || true
+    sleep 60
+done) &
 
 php-fpm -D
 exec nginx -g 'daemon off;'

@@ -1,5 +1,9 @@
 <?php
-require_once __DIR__ . '/_auth.php';
+if (PHP_SAPI === 'cli') {
+    require_once dirname(__DIR__) . '/config.php';
+} else {
+    require_once __DIR__ . '/_auth.php';
+}
 
 if (!defined('STATS_CACHE_JSON')) {
     define('STATS_CACHE_JSON', dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
@@ -7,7 +11,7 @@ if (!defined('STATS_CACHE_JSON')) {
 
 $cacheTtl = 45;
 $maxScanLines = 30000;
-$forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+$forceRefresh = PHP_SAPI === 'cli' || (isset($_GET['refresh']) && $_GET['refresh'] === '1');
 if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
     $cacheRaw = @file_get_contents(STATS_CACHE_JSON);
     $cache = $cacheRaw ? json_decode($cacheRaw, true) : null;
