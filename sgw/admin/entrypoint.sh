@@ -32,10 +32,17 @@ mkdir -p /var/log/subscribe
 chmod 777 /var/log/subscribe
 touch /var/log/subscribe/access.log
 chmod 666 /var/log/subscribe/access.log
+touch /var/log/subscribe/maintenance.log
+chmod 666 /var/log/subscribe/maintenance.log
 
 (while true; do
     php /var/www/html/api/stats.php >/dev/null 2>&1 || true
     sleep 60
+done) &
+
+(while true; do
+    php /var/www/html/maintenance.php prune-logs >> /var/log/subscribe/maintenance.log 2>&1 || true
+    sleep 21600
 done) &
 
 php-fpm -D

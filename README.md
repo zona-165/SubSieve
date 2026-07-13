@@ -185,6 +185,14 @@ https://你的域名或IP:64444/<随机路径>
 
 后台容器启动后会每分钟自动预热分析统计缓存，写入 `/etc/nginx/subscribe/stats_cache.json`。分析页默认读取缓存，避免日志量增长后每次打开页面都扫描大日志；首次部署和后续更新都会自动启用，无需手动配置。当前统计默认基于最近 30000 行网关日志生成。
 
+后台容器还会定时清理旧访问日志，默认保留最近 14 天，避免 `access.log` 长期增长拖慢统计或占满磁盘。如需调整，可在 `sgw/.env` 中设置：
+
+```env
+LOG_RETENTION_DAYS=14
+```
+
+设为 `0` 可关闭自动清理。维护日志见容器内 `/var/log/subscribe/maintenance.log`。
+
 ---
 
 ## 常用命令
@@ -203,6 +211,9 @@ docker compose up -d --build
 # 检查分析统计缓存是否在自动更新
 docker exec subscribe-admin sh -lc 'ls -lh /etc/nginx/subscribe/stats_cache.json'
 
+# 查看后台维护任务日志（统计预热 / 日志清理）
+docker exec subscribe-admin sh -lc 'tail -50 /var/log/subscribe/maintenance.log'
+
 # 进入 gateway 容器调试
 docker exec -it subscribe-gateway sh
 ```
@@ -217,5 +228,6 @@ docker exec -it subscribe-gateway sh
 - 2026-07-12：分析页新增“脚本/扫描器拉取订阅”报告，从日志识别 clash、curl、wget、python 等 UA 拉取订阅 Token 的行为，支持复制报告和一键封禁 IP。
 - 2026-07-13：脚本/扫描器报告接入 IP 情报查询，补充国家/地区/城市、ASN、运营商、代理/VPN/机房/移动网络画像，并缓存查询结果。
 - 2026-07-13：分析页新增“用户画像”分类，并在 admin 容器启动后自动后台预热统计缓存，降低大日志场景下的页面等待和 500 风险。
+- 2026-07-13：admin 容器新增后台维护任务，默认保留最近 14 天访问日志，可通过 `LOG_RETENTION_DAYS` 调整或关闭。
 - 2026-07-12：前端 API 请求失败提示更细化，便于定位 HTTP 500、JSON 解析失败等后台问题。
 - 2026-06-13：修复存储型 XSS 与 Nginx 配置注入两处高危漏洞，加固后台输入过滤与转义。
