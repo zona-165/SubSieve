@@ -1572,7 +1572,7 @@ function renderStatsOverview(data) {
       icon: '▦',
       title: '用户画像',
       main: `${(data.user_profiles || []).length} 个IP段`,
-      sub: (data.user_profiles || [])[0] ? `${esc((data.user_profiles || [])[0].range)}｜${esc((data.user_profiles || [])[0].ip_count)} 个IP` : '暂无画像数据',
+      sub: (data.user_profiles || [])[0] ? `${esc((data.user_profiles || [])[0].range)}｜最近 ${esc(data.scan_limit || 30000)} 行` : '暂无画像数据',
     },
     {
       key: 'uas',

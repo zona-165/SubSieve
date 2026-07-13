@@ -6,6 +6,7 @@ if (!defined('STATS_CACHE_JSON')) {
 }
 
 $cacheTtl = 45;
+$maxScanLines = 30000;
 $forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
 if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
     $cacheRaw = @file_get_contents(STATS_CACHE_JSON);
@@ -51,76 +52,72 @@ if (file_exists(WHITELIST_IPS)) {
 }
 
 if (file_exists(LOG_FILE)) {
-    $handle = fopen(LOG_FILE, 'r');
-    if ($handle) {
-        while (($line = fgets($handle)) !== false) {
-            $line = rtrim($line);
-            if ($line === '') continue;
+    foreach (tail_log_lines(LOG_FILE, $maxScanLines) as $line) {
+        $line = rtrim($line);
+        if ($line === '') continue;
 
-            $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"$/';
-            if (!preg_match($pat, $line, $m)) continue;
+        $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"$/';
+        if (!preg_match($pat, $line, $m)) continue;
 
-            [, $ip, $time, $request, $status, , $ua] = $m;
-            $status = (int)$status;
-            collect_profile_segment($profileSegments, $ip, $time, $request, $status, $ua);
+        [, $ip, $time, $request, $status, , $ua] = $m;
+        $status = (int)$status;
+        collect_profile_segment($profileSegments, $ip, $time, $request, $status, $ua);
 
-            // ── 今日统计 ──────────────────────────────────────────
-            if (str_contains($line, "[$today:")) {
-                if (!isset($ips[$ip])) $ips[$ip] = ['total'=>0,'s200'=>0,'s403'=>0,'s429'=>0,'s444'=>0];
-                $ips[$ip]['total']++;
-                if ($status === 200) $ips[$ip]['s200']++;
-                elseif ($status === 403) $ips[$ip]['s403']++;
-                elseif ($status === 429) $ips[$ip]['s429']++;
-                elseif ($status === 444) $ips[$ip]['s444']++;
+        // ── 今日统计 ──────────────────────────────────────────
+        if (str_contains($line, "[$today:")) {
+            if (!isset($ips[$ip])) $ips[$ip] = ['total'=>0,'s200'=>0,'s403'=>0,'s429'=>0,'s444'=>0];
+            $ips[$ip]['total']++;
+            if ($status === 200) $ips[$ip]['s200']++;
+            elseif ($status === 403) $ips[$ip]['s403']++;
+            elseif ($status === 429) $ips[$ip]['s429']++;
+            elseif ($status === 444) $ips[$ip]['s444']++;
 
-                if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) {
-                    $tok = $tm[1];
-                    if (!isset($tokenBlacklist[$tok])) {
-                        if (!isset($tokens[$tok])) $tokens[$tok] = ['count'=>0,'last_time'=>''];
-                        $tokens[$tok]['count']++;
-                        $tokens[$tok]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
-                    }
-                }
-
-                if ($status === 403 && $ua !== '') {
-                    if (!isset($badUas[$ua])) $badUas[$ua] = 0;
-                    $badUas[$ua]++;
+            if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) {
+                $tok = $tm[1];
+                if (!isset($tokenBlacklist[$tok])) {
+                    if (!isset($tokens[$tok])) $tokens[$tok] = ['count'=>0,'last_time'=>''];
+                    $tokens[$tok]['count']++;
+                    $tokens[$tok]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
                 }
             }
 
-            // ── 全量可疑分析（200 状态的订阅请求，排除白名单IP和Token黑名单）──
-            if ($status === 200
-                && !isset($whitelistIps[$ip])
-                && preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)
-            ) {
-                $tok = $tm[1];
-                if (!isset($tokenBlacklist[$tok])) {
-                    $suspTokenIps[$tok][$ip] = true;
-                    $suspIpTokens[$ip][$tok]  = true;
-                    $scannerReason = scanner_reason($ua);
-                    if ($scannerReason !== '') {
-                        $key = $ip . '|' . $tok;
-                        $path = extract_request_path($request);
-                        $scannerReports[$key] = [
-                            'ip' => $ip,
-                            'token' => $tok,
-                            'path' => $path,
-                            'ua' => $ua,
-                            'reason' => $scannerReason,
-                            'time' => format_log_time($time),
-                            'risk' => '高危',
-                            'score' => 90,
-                            'email' => '',
-                            'user_id' => '',
-                            'location' => '未查询',
-                            'asn' => '未查询',
-                            'query_source' => '本地日志',
-                        ];
-                    }
+            if ($status === 403 && $ua !== '') {
+                if (!isset($badUas[$ua])) $badUas[$ua] = 0;
+                $badUas[$ua]++;
+            }
+        }
+
+        // ── 近段日志可疑分析（200 状态订阅请求，排除白名单IP和Token黑名单）──
+        if ($status === 200
+            && !isset($whitelistIps[$ip])
+            && preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)
+        ) {
+            $tok = $tm[1];
+            if (!isset($tokenBlacklist[$tok])) {
+                $suspTokenIps[$tok][$ip] = true;
+                $suspIpTokens[$ip][$tok]  = true;
+                $scannerReason = scanner_reason($ua);
+                if ($scannerReason !== '') {
+                    $key = $ip . '|' . $tok;
+                    $path = extract_request_path($request);
+                    $scannerReports[$key] = [
+                        'ip' => $ip,
+                        'token' => $tok,
+                        'path' => $path,
+                        'ua' => $ua,
+                        'reason' => $scannerReason,
+                        'time' => format_log_time($time),
+                        'risk' => '高危',
+                        'score' => 90,
+                        'email' => '',
+                        'user_id' => '',
+                        'location' => '未查询',
+                        'asn' => '未查询',
+                        'query_source' => '本地日志',
+                    ];
                 }
             }
         }
-        fclose($handle);
     }
 }
 
@@ -209,10 +206,35 @@ $payload = [
     'scanner_reports' => $scannerList,
     'user_profiles' => $userProfiles,
     'cached' => false,
+    'scan_limit' => $maxScanLines,
 ];
 
 @file_put_contents(STATS_CACHE_JSON, json_encode(['ts' => time(), 'data' => $payload], JSON_UNESCAPED_UNICODE), LOCK_EX);
 json_out($payload);
+
+function tail_log_lines(string $file, int $maxLines): iterable {
+    try {
+        $obj = new SplFileObject($file, 'r');
+        $obj->seek(PHP_INT_MAX);
+        $last = $obj->key();
+        $start = max(0, $last - $maxLines + 1);
+        $obj->seek($start);
+        while (!$obj->eof()) {
+            $line = $obj->fgets();
+            if ($line !== false) yield $line;
+        }
+    } catch (Throwable $e) {
+        $handle = @fopen($file, 'r');
+        if (!$handle) return;
+        $buf = [];
+        while (($line = fgets($handle)) !== false) {
+            $buf[] = $line;
+            if (count($buf) > $maxLines) array_shift($buf);
+        }
+        fclose($handle);
+        foreach ($buf as $line) yield $line;
+    }
+}
 
 function collect_profile_segment(array &$segments, string $ip, string $time, string $request, int $status, string $ua): void {
     if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return;
