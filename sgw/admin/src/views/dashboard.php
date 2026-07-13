@@ -3073,6 +3073,7 @@ async function importAlertHistory(input) {
     const lines = [
       '即将导入告警展示记录：',
       `文件：${file.name || '-'}（${formatFileSize(file.size)}）`,
+      `导出时间：${p.exported_at || '-'}`,
       `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 ${p.history_max || p.total || 0} 条）` : ''}`,
       `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,

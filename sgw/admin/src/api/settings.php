@@ -643,6 +643,7 @@ function read_uploaded_alert_history(): array {
         'original_entries' => count(array_filter($history['entries'], 'is_array')),
         'history_max' => $historyMax,
     ];
+    if (!empty($data['exported_at'])) $result['exported_at'] = (string)$data['exported_at'];
     if ($context !== null) $result['context'] = $context;
     return $result;
 }
@@ -667,6 +668,7 @@ function summarize_alert_history(array $history): array {
         'truncated' => !empty($history['original_entries']) && (int)$history['original_entries'] > count($entries),
         'original_total' => (int)($history['original_entries'] ?? count($entries)),
         'history_max' => (int)($history['history_max'] ?? count($entries)),
+        'exported_at' => (string)($history['exported_at'] ?? ''),
     ];
     if (is_array($history['context'] ?? null)) {
         $summary['context'] = $history['context'];
