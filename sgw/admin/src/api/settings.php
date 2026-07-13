@@ -41,6 +41,15 @@ if ($method === 'POST') {
 
     $s = read_settings();
 
+    if (!empty($body['_test_alert'])) {
+        $testSettings = apply_alert_settings($s, $body);
+        $result = send_alert_message($testSettings, "SubSieve 测试告警\n这是一条后台测试通知。");
+        if (!$result['ok']) {
+            json_err('测试推送失败: ' . ($result['error'] ?? 'unknown'));
+        }
+        json_out(['ok' => true, 'msg' => '测试推送已发送']);
+    }
+
     // ── 界面标题 ───────────────────────────────────────────────
     if (isset($body['site_title'])) $s['site_title'] = trim($body['site_title']) ?: 'SubSieve';
     if (isset($body['page_title'])) $s['page_title'] = trim($body['page_title']) ?: 'SubSieve Admin';
@@ -92,6 +101,8 @@ if ($method === 'POST') {
         $s['subscribe_path'] = $path;
         $upstreamChanged = true;
     }
+
+    $s = apply_alert_settings($s, $body);
 
     // 保存 settings.json
     if (!write_settings($s)) {
@@ -147,6 +158,88 @@ function read_settings(): array {
 
 function write_settings(array $s): bool {
     return file_put_contents(SETTINGS_JSON, json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
+}
+
+function apply_alert_settings(array $s, array $body): array {
+    if (array_key_exists('alert_enabled', $body)) {
+        $s['alert_enabled'] = !empty($body['alert_enabled']) ? 1 : 0;
+    }
+    if (array_key_exists('alert_channel', $body)) {
+        $channel = trim((string)$body['alert_channel']);
+        $s['alert_channel'] = in_array($channel, ['webhook', 'telegram'], true) ? $channel : 'webhook';
+    }
+    foreach (['alert_webhook_url', 'alert_telegram_bot_token', 'alert_telegram_chat_id'] as $key) {
+        if (array_key_exists($key, $body)) {
+            $s[$key] = trim((string)$body[$key]);
+        }
+    }
+    return $s;
+}
+
+function send_alert_message(array $settings, string $text): array {
+    if (empty($settings['alert_enabled'])) {
+        return ['ok' => false, 'error' => '告警未开启'];
+    }
+    $channel = $settings['alert_channel'] ?? 'webhook';
+    if ($channel === 'telegram') {
+        return send_telegram_alert($settings, $text);
+    }
+    return send_webhook_alert($settings, $text);
+}
+
+function send_webhook_alert(array $settings, string $text): array {
+    $url = trim((string)($settings['alert_webhook_url'] ?? ''));
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return ['ok' => false, 'error' => 'Webhook 地址无效'];
+    }
+    $payload = json_encode([
+        'title' => 'SubSieve 告警',
+        'text' => $text,
+        'source' => 'SubSieve',
+        'time' => date('Y-m-d H:i:s'),
+    ], JSON_UNESCAPED_UNICODE);
+    $result = http_json_post($url, $payload);
+    return $result['ok'] ? ['ok' => true] : $result;
+}
+
+function send_telegram_alert(array $settings, string $text): array {
+    $token = trim((string)($settings['alert_telegram_bot_token'] ?? ''));
+    $chatId = trim((string)($settings['alert_telegram_chat_id'] ?? ''));
+    if ($token === '' || $chatId === '') {
+        return ['ok' => false, 'error' => 'Telegram Bot Token 或 Chat ID 未填写'];
+    }
+    $url = 'https://api.telegram.org/bot' . $token . '/sendMessage';
+    $payload = json_encode([
+        'chat_id' => $chatId,
+        'text' => $text,
+        'disable_web_page_preview' => true,
+    ], JSON_UNESCAPED_UNICODE);
+    $result = http_json_post($url, $payload);
+    return $result['ok'] ? ['ok' => true] : $result;
+}
+
+function http_json_post(string $url, string $payload): array {
+    $ctx = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $ctx);
+    $status = 0;
+    if (!empty($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+        $status = (int)$m[1];
+    }
+    if ($raw === false) {
+        return ['ok' => false, 'error' => '网络请求失败'];
+    }
+    if ($status >= 400) {
+        return ['ok' => false, 'error' => 'HTTP ' . $status . ': ' . substr($raw, 0, 160)];
+    }
+    return ['ok' => true, 'status' => $status, 'body' => $raw];
 }
 
 /**

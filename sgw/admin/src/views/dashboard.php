@@ -758,6 +758,41 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
           </div>
         </div>
 
+        <!-- 告警推送 -->
+        <div class="card">
+          <div class="card-title">告警推送</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px">
+              <input id="cfg-alert-enabled" type="checkbox" style="width:18px;height:18px">
+              开启高危事件推送
+            </label>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">渠道</label>
+              <select class="ip-input" id="cfg-alert-channel" style="width:100%">
+                <option value="webhook">Webhook</option>
+                <option value="telegram">Telegram</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">Webhook URL</label>
+              <input class="ip-input" id="cfg-alert-webhook-url" placeholder="https://example.com/webhook" style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">Telegram Bot Token</label>
+              <input class="ip-input" id="cfg-alert-telegram-token" placeholder="123456:ABC..." style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">Telegram Chat ID</label>
+              <input class="ip-input" id="cfg-alert-telegram-chat" placeholder="-1001234567890" style="width:100%">
+            </div>
+            <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；同一事件 1 小时内只推送一次。</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
+              <button class="mode-btn" onclick="testAlertSettings()">测试推送</button>
+            </div>
+          </div>
+        </div>
+
 
       </div>
     </div>
@@ -2250,6 +2285,16 @@ async function loadSettings() {
   if (currentSettings.gateway_port) {
     document.getElementById('cfg-gateway-port').value = currentSettings.gateway_port;
   }
+  const alertEnabled = document.getElementById('cfg-alert-enabled');
+  if (alertEnabled) alertEnabled.checked = !!parseInt(currentSettings.alert_enabled || 0, 10);
+  const alertChannel = document.getElementById('cfg-alert-channel');
+  if (alertChannel) alertChannel.value = currentSettings.alert_channel || 'webhook';
+  const alertWebhook = document.getElementById('cfg-alert-webhook-url');
+  if (alertWebhook) alertWebhook.value = currentSettings.alert_webhook_url || '';
+  const alertTelegramToken = document.getElementById('cfg-alert-telegram-token');
+  if (alertTelegramToken) alertTelegramToken.value = currentSettings.alert_telegram_bot_token || '';
+  const alertTelegramChat = document.getElementById('cfg-alert-telegram-chat');
+  if (alertTelegramChat) alertTelegramChat.value = currentSettings.alert_telegram_chat_id || '';
   // 显示证书信息
   const cert = data.cert || {};
   const certEl = document.getElementById('cert-info');
@@ -2386,6 +2431,61 @@ async function saveUpstreamSettings() {
   } else {
     toast(d.error || '保存失败', 'err');
   }
+}
+
+function getAlertSettingsPayload() {
+  return {
+    alert_enabled: document.getElementById('cfg-alert-enabled').checked ? 1 : 0,
+    alert_channel: document.getElementById('cfg-alert-channel').value || 'webhook',
+    alert_webhook_url: document.getElementById('cfg-alert-webhook-url').value.trim(),
+    alert_telegram_bot_token: document.getElementById('cfg-alert-telegram-token').value.trim(),
+    alert_telegram_chat_id: document.getElementById('cfg-alert-telegram-chat').value.trim(),
+  };
+}
+
+function validateAlertPayload(body, forTest = false) {
+  if (!body.alert_enabled && forTest) body.alert_enabled = 1;
+  if (!body.alert_enabled && !forTest) return true;
+  if (body.alert_channel === 'telegram') {
+    if (!body.alert_telegram_bot_token || !body.alert_telegram_chat_id) {
+      toast('请填写 Telegram Bot Token 和 Chat ID', 'err');
+      return false;
+    }
+    return true;
+  }
+  if (!body.alert_webhook_url) {
+    toast('请填写 Webhook URL', 'err');
+    return false;
+  }
+  return true;
+}
+
+async function saveAlertSettings() {
+  const body = getAlertSettingsPayload();
+  if (!validateAlertPayload(body, false)) return;
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify(body),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ 告警设置已保存');
+    await loadSettings();
+  } else {
+    toast(d.error || '保存失败', 'err');
+  }
+}
+
+async function testAlertSettings() {
+  const body = getAlertSettingsPayload();
+  body._test_alert = 1;
+  body.alert_enabled = 1;
+  if (!validateAlertPayload(body, true)) return;
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify(body),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) toast('✅ 测试推送已发送');
+  else toast(d.error || '测试失败', 'err');
 }
 
 

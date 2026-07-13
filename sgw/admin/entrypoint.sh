@@ -16,6 +16,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
 [ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
+[ -f "$SUBSCRIBE_DIR/alert_state.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_state.json"
 
 chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.json" \
@@ -25,7 +26,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
     "$SUBSCRIBE_DIR/admin_settings.json" \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
-    "$SUBSCRIBE_DIR/stats_cache.json"
+    "$SUBSCRIBE_DIR/stats_cache.json" \
+    "$SUBSCRIBE_DIR/alert_state.json"
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe
@@ -43,6 +45,11 @@ done) &
 (while true; do
     php /var/www/html/maintenance.php prune-logs >> /var/log/subscribe/maintenance.log 2>&1 || true
     sleep 21600
+done) &
+
+(while true; do
+    php /var/www/html/maintenance.php check-alerts >> /var/log/subscribe/maintenance.log 2>&1 || true
+    sleep 60
 done) &
 
 php-fpm -D
