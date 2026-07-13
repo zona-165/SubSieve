@@ -130,6 +130,8 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .alert-history-action{align-self:start}
 .alert-history-filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
 .alert-history-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 8px;border:1px solid rgba(99,102,241,.18);border-radius:999px;background:rgba(99,102,241,.08);color:var(--text2);font-size:11px;font-weight:700;line-height:1.4}
+.alert-history-chip-btn{cursor:pointer;font:inherit}
+.alert-history-chip-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,.13)}
 .alert-history-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .log-filter{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-size:12px;outline:none;width:160px;transition:all .15s}
 .log-filter:focus{border-color:var(--accent)}
@@ -2493,12 +2495,12 @@ function renderAlertHistory(history) {
   const limitOptions = [10, 25, 50].map(n => `<option value="${n}"${alertHistoryLimit === n ? ' selected' : ''}>${n}条</option>`).join('');
   const filterLabel = (filterItems.find(([value]) => value === alertHistoryFilter) || filterItems[0])[1];
   const rangeLabel = (rangeItems.find(([value]) => value === alertHistoryRange) || rangeItems[0])[1];
-  const queryChip = alertHistoryQuery ? `<div class="alert-history-chip"><span>关键词：${esc(alertHistoryQuery)}</span></div>` : '';
+  const queryChip = alertHistoryQuery ? `<button type="button" class="alert-history-chip alert-history-chip-btn" onclick="clearAlertHistoryQuery()" title="清空关键词"><span>关键词：${esc(alertHistoryQuery)} ×</span></button>` : '';
   const activeFilterChips = `
     <div class="alert-history-filters">
-      <div class="alert-history-chip"><span>状态：${esc(filterLabel)}</span></div>
-      <div class="alert-history-chip"><span>时间：${esc(rangeLabel)}</span></div>
-      <div class="alert-history-chip"><span>每页：${esc(alertHistoryLimit)} 条</span></div>
+      <button type="button" class="alert-history-chip alert-history-chip-btn" onclick="setAlertHistoryFilter('all')" title="恢复全部状态"><span>状态：${esc(filterLabel)}${alertHistoryFilter !== 'all' ? ' ×' : ''}</span></button>
+      <button type="button" class="alert-history-chip alert-history-chip-btn" onclick="setAlertHistoryRange('all')" title="恢复全部时间"><span>时间：${esc(rangeLabel)}${alertHistoryRange !== 'all' ? ' ×' : ''}</span></button>
+      <button type="button" class="alert-history-chip alert-history-chip-btn" onclick="setAlertHistoryLimit(10)" title="恢复每页 10 条"><span>每页：${esc(alertHistoryLimit)} 条${alertHistoryLimit !== 10 ? ' ×' : ''}</span></button>
       ${queryChip}
     </div>`;
   const rows = filteredEntries.length ? filteredEntries.map(e => {
