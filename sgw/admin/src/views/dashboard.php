@@ -128,6 +128,9 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .alert-history-search .mode-btn{height:34px;padding:0 10px;font-size:12px}
 .alert-history-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)}
 .alert-history-action{align-self:start}
+.alert-history-filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.alert-history-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 8px;border:1px solid rgba(99,102,241,.18);border-radius:999px;background:rgba(99,102,241,.08);color:var(--text2);font-size:11px;font-weight:700;line-height:1.4}
+.alert-history-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .log-filter{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-size:12px;outline:none;width:160px;transition:all .15s}
 .log-filter:focus{border-color:var(--accent)}
 .log-filter:focus,.ip-input:focus,.comment-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12)}
@@ -332,6 +335,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .alert-history-row{grid-template-columns:auto 1fr;gap:7px 8px;padding:10px 0}
   .alert-history-row .copy-btn{width:100%;min-height:30px}
   .alert-history-action{grid-column:auto;align-self:stretch}
+  .alert-history-chip{max-width:100%}
   .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2472,19 +2476,31 @@ function renderAlertHistory(history) {
       <div style="color:var(--text3);font-size:11px;line-height:1.45;margin-top:3px;word-break:break-all">${esc(quietSummary.latest_summary || '')}</div>
       <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(quietSummary.latest_time || '')}</div>
     </div>` : '';
-  const filterOptions = [
+  const filterItems = [
     ['all', '全部'],
     ['sent', '已推送'],
     ['muted', '静默'],
     ['error', '失败'],
-  ].map(([value, label]) => `<option value="${value}"${alertHistoryFilter === value ? ' selected' : ''}>${label}</option>`).join('');
-  const rangeOptions = [
+  ];
+  const rangeItems = [
     ['all', '全部时间'],
     ['today', '今天'],
     ['24h', '近24小时'],
     ['7d', '近7天'],
-  ].map(([value, label]) => `<option value="${value}"${alertHistoryRange === value ? ' selected' : ''}>${label}</option>`).join('');
+  ];
+  const filterOptions = filterItems.map(([value, label]) => `<option value="${value}"${alertHistoryFilter === value ? ' selected' : ''}>${label}</option>`).join('');
+  const rangeOptions = rangeItems.map(([value, label]) => `<option value="${value}"${alertHistoryRange === value ? ' selected' : ''}>${label}</option>`).join('');
   const limitOptions = [10, 25, 50].map(n => `<option value="${n}"${alertHistoryLimit === n ? ' selected' : ''}>${n}条</option>`).join('');
+  const filterLabel = (filterItems.find(([value]) => value === alertHistoryFilter) || filterItems[0])[1];
+  const rangeLabel = (rangeItems.find(([value]) => value === alertHistoryRange) || rangeItems[0])[1];
+  const queryChip = alertHistoryQuery ? `<div class="alert-history-chip"><span>关键词：${esc(alertHistoryQuery)}</span></div>` : '';
+  const activeFilterChips = `
+    <div class="alert-history-filters">
+      <div class="alert-history-chip"><span>状态：${esc(filterLabel)}</span></div>
+      <div class="alert-history-chip"><span>时间：${esc(rangeLabel)}</span></div>
+      <div class="alert-history-chip"><span>每页：${esc(alertHistoryLimit)} 条</span></div>
+      ${queryChip}
+    </div>`;
   const rows = filteredEntries.length ? filteredEntries.map(e => {
     const label = alertEntryStatusLabel(e);
     const color = alertEntryStatusColor(e);
@@ -2557,6 +2573,7 @@ function renderAlertHistory(history) {
       <button class="mode-btn" onclick="clearAlertHistoryQuery()" ${alertHistoryQuery ? '' : 'disabled'}>清空</button>
     </div>
     <div id="alert-history-query-state" style="min-height:16px;color:var(--text3);font-size:11px;margin-bottom:2px"></div>
+    ${activeFilterChips}
     ${rows}
     ${pager}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
