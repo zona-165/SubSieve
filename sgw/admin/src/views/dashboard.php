@@ -2745,6 +2745,16 @@ function formatFileSize(bytes) {
   return `${unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
 
+function alertImportAgeNote(value) {
+  if (!value) return '';
+  const ts = Date.parse(String(value).replace(' ', 'T'));
+  if (!Number.isFinite(ts)) return '';
+  const diff = Date.now() - ts;
+  if (diff < -5 * 60 * 1000) return '提示：导出时间晚于当前时间，请确认服务器或本机时间是否一致。';
+  if (diff > 7 * 24 * 3600 * 1000) return `提示：这份备份约 ${formatDuration(Math.floor(diff / 1000))}，导入前请确认不会覆盖较新的展示记录。`;
+  return '';
+}
+
 function copyFilteredAlertHistory() {
   const rows = currentFilteredAlertEntries();
   if (!rows.length) {
@@ -3067,6 +3077,7 @@ async function importAlertHistory(input) {
     }
     const p = previewData.preview || {};
     const ctx = p.context || {};
+    const ageNote = alertImportAgeNote(p.exported_at || '');
     const contextLine = ctx.status_label || ctx.range_label || ctx.page || ctx.query
       ? `来源筛选：状态 ${ctx.status_label || ctx.status || '-'} / 时间 ${ctx.range_label || ctx.range || '-'} / 关键词 ${ctx.query || '-'} / 页码 ${ctx.page || '-'} / 范围 ${ctx.range_label_text || '-'}`
       : '';
@@ -3078,6 +3089,7 @@ async function importAlertHistory(input) {
       `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
       `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
       ...(contextLine ? [contextLine] : []),
+      ...(ageNote ? [ageNote] : []),
       '',
       '导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？',
     ];
