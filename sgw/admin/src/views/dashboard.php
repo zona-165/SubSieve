@@ -1495,10 +1495,11 @@ function updateStatsView() {
 }
 
 function scannerReportText(r) {
+  const mapped = !!r.owner_mapped;
   return `脚本/扫描器拉取订阅
 ━━━━━━━━━━━━━━
-结论：已读取到订阅Token，但未映射到邮箱。
-建议：复制 Token 到后台查询用户；是否写入token:owner映射。
+结论：已读取到订阅Token，${mapped ? '已映射到机场用户。' : '但未映射到邮箱。'}
+建议：${mapped ? '核对该用户近期客户端与节点使用情况，再决定是否封禁 IP。' : '复制 Token 到后台查询用户；也可配置 V2B 数据库自动映射。'}
 风险：${r.risk || '高危'}｜评分 ${r.score || 90}
 定位：邮箱 ${r.email || '未映射'}｜用户ID ${r.user_id || '未映射'}
 Token：${r.token || ''}
