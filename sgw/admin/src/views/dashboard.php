@@ -1497,10 +1497,9 @@ function updateStatsView() {
 function scannerReportText(r) {
   return `脚本/扫描器拉取订阅
 ━━━━━━━━━━━━━━
-结论：已读取到订阅Token，但未映射到邮箱。
-建议：复制 Token 到后台查询用户；是否写入token:owner映射。
+结论：已读取到订阅Token。
+建议：必要时复制 Token 到机场后台手动核对用户。
 风险：${r.risk || '高危'}｜评分 ${r.score || 90}
-定位：邮箱 ${r.email || '未映射'}｜用户ID ${r.user_id || '未映射'}
 Token：${r.token || ''}
 来源：${r.ip || ''}｜${r.location || '未查询'}
 ASN：${r.asn || '未查询'}
