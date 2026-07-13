@@ -831,6 +831,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
             <div id="alert-history-info" style="border-top:1px solid var(--border);padding-top:12px">
               <div class="loading">加载中…</div>
             </div>
+            <input type="file" id="alert-history-import-file" accept=".json,application/json" style="display:none" onchange="importAlertHistory(this)">
           </div>
         </div>
 
@@ -2464,6 +2465,7 @@ function renderAlertHistory(history) {
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
       <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
+      <button class="mode-btn" onclick="document.getElementById('alert-history-import-file').click()">导入记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(true)">重置去重</button>
     </div>`;
@@ -2688,6 +2690,32 @@ function exportAlertHistory() {
   a.href = BASE + '/api/settings.php?export_alert_history=1';
   a.download = '';
   a.click();
+}
+
+async function importAlertHistory(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!confirm('导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？')) return;
+  const fd = new FormData();
+  fd.append('history', file);
+  try {
+    const r = await fetch(BASE + '/api/settings.php?import_alert_history=1', {
+      method: 'POST',
+      body: fd,
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      credentials: 'same-origin',
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`✅ 已导入 ${d.imported || 0} 条告警记录`);
+      await loadSettings();
+    } else {
+      toast(d.error || '导入失败', 'err');
+    }
+  } catch(e) {
+    toast('导入失败: ' + e.message, 'err');
+  }
 }
 
 

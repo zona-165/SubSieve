@@ -3,6 +3,14 @@ require_once __DIR__ . '/_auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+if ($method === 'POST' && !empty($_GET['import_alert_history'])) {
+    try {
+        import_alert_history();
+    } catch (Throwable $e) {
+        json_err('导入失败: ' . $e->getMessage());
+    }
+}
+
 // GET — 读取当前设置
 if ($method === 'GET') {
     try {
@@ -506,6 +514,37 @@ function export_alert_history(): void {
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+function import_alert_history(): void {
+    if (empty($_FILES['history']) || !is_uploaded_file($_FILES['history']['tmp_name'])) {
+        json_err('请选择告警历史 JSON 文件');
+    }
+    if ((int)($_FILES['history']['size'] ?? 0) > 1024 * 1024) {
+        json_err('文件过大，最多 1MB');
+    }
+    $raw = @file_get_contents($_FILES['history']['tmp_name']);
+    if ($raw === false || trim($raw) === '') {
+        json_err('文件为空或无法读取');
+    }
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        json_err('JSON 格式无效');
+    }
+    $history = is_array($data['history'] ?? null) ? $data['history'] : $data;
+    if (!is_array($history['status'] ?? null) || !is_array($history['entries'] ?? null)) {
+        json_err('不是有效的告警历史文件');
+    }
+    $entries = array_slice(array_values(array_filter($history['entries'], 'is_array')), 0, 50);
+    $safeHistory = [
+        'status' => $history['status'],
+        'entries' => $entries,
+    ];
+    if (!file_put_contents(ALERT_HISTORY_JSON, json_encode($safeHistory, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX)) {
+        json_err('写入告警历史失败，请检查权限');
+    }
+    @chmod(ALERT_HISTORY_JSON, 0666);
+    json_out(['ok' => true, 'imported' => count($entries)]);
 }
 
 function human_bytes(int $bytes): string {
