@@ -177,7 +177,11 @@ $scannerList = array_values($scannerReports);
 usort($scannerList, fn($a,$b) => strcmp($b['time'], $a['time']));
 $scannerList = array_slice($scannerList, 0, 100);
 $scannerList = enrich_scanner_reports($scannerList);
-$userProfiles = build_user_profiles($profileSegments);
+try {
+    $userProfiles = build_user_profiles($profileSegments);
+} catch (Throwable $e) {
+    $userProfiles = [];
+}
 
 json_out([
     'ok'          => true,
@@ -192,15 +196,19 @@ json_out([
 
 function collect_profile_segment(array &$segments, string $ip, string $time, string $request, int $status, string $ua): void {
     if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return;
-    $long = ip2long($ip);
-    if ($long === false) return;
-    $baseLong = $long & 0xFFFFFF00;
-    $segment = long2ip($baseLong);
-    $lastOctet = $long & 0xFF;
+    $parts = explode('.', $ip);
+    if (count($parts) !== 4) return;
+    $octets = array_map('intval', $parts);
+    foreach ($octets as $octet) {
+        if ($octet < 0 || $octet > 255) return;
+    }
+    $segment = $octets[0] . '.' . $octets[1] . '.' . $octets[2] . '.0';
+    $rangeEnd = $octets[0] . '.' . $octets[1] . '.' . $octets[2] . '.255';
+    $lastOctet = $octets[3];
     if (!isset($segments[$segment])) {
         $segments[$segment] = [
             'base' => $segment,
-            'range' => $segment . ' - ' . long2ip($baseLong + 255),
+            'range' => $segment . ' - ' . $rangeEnd,
             'ips' => [],
             'total' => 0,
             'last_time' => '',
@@ -236,8 +244,6 @@ function build_user_profiles(array $segments): array {
     if (!$segments) return [];
     uasort($segments, fn($a, $b) => ($b['total'] <=> $a['total']) ?: strcmp($a['base'], $b['base']));
     $cache = read_ip_intel_cache();
-    $dirty = false;
-    $lookups = 0;
     $profiles = [];
     foreach (array_slice($segments, 0, 8, true) as $segment) {
         $cells = [];
@@ -245,11 +251,7 @@ function build_user_profiles(array $segments): array {
         uasort($segment['ips'], fn($a, $b) => $a['last_octet'] <=> $b['last_octet']);
         foreach ($segment['ips'] as $ip => $cell) {
             $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
-            $intel = null;
-            if ($cached || $lookups < 40) {
-                if (!$cached) $lookups++;
-                $intel = get_ip_intel($ip, $cache, $dirty);
-            }
+            $intel = $cached ? ($cache[$ip]['data'] ?? null) : null;
             $kind = profile_cell_kind($cell, $intel);
             $summary[$kind]++;
             $cells[] = [
@@ -275,7 +277,6 @@ function build_user_profiles(array $segments): array {
             'cells' => array_slice($cells, 0, 256),
         ];
     }
-    if ($dirty) write_ip_intel_cache($cache);
     return $profiles;
 }
 
