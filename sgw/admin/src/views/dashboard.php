@@ -126,6 +126,8 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .alert-history-search{display:flex;gap:8px;align-items:center;margin-bottom:4px}
 .alert-history-search .ip-input{flex:1;min-width:0;height:34px;font-size:12px}
 .alert-history-search .mode-btn{height:34px;padding:0 10px;font-size:12px}
+.alert-history-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)}
+.alert-history-action{align-self:start}
 .log-filter{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:9px;font-size:12px;outline:none;width:160px;transition:all .15s}
 .log-filter:focus{border-color:var(--accent)}
 .log-filter:focus,.ip-input:focus,.comment-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12)}
@@ -327,6 +329,9 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .alert-history-search{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .alert-history-search .ip-input{grid-column:1 / -1;height:36px}
   .alert-history-search .mode-btn{height:34px;width:100%;padding:0 8px}
+  .alert-history-row{grid-template-columns:auto 1fr;gap:7px 8px;padding:10px 0}
+  .alert-history-row .copy-btn{width:100%;min-height:30px}
+  .alert-history-action{grid-column:auto;align-self:stretch}
   .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2486,15 +2491,15 @@ function renderAlertHistory(history) {
     const report = formatAlertEntryText(e);
     const timeText = formatAlertHistoryTime(e.time || '');
     return `
-      <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+      <div class="alert-history-row">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
         <div style="min-width:0">
           <div style="font-weight:700;color:var(--text);font-size:12px;word-break:break-word">${esc(e.title || '告警')}</div>
           <div style="color:var(--text3);font-size:11px;line-height:1.45;word-break:break-all">${esc(e.summary || '')}</div>
           <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(timeText)} · ${esc(e.channel || '-')}</div>
         </div>
-        <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)" style="align-self:start">复制</button>
-        <button class="copy-btn" data-key="${esc(e.key || '')}" data-time="${esc(e.time || '')}" data-status="${esc(e.status || '')}" onclick="deleteAlertHistoryEntry(this.dataset.key,this.dataset.time,this.dataset.status)" style="align-self:start;color:#ef4444">删除</button>
+        <button class="copy-btn alert-history-action" data-val="${esc(report)}" onclick="copyText(this.dataset.val)">复制</button>
+        <button class="copy-btn alert-history-action" data-key="${esc(e.key || '')}" data-time="${esc(e.time || '')}" data-status="${esc(e.status || '')}" onclick="deleteAlertHistoryEntry(this.dataset.key,this.dataset.time,this.dataset.status)" style="color:#ef4444">删除</button>
       </div>`;
   }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${filteredTotal ? '当前页暂无记录' : '当前条件暂无记录'}</div>`;
   const pager = totalPages > 1 ? `
