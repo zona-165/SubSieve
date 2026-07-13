@@ -2431,6 +2431,7 @@ function renderAlertHistory(history) {
   const totalPages = Math.max(1, parseInt(history.total_pages || 1, 10));
   const filteredTotal = parseInt(history.filtered_total ?? entries.length, 10);
   alertHistoryPage = page;
+  const historySummary = history.summary || {};
   const quietSummary = history.quiet_summary || {};
   const enabled = !!status.enabled;
   const ok = !status.errors || status.errors.length === 0;
@@ -2499,6 +2500,13 @@ function renderAlertHistory(history) {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">推送</div><div style="font-weight:900">${esc(status.sent ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">去重</div><div style="font-weight:900">${esc(status.skipped ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(status.muted ?? 0)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;margin-bottom:10px">
+      <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">历史</div><div style="font-weight:900">${esc(historySummary.total ?? history.total ?? 0)}</div></div>
+      <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.18);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">已推送</div><div style="font-weight:900">${esc(historySummary.sent ?? 0)}</div></div>
+      <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.18);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">静默</div><div style="font-weight:900">${esc(historySummary.muted ?? 0)}</div></div>
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">失败</div><div style="font-weight:900">${esc(historySummary.error ?? 0)}</div></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">上限</div><div style="font-weight:900">${esc(historySummary.history_max ?? currentSettings.alert_history_max ?? 200)}</div></div>
     </div>
     ${quietSummaryHtml}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">

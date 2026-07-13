@@ -535,6 +535,10 @@ function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all
         return ['exists' => true, 'status' => [], 'entries' => []];
     }
     $allEntries = is_array($data['entries'] ?? null) ? $data['entries'] : [];
+    $historySummary = summarize_alert_history([
+        'entries' => $allEntries,
+        'history_max' => alert_history_max_setting(),
+    ]);
     $filteredEntries = array_values(array_filter($allEntries, function ($entry) use ($filter, $query) {
         if (!is_array($entry)) return false;
         $status = (string)($entry['status'] ?? 'sent');
@@ -566,6 +570,7 @@ function get_alert_history(int $limit = 10, int $page = 1, string $filter = 'all
         'filtered_total' => $filteredTotal,
         'filter' => $filter,
         'query' => $query,
+        'summary' => $historySummary,
         'quiet_summary' => [
             'count' => count($quietEntries),
             'latest_time' => is_array($latestQuiet) ? ($latestQuiet['time'] ?? '') : '',
