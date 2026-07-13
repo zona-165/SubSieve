@@ -2435,6 +2435,9 @@ function renderAlertHistory(history) {
   alertHistoryPage = page;
   const historySummary = history.summary || {};
   const quietSummary = history.quiet_summary || {};
+  const historyRangeText = historySummary.first_time && historySummary.last_time
+    ? `${formatAlertHistoryTime(historySummary.first_time)} ~ ${formatAlertHistoryTime(historySummary.last_time)}`
+    : '';
   const enabled = !!status.enabled;
   const ok = !status.errors || status.errors.length === 0;
   const badgeColor = enabled ? (ok ? '#22c55e' : '#ef4444') : '#94a3b8';
@@ -2517,6 +2520,7 @@ function renderAlertHistory(history) {
       <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">失败</div><div style="font-weight:900">${esc(historySummary.error ?? 0)}</div></div>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px"><div style="color:var(--text3);font-size:11px">上限</div><div style="font-weight:900">${esc(historySummary.history_max ?? currentSettings.alert_history_max ?? 200)}</div></div>
     </div>
+    ${historyRangeText ? `<div style="color:var(--text3);font-size:11px;line-height:1.5;margin:-4px 0 10px">历史范围：${esc(historyRangeText)}</div>` : ''}
     ${quietSummaryHtml}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
       <div style="font-weight:800;color:var(--text);font-size:12px;flex:1 1 140px">最近记录 · ${esc(filteredEntries.length)} / ${esc(filteredTotal)} 条</div>
