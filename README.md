@@ -183,19 +183,6 @@ https://你的域名或IP:64444/<随机路径>
 
 脚本/扫描器报告中的 IP 情报默认通过 `ip-api.com` 查询，结果缓存到 `/etc/nginx/subscribe/ip_intel_cache.json`，缓存有效期 7 天；接口不可用时会显示“查询失败”，但不会影响后台统计。
 
-如果需要把订阅 Token 自动映射到机场用户邮箱 / 用户 ID，可在 `sgw/.env` 填写 V2Board 数据库只读账号：
-
-```env
-V2B_DB_HOST=127.0.0.1
-V2B_DB_PORT=3306
-V2B_DB_NAME=v2board
-V2B_DB_USER=readonly_user
-V2B_DB_PASS=readonly_password
-V2B_USER_TABLE=v2_user
-```
-
-保存后执行 `./update.sh` 重建后台容器。后台会通过 `token` 查询 `V2B_USER_TABLE` 表中的 `id` / `email` 字段，并缓存到 `/etc/nginx/subscribe/token_owner_cache.json` 1 小时。建议使用只读数据库账号。
-
 ---
 
 ## 常用命令
@@ -224,6 +211,5 @@ docker exec -it subscribe-gateway sh
 - 2026-07-12：分析页增强可疑 IP 展示，新增风险评分、高危成立依据、紧凑排版和一键封禁/白名单操作。
 - 2026-07-12：分析页新增“脚本/扫描器拉取订阅”报告，从日志识别 clash、curl、wget、python 等 UA 拉取订阅 Token 的行为，支持复制报告和一键封禁 IP。
 - 2026-07-13：脚本/扫描器报告接入 IP 情报查询，补充国家/地区/城市、ASN、运营商、代理/VPN/机房/移动网络画像，并缓存查询结果。
-- 2026-07-13：支持通过 V2Board 数据库按订阅 Token 反查用户邮箱和用户 ID，脚本/扫描器报告不再只能显示“未映射”。
 - 2026-07-12：前端 API 请求失败提示更细化，便于定位 HTTP 500、JSON 解析失败等后台问题。
 - 2026-06-13：修复存储型 XSS 与 Nginx 配置注入两处高危漏洞，加固后台输入过滤与转义。

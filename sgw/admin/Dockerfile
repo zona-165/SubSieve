@@ -1,7 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache nginx docker-cli tzdata \
-    && docker-php-ext-install pdo_mysql
+RUN apk add --no-cache nginx docker-cli tzdata
 ENV TZ=Asia/Shanghai
 
 # php-fpm + nginx 配置

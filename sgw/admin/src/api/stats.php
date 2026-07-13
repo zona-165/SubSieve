@@ -83,7 +83,6 @@ if (file_exists(LOG_FILE)) {
                     if ($scannerReason !== '') {
                         $key = $ip . '|' . $tok;
                         $path = extract_request_path($request);
-                        $owner = v2b_get_user_by_token($tok);
                         $scannerReports[$key] = [
                             'ip' => $ip,
                             'token' => $tok,
@@ -93,9 +92,8 @@ if (file_exists(LOG_FILE)) {
                             'time' => format_log_time($time),
                             'risk' => '高危',
                             'score' => 90,
-                            'email' => $owner['email'] ?? '',
-                            'user_id' => $owner['user_id'] ?? '',
-                            'owner_mapped' => is_array($owner),
+                            'email' => '',
+                            'user_id' => '',
                             'location' => '未查询',
                             'asn' => '未查询',
                             'query_source' => '本地日志',

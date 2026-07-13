@@ -17,7 +17,6 @@ define('UA_WHITELIST_JSON', '/etc/nginx/subscribe/ua_whitelist.json');
 define('UA_WHITELIST_CONF',    '/etc/nginx/subscribe/ua_whitelist.conf');
 define('TOKEN_BLACKLIST_JSON', '/etc/nginx/subscribe/token_blacklist.json');
 define('IP_INTEL_CACHE_JSON', '/etc/nginx/subscribe/ip_intel_cache.json');
-define('TOKEN_OWNER_CACHE_JSON', '/etc/nginx/subscribe/token_owner_cache.json');
 define('SETTINGS_JSON',     '/etc/nginx/subscribe/admin_settings.json');
 define('PROTECT_CONF',      '/etc/nginx/subscribe/protect.conf');
 define('DEPLOY_INFO_FILE',  '/var/log/subscribe/DEPLOY_INFO.txt');
@@ -104,54 +103,6 @@ function nginx_ua_pattern(string $ua): string {
     return str_replace(['\\', '"'], ['\\\\', '\\"'], $p);
 }
 
-// ── V2B 数据库接口：通过订阅 token 反查用户 ───────────────────
-function v2b_get_user_by_token(string $token): ?array {
-    $token = trim($token);
-    if ($token === '') return null;
-
-    $cache = read_token_owner_cache();
-    $now = time();
-    if (isset($cache[$token]) && is_array($cache[$token]) && ($now - (int)($cache[$token]['ts'] ?? 0) < 3600)) {
-        $data = $cache[$token]['data'] ?? null;
-        return is_array($data) ? $data : null;
-    }
-
-    $host = trim(getenv('V2B_DB_HOST') ?: '');
-    $db   = trim(getenv('V2B_DB_NAME') ?: '');
-    $user = trim(getenv('V2B_DB_USER') ?: '');
-    $pass = getenv('V2B_DB_PASS') ?: '';
-    $port = (int)(getenv('V2B_DB_PORT') ?: 3306);
-    $table = getenv('V2B_USER_TABLE') ?: 'v2_user';
-
-    if ($host === '' || $db === '' || $user === '') return null;
-    if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) return null;
-    if (!class_exists('PDO')) return null;
-
-    try {
-        $dsn = "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4";
-        $pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_TIMEOUT => 2,
-        ]);
-        $stmt = $pdo->prepare("SELECT id, email FROM `{$table}` WHERE token = ? LIMIT 1");
-        $stmt->execute([$token]);
-        $row = $stmt->fetch();
-        $data = $row ? ['user_id' => (string)$row['id'], 'email' => (string)$row['email']] : null;
-        $cache[$token] = ['ts' => $now, 'data' => $data];
-        write_token_owner_cache($cache);
-        return $data;
-    } catch (Throwable $e) {
-        return null;
-    }
-}
-
-function read_token_owner_cache(): array {
-    if (!file_exists(TOKEN_OWNER_CACHE_JSON)) return [];
-    $data = json_decode((string)file_get_contents(TOKEN_OWNER_CACHE_JSON), true);
-    return is_array($data) ? $data : [];
-}
-
-function write_token_owner_cache(array $cache): void {
-    @file_put_contents(TOKEN_OWNER_CACHE_JSON, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-}
+// ── V2B 数据库接口（预留，后续填充）─────────────────────────
+// TODO: 连接 V2B MySQL 查询 token 对应用户信息
+// function v2b_get_user_by_token(string $token): ?array { return null; }

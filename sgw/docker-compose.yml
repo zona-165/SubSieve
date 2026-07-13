@@ -30,12 +30,6 @@ services:
       - ADMIN_PASS=${ADMIN_PASS}
       - ADMIN_SECRET_PATH=${ADMIN_SECRET_PATH}
       - GATEWAY_PORT=${GATEWAY_PORT:-443}
-      - V2B_DB_HOST=${V2B_DB_HOST:-}
-      - V2B_DB_PORT=${V2B_DB_PORT:-3306}
-      - V2B_DB_NAME=${V2B_DB_NAME:-}
-      - V2B_DB_USER=${V2B_DB_USER:-}
-      - V2B_DB_PASS=${V2B_DB_PASS:-}
-      - V2B_USER_TABLE=${V2B_USER_TABLE:-v2_user}
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
       - gw_config:/etc/nginx/subscribe
