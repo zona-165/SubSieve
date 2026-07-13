@@ -2474,13 +2474,14 @@ function renderAlertHistory(history) {
     const label = alertEntryStatusLabel(e);
     const color = alertEntryStatusColor(e);
     const report = formatAlertEntryText(e);
+    const timeText = formatAlertHistoryTime(e.time || '');
     return `
       <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
         <div style="min-width:0">
           <div style="font-weight:700;color:var(--text);font-size:12px;word-break:break-word">${esc(e.title || '告警')}</div>
           <div style="color:var(--text3);font-size:11px;line-height:1.45;word-break:break-all">${esc(e.summary || '')}</div>
-          <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(e.time || '-')} · ${esc(e.channel || '-')}</div>
+          <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(timeText)} · ${esc(e.channel || '-')}</div>
         </div>
         <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)" style="align-self:start">复制</button>
         <button class="copy-btn" data-key="${esc(e.key || '')}" data-time="${esc(e.time || '')}" data-status="${esc(e.status || '')}" onclick="deleteAlertHistoryEntry(this.dataset.key,this.dataset.time,this.dataset.status)" style="align-self:start;color:#ef4444">删除</button>
@@ -2595,10 +2596,19 @@ function formatAlertEntryText(e) {
     `状态：${alertEntryStatusLabel(e)}`,
     `标题：${e.title || '告警'}`,
     `摘要：${e.summary || '-'}`,
-    `时间：${e.time || '-'}`,
+    `时间：${formatAlertHistoryTime(e.time || '')}`,
     `渠道：${e.channel || '-'}`,
     `Key：${e.key || '-'}`,
   ].join('\n');
+}
+
+function formatAlertHistoryTime(value) {
+  if (!value) return '-';
+  const normalized = String(value).replace(' ', 'T');
+  const ts = Date.parse(normalized);
+  if (!Number.isFinite(ts)) return value;
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  return `${value} · ${formatDuration(seconds)}`;
 }
 
 function currentFilteredAlertEntries() {
@@ -2638,7 +2648,7 @@ function copyAlertHistorySummary() {
     `当前页分布：已推送 ${statusCounts.sent || 0}｜静默 ${statusCounts.muted || 0}｜失败 ${statusCounts.error || 0}`,
     '',
     '当前页前 5 条：',
-    ...rows.slice(0, 5).map((e, idx) => `${idx + 1}. [${alertEntryStatusLabel(e)}] ${e.title || '告警'}｜${e.summary || '-'}｜${e.time || '-'}`),
+    ...rows.slice(0, 5).map((e, idx) => `${idx + 1}. [${alertEntryStatusLabel(e)}] ${e.title || '告警'}｜${e.summary || '-'}｜${formatAlertHistoryTime(e.time || '')}`),
   ];
   copyText(lines.join('\n'));
 }
