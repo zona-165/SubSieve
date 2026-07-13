@@ -60,6 +60,7 @@ function _val(string $v): string { return htmlspecialchars($v, ENT_QUOTES); }
   --border:#1e2236;--border2:#2d3144;
   --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
   --accent:#6366f1;
+  --motion-fast:140ms;--motion-med:240ms;
 }
 [data-theme="light"]{
   --bg:#f0f2f5;--bg2:#ffffff;--bg3:#ffffff;--bg-input:#f8fafc;
@@ -76,6 +77,7 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--text3);font-size:13px;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:var(--border);color:var(--text)}
 .nav-item.active{background:var(--border);color:var(--accent)}
+.nav-item:active,.mode-btn:active,.refresh-btn:active,.theme-btn:active,.btn-primary:active,.add-btn-sm:active,.copy-btn:active{transform:scale(.97)}
 .nav-icon{font-size:15px;width:18px;text-align:center}
 .sidebar-bottom{margin-top:auto}
 .logout{color:#ef4444!important}
@@ -98,9 +100,11 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .content{padding:24px;flex:1;overflow:auto}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
+.tab-panel.active{animation:panelIn var(--motion-med) ease both}
 
 /* Cards */
 .card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.card{animation:itemIn var(--motion-med) ease both}
 .card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
 
 /* Log panel */
@@ -143,7 +147,8 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .stats-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .stats-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;min-height:118px;text-align:left;color:var(--text);font:inherit}
-.stats-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.stats-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.stats-card:active{transform:translateY(0) scale(.99)}
 .stats-card-title{display:flex;align-items:center;justify-content:space-between;color:var(--text2);font-size:12px;font-weight:700;margin-bottom:10px}
 .stats-card-main{font-size:24px;font-weight:700;color:var(--text);line-height:1.2}
 .stats-card-sub{margin-top:8px;color:var(--text3);font-size:12px;line-height:1.45}
@@ -151,9 +156,12 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .stats-detail-title{font-size:15px;font-weight:700;color:var(--text)}
 .stats-detail-grid{display:none}
 .stats-detail-grid.active{display:grid}
+.stats-detail-grid.active{animation:slideIn var(--motion-med) ease both}
 .stats-detail-card{display:none}
 .stats-detail-card.active{display:block}
+.stats-detail-card.active{animation:itemIn var(--motion-med) ease both}
 .top-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #13161f}
+.top-row{animation:listIn var(--motion-med) ease both}
 .top-row:last-child{border-bottom:none}
 .top-rank{color:#64748b;font-size:11px;width:18px}
 .top-val{font-family:monospace;font-size:12px;flex:1;padding:0 10px;word-break:break-all}
@@ -175,6 +183,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .risk-samples{margin-top:5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .risk-samples code{font-size:10px;color:#93c5fd}
 .scanner-report{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:rgba(100,116,139,.08)}
+.scanner-report{animation:listIn var(--motion-med) ease both}
 .scanner-report pre{white-space:pre-wrap;word-break:break-word;color:var(--text2);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:8px}
 .scanner-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
@@ -219,6 +228,21 @@ tr:hover td{background:rgba(99,102,241,.04)}
 /* IDC 汇总区域 */
 .idc-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .idc-section .card-title{margin-bottom:10px}
+
+@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes itemIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes listIn{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}
+@keyframes slideIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+tbody tr{animation:listIn var(--motion-med) ease both}
+tbody tr:nth-child(2),.top-row:nth-child(2),.scanner-report:nth-child(2),.stats-card:nth-child(2){animation-delay:25ms}
+tbody tr:nth-child(3),.top-row:nth-child(3),.scanner-report:nth-child(3),.stats-card:nth-child(3){animation-delay:50ms}
+tbody tr:nth-child(4),.top-row:nth-child(4),.scanner-report:nth-child(4),.stats-card:nth-child(4){animation-delay:75ms}
+tbody tr:nth-child(5),.top-row:nth-child(5),.scanner-report:nth-child(5),.stats-card:nth-child(5){animation-delay:100ms}
+tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.stats-card:nth-child(n+6){animation-delay:120ms}
+
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
 
 @media (max-width: 760px) {
   body{display:block;min-height:100vh;overflow-x:hidden}
@@ -731,10 +755,19 @@ function switchTab(name, el) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-' + name).classList.add('active');
+  const panel = document.getElementById('panel-' + name);
+  panel.classList.add('active');
+  restartAnimation(panel);
   document.getElementById('tab-title').textContent = TABS[name].title;
   resetCountdown();
   TABS[name].loader();
+}
+
+function restartAnimation(el) {
+  if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.style.animation = 'none';
+  void el.offsetHeight;
+  el.style.animation = '';
 }
 
 // ── 自动刷新倒计时 ─────────────────────────────────────────────
@@ -1396,11 +1429,13 @@ function topSummary(rows, labelKey, countKey, emptyText) {
 function showStatsDetail(key) {
   activeStatsDetail = key;
   updateStatsView();
+  restartAnimation(document.getElementById('stats-detail-grid'));
 }
 
 function showStatsOverview() {
   activeStatsDetail = '';
   updateStatsView();
+  restartAnimation(document.getElementById('stats-overview'));
 }
 
 function updateStatsView() {
