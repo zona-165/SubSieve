@@ -2730,6 +2730,10 @@ function alertHistoryContextText(rows) {
   ];
 }
 
+function alertExportSlug(value) {
+  return String(value || 'all').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'all';
+}
+
 function copyFilteredAlertHistory() {
   const rows = currentFilteredAlertEntries();
   if (!rows.length) {
@@ -3013,16 +3017,20 @@ function exportCurrentAlertHistoryPage() {
     toast('当前页没有可导出的告警记录', 'err');
     return;
   }
+  const context = alertHistoryContextData(entries);
   const payload = {
     exported_at: new Date().toISOString(),
     scope: 'current_page',
-    context: alertHistoryContextData(entries),
+    context,
     entries,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json;charset=utf-8'});
   const a = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const status = alertExportSlug(context.status);
+  const range = alertExportSlug(context.range);
   a.href = URL.createObjectURL(blob);
-  a.download = `subsieve-alert-page-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  a.download = `subsieve-alert-${status}-${range}-p${context.page}-${stamp}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   toast(`✅ 已导出当前页 ${entries.length} 条`);
