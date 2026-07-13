@@ -11,6 +11,14 @@ if ($method === 'POST' && !empty($_GET['import_alert_history'])) {
     }
 }
 
+if ($method === 'POST' && !empty($_GET['preview_alert_history'])) {
+    try {
+        preview_alert_history();
+    } catch (Throwable $e) {
+        json_err('预览失败: ' . $e->getMessage());
+    }
+}
+
 // GET — 读取当前设置
 if ($method === 'GET') {
     try {
@@ -585,7 +593,7 @@ function export_alert_history(): void {
     exit;
 }
 
-function import_alert_history(): void {
+function read_uploaded_alert_history(): array {
     if (empty($_FILES['history']) || !is_uploaded_file($_FILES['history']['tmp_name'])) {
         json_err('请选择告警历史 JSON 文件');
     }
@@ -605,15 +613,56 @@ function import_alert_history(): void {
         json_err('不是有效的告警历史文件');
     }
     $entries = array_slice(array_values(array_filter($history['entries'], 'is_array')), 0, 50);
-    $safeHistory = [
+    return [
         'status' => $history['status'],
         'entries' => $entries,
+        'original_entries' => count(array_filter($history['entries'], 'is_array')),
+    ];
+}
+
+function summarize_alert_history(array $history): array {
+    $entries = is_array($history['entries'] ?? null) ? $history['entries'] : [];
+    $summary = [
+        'total' => count($entries),
+        'sent' => 0,
+        'muted' => 0,
+        'error' => 0,
+        'first_time' => '',
+        'last_time' => '',
+        'truncated' => !empty($history['original_entries']) && (int)$history['original_entries'] > count($entries),
+        'original_total' => (int)($history['original_entries'] ?? count($entries)),
+    ];
+    $times = [];
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) continue;
+        $status = (string)($entry['status'] ?? 'sent');
+        if (isset($summary[$status])) $summary[$status]++;
+        if (!empty($entry['time'])) $times[] = (string)$entry['time'];
+    }
+    sort($times);
+    if ($times) {
+        $summary['first_time'] = $times[0];
+        $summary['last_time'] = $times[count($times) - 1];
+    }
+    return $summary;
+}
+
+function preview_alert_history(): void {
+    $history = read_uploaded_alert_history();
+    json_out(['ok' => true, 'preview' => summarize_alert_history($history)]);
+}
+
+function import_alert_history(): void {
+    $history = read_uploaded_alert_history();
+    $safeHistory = [
+        'status' => $history['status'],
+        'entries' => $history['entries'],
     ];
     if (!file_put_contents(ALERT_HISTORY_JSON, json_encode($safeHistory, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX)) {
         json_err('写入告警历史失败，请检查权限');
     }
     @chmod(ALERT_HISTORY_JSON, 0666);
-    json_out(['ok' => true, 'imported' => count($entries)]);
+    json_out(['ok' => true, 'imported' => count($history['entries']), 'preview' => summarize_alert_history($history)]);
 }
 
 function human_bytes(int $bytes): string {

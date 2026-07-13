@@ -2814,10 +2814,32 @@ async function importAlertHistory(input) {
   const file = input.files[0];
   input.value = '';
   if (!file) return;
-  if (!confirm('导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？')) return;
-  const fd = new FormData();
-  fd.append('history', file);
+  const previewFd = new FormData();
+  previewFd.append('history', file);
   try {
+    const previewRes = await fetch(BASE + '/api/settings.php?preview_alert_history=1', {
+      method: 'POST',
+      body: previewFd,
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      credentials: 'same-origin',
+    });
+    const previewData = await previewRes.json();
+    if (!previewData.ok) {
+      toast(previewData.error || '预览失败', 'err');
+      return;
+    }
+    const p = previewData.preview || {};
+    const lines = [
+      '即将导入告警展示记录：',
+      `总数：${p.total || 0} 条${p.truncated ? `（原文件 ${p.original_total || 0} 条，仅保留最近 50 条）` : ''}`,
+      `已推送：${p.sent || 0} / 静默：${p.muted || 0} / 失败：${p.error || 0}`,
+      `时间范围：${p.first_time || '-'} ~ ${p.last_time || '-'}`,
+      '',
+      '导入后会替换当前告警展示记录，但不会修改告警配置和去重状态。继续？',
+    ];
+    if (!confirm(lines.join('\n'))) return;
+    const fd = new FormData();
+    fd.append('history', file);
     const r = await fetch(BASE + '/api/settings.php?import_alert_history=1', {
       method: 'POST',
       body: fd,
