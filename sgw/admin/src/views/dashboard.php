@@ -875,6 +875,7 @@ let suppressToasts = 0;
 let alertHistoryFilter = 'all';
 let alertHistoryQuery = '';
 let alertHistoryLimit = 10;
+let lastAlertHistory = null;
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -2409,6 +2410,7 @@ function formatDuration(seconds) {
 function renderAlertHistory(history) {
   const el = document.getElementById('alert-history-info');
   if (!el) return;
+  lastAlertHistory = history || {};
   const status = history.status || {};
   const entries = history.entries || [];
   const query = alertHistoryQuery.trim().toLowerCase();
@@ -2453,16 +2455,9 @@ function renderAlertHistory(history) {
   ].map(([value, label]) => `<option value="${value}"${alertHistoryFilter === value ? ' selected' : ''}>${label}</option>`).join('');
   const limitOptions = [10, 25, 50].map(n => `<option value="${n}"${alertHistoryLimit === n ? ' selected' : ''}>${n}条</option>`).join('');
   const rows = filteredEntries.length ? filteredEntries.map(e => {
-    const color = e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
-    const label = e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
-    const report = [
-      `状态：${label}`,
-      `标题：${e.title || '告警'}`,
-      `摘要：${e.summary || '-'}`,
-      `时间：${e.time || '-'}`,
-      `渠道：${e.channel || '-'}`,
-      `Key：${e.key || '-'}`,
-    ].join('\n');
+    const label = alertEntryStatusLabel(e);
+    const color = alertEntryStatusColor(e);
+    const report = formatAlertEntryText(e);
     return `
       <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
@@ -2504,6 +2499,7 @@ function renderAlertHistory(history) {
     <input class="ip-input" id="alert-history-query" value="${esc(alertHistoryQuery)}" placeholder="搜索 IP / Token / 错误原因" style="width:100%;height:34px;margin-bottom:4px;font-size:12px" oninput="setAlertHistoryQuery(this.value)">
     ${rows}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px">
+      <button class="mode-btn" onclick="copyFilteredAlertHistory()">复制当前</button>
       <button class="mode-btn" onclick="exportAlertHistory()">导出记录</button>
       <button class="mode-btn" onclick="document.getElementById('alert-history-import-file').click()">导入记录</button>
       <button class="mode-btn" onclick="clearAlertHistory(false)">清空记录</button>
@@ -2525,6 +2521,51 @@ function setAlertHistoryLimit(value) {
   const n = parseInt(value, 10);
   alertHistoryLimit = [10, 25, 50].includes(n) ? n : 10;
   loadSettings();
+}
+
+function alertEntryStatusLabel(e) {
+  return e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
+}
+
+function alertEntryStatusColor(e) {
+  return e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
+}
+
+function formatAlertEntryText(e) {
+  return [
+    `状态：${alertEntryStatusLabel(e)}`,
+    `标题：${e.title || '告警'}`,
+    `摘要：${e.summary || '-'}`,
+    `时间：${e.time || '-'}`,
+    `渠道：${e.channel || '-'}`,
+    `Key：${e.key || '-'}`,
+  ].join('\n');
+}
+
+function currentFilteredAlertEntries() {
+  const entries = (lastAlertHistory && lastAlertHistory.entries) || [];
+  const query = alertHistoryQuery.trim().toLowerCase();
+  let filtered = alertHistoryFilter === 'all' ? entries : entries.filter(e => (e.status || 'sent') === alertHistoryFilter);
+  if (query) {
+    filtered = filtered.filter(e => [
+      e.title || '',
+      e.summary || '',
+      e.time || '',
+      e.channel || '',
+      e.key || '',
+    ].join(' ').toLowerCase().includes(query));
+  }
+  return filtered;
+}
+
+function copyFilteredAlertHistory() {
+  const rows = currentFilteredAlertEntries();
+  if (!rows.length) {
+    toast('当前没有可复制的告警记录', 'err');
+    return;
+  }
+  const text = rows.map((e, idx) => `#${idx + 1}\n${formatAlertEntryText(e)}`).join('\n\n');
+  copyText(text);
 }
 
 
