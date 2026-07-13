@@ -2455,14 +2455,23 @@ function renderAlertHistory(history) {
   const rows = filteredEntries.length ? filteredEntries.map(e => {
     const color = e.status === 'error' ? '#ef4444' : (e.status === 'muted' ? '#eab308' : '#22c55e');
     const label = e.status === 'error' ? '失败' : (e.status === 'muted' ? '静默' : '已推送');
+    const report = [
+      `状态：${label}`,
+      `标题：${e.title || '告警'}`,
+      `摘要：${e.summary || '-'}`,
+      `时间：${e.time || '-'}`,
+      `渠道：${e.channel || '-'}`,
+      `Key：${e.key || '-'}`,
+    ].join('\n');
     return `
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <span style="color:${color};font-weight:800;font-size:12px;white-space:nowrap">${label}</span>
         <div style="min-width:0">
           <div style="font-weight:700;color:var(--text);font-size:12px;word-break:break-word">${esc(e.title || '告警')}</div>
           <div style="color:var(--text3);font-size:11px;line-height:1.45;word-break:break-all">${esc(e.summary || '')}</div>
           <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(e.time || '-')} · ${esc(e.channel || '-')}</div>
         </div>
+        <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)" style="align-self:start">复制</button>
       </div>`;
   }).join('') : `<div class="empty" style="font-size:12px;color:var(--text3);padding-top:8px">${entries.length ? '当前条件暂无记录' : '暂无推送记录'}</div>`;
   el.innerHTML = `
