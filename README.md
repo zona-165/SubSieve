@@ -63,9 +63,10 @@ sgw/
 ```bash
 git clone https://github.com/zona-165/SubSieve.git
 cd SubSieve/sgw
-chmod +x setup.sh
 ./setup.sh
 ```
+
+如果系统提示 `Permission denied`，再执行一次 `chmod +x setup.sh update.sh` 后重试即可。
 
 向导会依次询问：
 

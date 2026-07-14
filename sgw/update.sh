@@ -49,6 +49,18 @@ fi
 # 拉取最新代码（从仓库根目录执行）
 GIT_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")")
 
+# 兼容旧版本：如果本地只因为 chmod 改了部署脚本权限，自动还原后继续更新。
+# 真正的内容改动仍会保留并让 git pull 报错，避免覆盖用户手动修改。
+SCRIPT_DIR=$(pwd -P)
+DEPLOY_SCRIPT_DIR=${SCRIPT_DIR#"$GIT_ROOT"/}
+[[ "$DEPLOY_SCRIPT_DIR" == "$SCRIPT_DIR" ]] && DEPLOY_SCRIPT_DIR="sgw"
+if git -C "$GIT_ROOT" diff --quiet -- "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null; then
+    :
+elif [[ -z "$(git -C "$GIT_ROOT" diff --numstat -- "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null)" ]]; then
+    echo -e "${CYAN}检测到部署脚本仅权限变更，已自动还原以便更新${RESET}"
+    git -C "$GIT_ROOT" restore "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null || true
+fi
+
 # 自动检测远程默认分支（main / master 均可）
 REMOTE_BRANCH=$(git -C "$GIT_ROOT" remote show origin 2>/dev/null \
     | grep 'HEAD branch' | awk '{print $NF}')
