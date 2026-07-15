@@ -1,6 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache nginx docker-cli tzdata
+RUN apk add --no-cache nginx docker-cli tzdata ca-certificates
 ENV TZ=Asia/Shanghai
 
 # php-fpm + nginx 配置

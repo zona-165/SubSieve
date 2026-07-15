@@ -392,16 +392,21 @@ function enrich_scanner_reports(array $reports): array {
         $ip = $report['ip'] ?? '';
         if (!filter_var($ip, FILTER_VALIDATE_IP)) continue;
         $cached = isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip]);
-        if (!$cached && (!$allowRemoteLookup || $lookups >= 20)) continue;
+        if (!$cached && (!$allowRemoteLookup || $lookups >= 5)) continue;
         if (!$cached) $lookups++;
         $intel = get_ip_intel($ip, $cache, $dirty);
         if (!$intel) continue;
         $report['location'] = $intel['location'] ?? '未查询';
         $report['asn'] = $intel['asn'] ?? '未查询';
-        $report['query_source'] = $intel['source'] ?? 'ip-api';
+        $report['query_source'] = $intel['source'] ?? '多源查询';
+        $report['intel_sources'] = is_array($intel['sources'] ?? null) ? $intel['sources'] : [];
+        $report['intel_source_count'] = (int)($intel['source_count'] ?? 0);
+        $report['intel_confidence'] = $intel['confidence'] ?? '未评估';
+        $report['intel_consensus'] = $intel['consensus'] ?? '';
+        $report['route_prefix'] = $intel['route_prefix'] ?? '';
         $report['network_type'] = $intel['network_type'] ?? '未知网络';
         $report['intel_tags'] = $intel['tags'] ?? [];
-        if (!empty($intel['is_proxy']) || !empty($intel['is_hosting'])) {
+        if (!empty($intel['is_proxy']) || !empty($intel['is_hosting']) || !empty($intel['is_tor'])) {
             $report['score'] = max((int)($report['score'] ?? 90), 95);
             $report['risk'] = '极高危';
         }
@@ -433,7 +438,13 @@ function is_ip_intel_cache_fresh($entry): bool {
     $failed = !empty($data['query_failed'])
         || ($data['location'] ?? '') === '查询失败'
         || in_array('情报查询失败', is_array($data['tags'] ?? null) ? $data['tags'] : [], true);
-    return $age >= 0 && $age < ($failed ? 600 : 604800);
+    if (!$failed && (int)($data['intel_version'] ?? 0) < 2) return false;
+    if ($failed) $ttl = 600;
+    elseif (($data['confidence'] ?? '') === '高' && (int)($data['source_count'] ?? 0) >= 4) $ttl = 604800;
+    elseif (($data['confidence'] ?? '') === '高') $ttl = 259200;
+    elseif (($data['confidence'] ?? '') === '中') $ttl = 86400;
+    else $ttl = 21600;
+    return $age >= 0 && $age < $ttl;
 }
 
 function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
@@ -441,16 +452,23 @@ function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
     if (isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip])) {
         return $cache[$ip]['data'] ?? null;
     }
-    $intel = query_ip_api($ip);
+    $intel = query_multi_source_ip($ip, $cache, $dirty);
     if (!$intel) {
         $intel = [
             'location' => '查询失败',
             'asn' => '查询失败',
-            'source' => 'ip-api',
+            'source' => '多源查询',
+            'sources' => [],
+            'source_count' => 0,
+            'confidence' => '无',
+            'consensus' => '',
+            'route_prefix' => '',
             'network_type' => '未知网络',
             'tags' => ['情报查询失败'],
             'is_proxy' => false,
             'is_hosting' => false,
+            'is_tor' => false,
+            'intel_version' => 2,
             'query_failed' => true,
         ];
     }
@@ -459,33 +477,310 @@ function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
     return $intel;
 }
 
-function query_ip_api(string $ip): ?array {
-    $fields = 'status,message,country,regionName,city,isp,org,as,proxy,hosting,mobile';
-    $url = 'http://ip-api.com/json/' . rawurlencode($ip) . '?fields=' . rawurlencode($fields) . '&lang=zh-CN';
+function query_multi_source_ip(string $ip, array &$cache, bool &$dirty): ?array {
+    $results = [];
+
+    // ipwho.is 免费接口按调用方 IP 计日额度，预留余量避免触发硬限制。
+    if (consume_ip_intel_budget($cache, 'ipwho.is', 900, $dirty)) {
+        $result = query_ipwho_source($ip);
+        if ($result) $results[] = $result;
+    }
+
+    foreach ([query_ip_api_source($ip), query_geojs_source($ip), query_ripe_source($ip)] as $result) {
+        if ($result) $results[] = $result;
+    }
+
+    return $results ? merge_ip_intel_sources($results) : null;
+}
+
+function consume_ip_intel_budget(array &$cache, string $provider, int $dailyLimit, bool &$dirty): bool {
+    $day = gmdate('Y-m-d');
+    $usage = $cache['_meta']['provider_usage'][$provider] ?? [];
+    $count = ($usage['day'] ?? '') === $day ? (int)($usage['count'] ?? 0) : 0;
+    if ($count >= $dailyLimit) return false;
+    $cache['_meta']['provider_usage'][$provider] = ['day' => $day, 'count' => $count + 1];
+    $dirty = true;
+    return true;
+}
+
+function fetch_ip_intel_json(string $url, float $timeout = 1.2): ?array {
     $ctx = stream_context_create([
         'http' => [
-            'timeout' => 1.2,
-            'header' => "User-Agent: SubSieve-IP-Intel/1.0\r\n",
+            'timeout' => $timeout,
+            'ignore_errors' => true,
+            'max_redirects' => 2,
+            'header' => "User-Agent: SubSieve-IP-Intel/2.0\r\nAccept: application/json\r\n",
         ],
+        'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
     ]);
     $raw = @file_get_contents($url, false, $ctx);
     if ($raw === false || $raw === '') return null;
     $data = json_decode($raw, true);
-    if (!is_array($data) || ($data['status'] ?? '') !== 'success') return null;
-    $parts = array_filter([$data['country'] ?? '', $data['regionName'] ?? '', $data['city'] ?? '']);
-    $tags = [];
-    if (!empty($data['proxy'])) $tags[] = '代理/VPN';
-    if (!empty($data['hosting'])) $tags[] = '机房/托管';
-    if (!empty($data['mobile'])) $tags[] = '移动网络';
-    if (!$tags) $tags[] = '普通运营商网络';
+    return is_array($data) ? $data : null;
+}
+
+function query_ip_api_source(string $ip): ?array {
+    $fields = 'status,message,country,countryCode,regionName,city,isp,org,as,asname,proxy,hosting,mobile';
+    $url = 'http://ip-api.com/json/' . rawurlencode($ip) . '?fields=' . rawurlencode($fields) . '&lang=zh-CN';
+    $data = fetch_ip_intel_json($url);
+    if (!$data || ($data['status'] ?? '') !== 'success') return null;
     return [
-        'location' => $parts ? implode(' / ', $parts) : '未知地区',
-        'asn' => trim(($data['as'] ?? '') . ' ' . ($data['isp'] ?? '') . ' ' . ($data['org'] ?? '')),
-        'source' => 'ip-api',
+        'provider' => 'ip-api',
+        'country' => trim((string)($data['country'] ?? '')),
+        'country_code' => strtoupper(trim((string)($data['countryCode'] ?? ''))),
+        'region' => trim((string)($data['regionName'] ?? '')),
+        'city' => trim((string)($data['city'] ?? '')),
+        'asn_number' => normalize_asn_number($data['as'] ?? ''),
+        'organization' => trim((string)($data['org'] ?? $data['asname'] ?? '')),
+        'isp' => trim((string)($data['isp'] ?? '')),
+        'proxy' => (bool)($data['proxy'] ?? false),
+        'vpn' => null,
+        'tor' => null,
+        'hosting' => (bool)($data['hosting'] ?? false),
+        'mobile' => (bool)($data['mobile'] ?? false),
+        'prefix' => '',
+    ];
+}
+
+function query_ipwho_source(string $ip): ?array {
+    $data = fetch_ip_intel_json('https://ipwho.is/' . rawurlencode($ip));
+    if (!$data || ($data['success'] ?? false) !== true) return null;
+    $connection = is_array($data['connection'] ?? null) ? $data['connection'] : [];
+    $security = is_array($data['security'] ?? null) ? $data['security'] : [];
+    return [
+        'provider' => 'ipwho.is',
+        'country' => trim((string)($data['country'] ?? '')),
+        'country_code' => strtoupper(trim((string)($data['country_code'] ?? ''))),
+        'region' => trim((string)($data['region'] ?? '')),
+        'city' => trim((string)($data['city'] ?? '')),
+        'asn_number' => normalize_asn_number($connection['asn'] ?? ''),
+        'organization' => trim((string)($connection['org'] ?? '')),
+        'isp' => trim((string)($connection['isp'] ?? '')),
+        'proxy' => nullable_ip_intel_bool($security, 'proxy'),
+        'vpn' => nullable_ip_intel_bool($security, 'vpn'),
+        'tor' => nullable_ip_intel_bool($security, 'tor'),
+        'hosting' => nullable_ip_intel_bool($security, 'hosting'),
+        'mobile' => nullable_ip_intel_bool($security, 'mobile'),
+        'prefix' => '',
+    ];
+}
+
+function query_geojs_source(string $ip): ?array {
+    $data = fetch_ip_intel_json('https://get.geojs.io/v1/ip/geo/' . rawurlencode($ip) . '.json');
+    if (!$data) return null;
+    if (array_is_list($data) && isset($data[0]) && is_array($data[0])) $data = $data[0];
+    if (isset($data['error']) || !isset($data['ip'])) return null;
+    $asn = normalize_asn_number($data['asn'] ?? '');
+    if ($asn === '64512') $asn = '';
+    return [
+        'provider' => 'GeoJS',
+        'country' => trim((string)($data['country'] ?? '')),
+        'country_code' => strtoupper(trim((string)($data['country_code'] ?? ''))),
+        'region' => trim((string)($data['region'] ?? '')),
+        'city' => trim((string)($data['city'] ?? '')),
+        'asn_number' => $asn,
+        'organization' => trim((string)($data['organization_name'] ?? '')),
+        'isp' => '',
+        'proxy' => null,
+        'vpn' => null,
+        'tor' => null,
+        'hosting' => null,
+        'mobile' => null,
+        'prefix' => '',
+        'accuracy' => isset($data['accuracy']) ? (int)$data['accuracy'] : null,
+    ];
+}
+
+function query_ripe_source(string $ip): ?array {
+    $url = 'https://stat.ripe.net/data/network-info/data.json?resource=' . rawurlencode($ip);
+    $data = fetch_ip_intel_json($url);
+    $network = is_array($data['data'] ?? null) ? $data['data'] : [];
+    $asns = is_array($network['asns'] ?? null) ? $network['asns'] : [];
+    $normalizedAsns = unique_ip_intel_values(array_map('normalize_asn_number', $asns));
+    $asn = $normalizedAsns[0] ?? '';
+    $prefix = trim((string)($network['prefix'] ?? ''));
+    if (!$asn && !$prefix) return null;
+    return [
+        'provider' => 'RIPEstat',
+        'country' => '',
+        'country_code' => '',
+        'region' => '',
+        'city' => '',
+        'asn_number' => $asn,
+        'asn_numbers' => $normalizedAsns,
+        'organization' => '',
+        'isp' => '',
+        'proxy' => null,
+        'vpn' => null,
+        'tor' => null,
+        'hosting' => null,
+        'mobile' => null,
+        'prefix' => $prefix,
+    ];
+}
+
+function nullable_ip_intel_bool(array $data, string $key): ?bool {
+    return array_key_exists($key, $data) ? (bool)$data[$key] : null;
+}
+
+function normalize_asn_number($value): string {
+    return preg_match('/(?:AS)?\s*(\d+)/i', trim((string)$value), $match) ? $match[1] : '';
+}
+
+function ip_intel_consensus(array $sources, string $field, bool $uppercase = false): array {
+    $counts = [];
+    $values = [];
+    foreach ($sources as $source) {
+        $value = trim((string)($source[$field] ?? ''));
+        if ($value === '') continue;
+        $key = $uppercase ? strtoupper($value) : strtolower((string)preg_replace('/\s+/u', ' ', $value));
+        if (!isset($counts[$key])) {
+            $counts[$key] = 0;
+            $values[$key] = $value;
+        }
+        $counts[$key]++;
+    }
+    if (!$counts) return ['', 0, 0];
+    $winner = '';
+    $best = 0;
+    foreach ($counts as $key => $count) {
+        if ($count > $best) {
+            $winner = $key;
+            $best = $count;
+        }
+    }
+    return [$values[$winner], $best, array_sum($counts)];
+}
+
+function ip_intel_any_true(array $sources, string $field): bool {
+    foreach ($sources as $source) {
+        if (($source[$field] ?? null) === true) return true;
+    }
+    return false;
+}
+
+function unique_ip_intel_values(array $values): array {
+    $result = [];
+    $seen = [];
+    foreach ($values as $value) {
+        $value = trim((string)$value);
+        if ($value === '') continue;
+        $key = strtolower($value);
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+        $result[] = $value;
+    }
+    return $result;
+}
+
+function merge_ip_intel_sources(array $sources): array {
+    [$countryCode, $countryVotes, $countryTotal] = ip_intel_consensus($sources, 'country_code', true);
+    [$country] = ip_intel_consensus($sources, 'country');
+    [$region, $regionVotes, $regionTotal] = ip_intel_consensus($sources, 'region');
+    [$city, $cityVotes, $cityTotal] = ip_intel_consensus($sources, 'city');
+    [$majorityAsn] = ip_intel_consensus($sources, 'asn_number', true);
+
+    // RIPE 的 BGP 起源 ASN 优先；多起源网段则选取与其他来源一致的 ASN。
+    $ripeAsns = [];
+    $routePrefix = '';
+    foreach ($sources as $source) {
+        if (($source['provider'] ?? '') !== 'RIPEstat') continue;
+        $ripeAsns = is_array($source['asn_numbers'] ?? null)
+            ? $source['asn_numbers']
+            : array_filter([trim((string)($source['asn_number'] ?? ''))]);
+        $routePrefix = trim((string)($source['prefix'] ?? ''));
+        break;
+    }
+    $selectedAsn = $majorityAsn !== '' && in_array($majorityAsn, $ripeAsns, true)
+        ? $majorityAsn
+        : ($ripeAsns[0] ?? $majorityAsn);
+    $asnVotes = 0;
+    $asnTotal = 0;
+    foreach ($sources as $source) {
+        if (($source['provider'] ?? '') === 'RIPEstat') {
+            $sourceAsns = is_array($source['asn_numbers'] ?? null)
+                ? $source['asn_numbers']
+                : array_filter([trim((string)($source['asn_number'] ?? ''))]);
+            if (!$sourceAsns) continue;
+            $asnTotal++;
+            if ($selectedAsn !== '' && in_array($selectedAsn, $sourceAsns, true)) $asnVotes++;
+            continue;
+        }
+        $asn = trim((string)($source['asn_number'] ?? ''));
+        if ($asn === '') continue;
+        $asnTotal++;
+        if ($selectedAsn !== '' && $asn === $selectedAsn) $asnVotes++;
+    }
+
+    $organizationValues = [];
+    foreach (['ipwho.is', 'ip-api', 'GeoJS'] as $preferredProvider) {
+        foreach ($sources as $source) {
+            if (($source['provider'] ?? '') !== $preferredProvider) continue;
+            $sourceAsn = trim((string)($source['asn_number'] ?? ''));
+            if ($selectedAsn !== '' && $sourceAsn !== '' && $sourceAsn !== $selectedAsn) continue;
+            $organizationValues[] = $source['organization'] ?? '';
+            $organizationValues[] = $source['isp'] ?? '';
+        }
+    }
+    $organizations = array_slice(unique_ip_intel_values($organizationValues), 0, 2);
+    $asnParts = $selectedAsn !== '' ? ['AS' . $selectedAsn] : [];
+    array_push($asnParts, ...$organizations);
+
+    $isProxy = ip_intel_any_true($sources, 'proxy');
+    $isVpn = ip_intel_any_true($sources, 'vpn');
+    $isTor = ip_intel_any_true($sources, 'tor');
+    $isHosting = ip_intel_any_true($sources, 'hosting');
+    $isMobile = ip_intel_any_true($sources, 'mobile');
+    $tags = [];
+    if ($isTor) $tags[] = 'Tor';
+    if ($isVpn) $tags[] = 'VPN';
+    if ($isProxy) $tags[] = '代理';
+    if ($isHosting) $tags[] = '机房/托管';
+    if ($isMobile) $tags[] = '移动网络';
+    if (!$tags) $tags[] = '普通运营商网络';
+
+    $sourceNames = unique_ip_intel_values(array_map(
+        static fn(array $source): string => (string)($source['provider'] ?? ''),
+        $sources
+    ));
+    $sourceCount = count($sourceNames);
+    $countryAgreement = $countryTotal < 2 || $countryVotes >= 2;
+    $regionAgreement = $regionTotal < 2 || $regionVotes >= 2;
+    $cityAgreement = $cityTotal < 2 || $cityVotes >= 2;
+    $asnAgreement = $asnTotal < 2 || $asnVotes >= 2;
+    if ($sourceCount >= 3 && $countryAgreement && $regionAgreement && $cityAgreement && $asnAgreement) {
+        $confidence = '高';
+    } elseif ($sourceCount >= 2 && $countryAgreement && $asnAgreement) {
+        $confidence = '中';
+    } else {
+        $confidence = '低';
+    }
+
+    $consensusParts = [];
+    if ($countryTotal) $consensusParts[] = '国家' . $countryVotes . '/' . $countryTotal;
+    if ($regionTotal) $consensusParts[] = '地区' . $regionVotes . '/' . $regionTotal;
+    if ($cityTotal) $consensusParts[] = '城市' . $cityVotes . '/' . $cityTotal;
+    if ($asnTotal) $consensusParts[] = 'ASN' . $asnVotes . '/' . $asnTotal;
+    $locationParts = array_values(array_filter([$country, $region, $city], static fn($value): bool => $value !== ''));
+
+    return [
+        'location' => $locationParts ? implode(' / ', $locationParts) : ($countryCode ?: '未知地区'),
+        'country_code' => $countryCode,
+        'asn' => $asnParts ? implode(' ', $asnParts) : '未查询',
+        'route_prefix' => $routePrefix,
+        'source' => implode('、', $sourceNames),
+        'sources' => $sourceNames,
+        'source_count' => $sourceCount,
+        'confidence' => $confidence,
+        'consensus' => implode('｜', $consensusParts),
         'network_type' => implode('、', $tags),
         'tags' => $tags,
-        'is_proxy' => !empty($data['proxy']),
-        'is_hosting' => !empty($data['hosting']),
+        'is_proxy' => $isProxy || $isVpn,
+        'is_vpn' => $isVpn,
+        'is_tor' => $isTor,
+        'is_hosting' => $isHosting,
+        'is_mobile' => $isMobile,
+        'intel_version' => 2,
         'query_failed' => false,
     ];
 }

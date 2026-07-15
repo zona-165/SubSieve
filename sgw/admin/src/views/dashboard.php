@@ -1770,6 +1770,12 @@ function updateStatsView() {
 }
 
 function scannerReportText(r) {
+  const sourceCount = Number(r.intel_source_count || 0);
+  const intelSummary = sourceCount
+    ? `情报：${sourceCount} 源交叉验证｜置信度 ${r.intel_confidence || '未评估'}`
+    : '情报：暂未完成外部查询';
+  const consensus = r.intel_consensus ? `\n一致性：${r.intel_consensus}` : '';
+  const routePrefix = r.route_prefix ? `\n路由网段：${r.route_prefix}` : '';
   return `脚本/扫描器拉取订阅
 ━━━━━━━━━━━━━━
 结论：已读取到订阅Token。
@@ -1778,8 +1784,9 @@ function scannerReportText(r) {
 Token：${r.token || ''}
 来源：${r.ip || ''}｜${r.location || '未查询'}
 ASN：${r.asn || '未查询'}
-网络：${r.network_type || '未知网络'}${(r.intel_tags || []).length ? '｜' + (r.intel_tags || []).join('、') : ''}
-查询：${r.query_source || '本地日志'}
+网络：${r.network_type || '未知网络'}
+${intelSummary}${consensus}${routePrefix}
+数据源：${r.query_source || '本地日志'}
 路径 ${r.path || ''}
 UA：${r.ua || '（空UA）'}
 证据：原因 ${r.reason || 'unknown'}
