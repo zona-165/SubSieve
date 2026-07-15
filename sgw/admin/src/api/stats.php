@@ -9,7 +9,7 @@ if (!defined('STATS_CACHE_JSON')) {
     define('STATS_CACHE_JSON', dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
 }
 
-$cacheTtl = 45;
+$cacheTtl = 120;
 $maxScanLines = 30000;
 $forceRefresh = PHP_SAPI === 'cli' || (isset($_GET['refresh']) && $_GET['refresh'] === '1');
 if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
@@ -213,8 +213,17 @@ $payload = [
     'scan_limit' => $maxScanLines,
 ];
 
-@file_put_contents(STATS_CACHE_JSON, json_encode(['ts' => time(), 'data' => $payload], JSON_UNESCAPED_UNICODE), LOCK_EX);
+write_stats_cache($payload);
 json_out($payload);
+
+function write_stats_cache(array $payload): void {
+    $tmp = STATS_CACHE_JSON . '.tmp.' . getmypid();
+    $json = json_encode(['ts' => time(), 'data' => $payload], JSON_UNESCAPED_UNICODE);
+    if ($json !== false && @file_put_contents($tmp, $json, LOCK_EX) !== false) {
+        @rename($tmp, STATS_CACHE_JSON);
+    }
+    @unlink($tmp);
+}
 
 function tail_log_lines(string $file, int $maxLines): iterable {
     try {
@@ -296,7 +305,7 @@ function build_user_profiles(array $segments): array {
         $summary = ['V'=>0, 'O'=>0, 'T'=>0, 'P'=>0, 'B'=>0, 'N'=>0];
         uasort($segment['ips'], fn($a, $b) => $a['last_octet'] <=> $b['last_octet']);
         foreach ($segment['ips'] as $ip => $cell) {
-            $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
+            $cached = isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip]);
             $intel = $cached ? ($cache[$ip]['data'] ?? null) : null;
             $kind = profile_cell_kind($cell, $intel);
             $summary[$kind]++;
@@ -344,20 +353,20 @@ function profile_cell_kind(array $cell, ?array $intel): string {
 function scanner_reason(string $ua): string {
     $u = strtolower(trim($ua));
     if ($u === '' || $u === '-') return 'empty_or_invalid_user_agent';
+    if ($u === 'clash') return 'generic_proxy_client_user_agent';
     $patterns = [
-        'clash' => 'proxy_client_user_agent',
-        'curl' => 'script_user_agent',
-        'wget' => 'script_user_agent',
-        'python' => 'script_user_agent',
-        'go-http-client' => 'script_user_agent',
-        'java' => 'script_user_agent',
-        'node-fetch' => 'script_user_agent',
-        'okhttp' => 'script_user_agent',
-        'httpclient' => 'script_user_agent',
-        'postman' => 'tool_user_agent',
+        '/^curl(?:\/|$)/' => 'script_user_agent',
+        '/^wget(?:\/|$)/' => 'script_user_agent',
+        '/^python(?:[\/\s-]|$)/' => 'script_user_agent',
+        '/^go-http-client(?:\/|$)/' => 'script_user_agent',
+        '/^java(?:\/|$)/' => 'script_user_agent',
+        '/^libcurl(?:\/|$)/' => 'script_user_agent',
+        '/^node-fetch(?:\/|$)/' => 'script_user_agent',
+        '/^axios(?:\/|$)/' => 'script_user_agent',
+        '/^postmanruntime(?:\/|$)/' => 'tool_user_agent',
     ];
-    foreach ($patterns as $needle => $reason) {
-        if (str_contains($u, $needle)) return $reason;
+    foreach ($patterns as $pattern => $reason) {
+        if (preg_match($pattern, $u)) return $reason;
     }
     return '';
 }
@@ -376,12 +385,16 @@ function format_log_time(string $time): string {
 
 function enrich_scanner_reports(array $reports): array {
     $cache = read_ip_intel_cache();
+    $dirty = false;
+    $lookups = 0;
+    $allowRemoteLookup = PHP_SAPI === 'cli';
     foreach ($reports as &$report) {
         $ip = $report['ip'] ?? '';
-        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) continue;
-        $cached = isset($cache[$ip]) && is_array($cache[$ip]) && (time() - (int)($cache[$ip]['ts'] ?? 0) < 604800);
-        if (!$cached) continue;
-        $intel = $cache[$ip]['data'] ?? null;
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) continue;
+        $cached = isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip]);
+        if (!$cached && (!$allowRemoteLookup || $lookups >= 20)) continue;
+        if (!$cached) $lookups++;
+        $intel = get_ip_intel($ip, $cache, $dirty);
         if (!$intel) continue;
         $report['location'] = $intel['location'] ?? '未查询';
         $report['asn'] = $intel['asn'] ?? '未查询';
@@ -394,6 +407,7 @@ function enrich_scanner_reports(array $reports): array {
         }
     }
     unset($report);
+    if ($dirty) write_ip_intel_cache($cache);
     return $reports;
 }
 
@@ -404,12 +418,27 @@ function read_ip_intel_cache(): array {
 }
 
 function write_ip_intel_cache(array $cache): void {
-    @file_put_contents(IP_INTEL_CACHE_JSON, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    $tmp = IP_INTEL_CACHE_JSON . '.tmp.' . getmypid();
+    $json = json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json !== false && @file_put_contents($tmp, $json, LOCK_EX) !== false) {
+        @rename($tmp, IP_INTEL_CACHE_JSON);
+    }
+    @unlink($tmp);
+}
+
+function is_ip_intel_cache_fresh($entry): bool {
+    if (!is_array($entry)) return false;
+    $age = time() - (int)($entry['ts'] ?? 0);
+    $data = is_array($entry['data'] ?? null) ? $entry['data'] : [];
+    $failed = !empty($data['query_failed'])
+        || ($data['location'] ?? '') === '查询失败'
+        || in_array('情报查询失败', is_array($data['tags'] ?? null) ? $data['tags'] : [], true);
+    return $age >= 0 && $age < ($failed ? 600 : 604800);
 }
 
 function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
     $now = time();
-    if (isset($cache[$ip]) && is_array($cache[$ip]) && ($now - (int)($cache[$ip]['ts'] ?? 0) < 604800)) {
+    if (isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip])) {
         return $cache[$ip]['data'] ?? null;
     }
     $intel = query_ip_api($ip);
@@ -422,6 +451,7 @@ function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
             'tags' => ['情报查询失败'],
             'is_proxy' => false,
             'is_hosting' => false,
+            'query_failed' => true,
         ];
     }
     $cache[$ip] = ['ts' => $now, 'data' => $intel];
@@ -456,5 +486,6 @@ function query_ip_api(string $ip): ?array {
         'tags' => $tags,
         'is_proxy' => !empty($data['proxy']),
         'is_hosting' => !empty($data['hosting']),
+        'query_failed' => false,
     ];
 }

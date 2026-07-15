@@ -100,7 +100,7 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
     TMPFILE="$TEMP_DIR/${NAME}.json"
     KEY="asn_${NAME}"
     if [[ "${RESULTS[$KEY]:-fail}" == "ok" ]] && [[ -s "$TMPFILE" ]]; then
-        COUNT=$(grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | wc -l || echo 0)
+        COUNT=$( { grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" || true; } | sed 's/"prefix":"//;s/"//' | wc -l | tr -d ' ')
         TOTAL=$((TOTAL + COUNT))
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
         grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | while read -r cidr; do
@@ -114,11 +114,13 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
 done
 
 if [[ "${RESULTS[aws]:-fail}" == "ok" ]] && [[ -s "$AWS_TMP" ]]; then
+    AWS_COUNT=$( { grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" || true; } | sed 's/"ip_prefix":"//;s/"//' | sort -u | wc -l | tr -d ' ')
+    TOTAL=$((TOTAL + AWS_COUNT))
     echo "    # === AWS ===" >> "$OUTPUT_TMP"
     grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" | sed 's/"ip_prefix":"//;s/"//' | sort -u | while read -r cidr; do
         echo "    $cidr 1;" >> "$OUTPUT_TMP"
     done || true
-    log "  AWS: $(grep -o '"ip_prefix"' "$AWS_TMP" | wc -l || echo 0) 条"
+    log "  AWS: ${AWS_COUNT} 条"
     echo "" >> "$OUTPUT_TMP"
 else
     log "  [警告] AWS 拉取失败"
@@ -143,7 +145,15 @@ map $http_user_agent $bad_subscribe_ua {
 }
 EOF
 
-log "共 $TOTAL 条CIDR（不含AWS）"
+log "共 $TOTAL 条CIDR"
+
+if [[ "$TOTAL" -eq 0 && -s "$OUTPUT" ]]; then
+    log "❌ 所有云 IP 数据源均无有效结果，已保留上一版规则"
+    exit 1
+fi
+if [[ "$TOTAL" -eq 0 ]]; then
+    log "[警告] 首次启动未取得云 IP 数据，将使用最小规则并在下次周期重试"
+fi
 
 # 原子替换：写完整再覆盖，避免容器被杀时生成损坏的配置文件
 mv "$OUTPUT_TMP" "$OUTPUT"

@@ -1,5 +1,5 @@
 FROM nginx:alpine
-RUN apk add --no-cache bash curl tzdata gettext
+RUN apk add --no-cache bash curl jq tzdata gettext
 ENV TZ=Asia/Shanghai
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh

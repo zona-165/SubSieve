@@ -54,9 +54,12 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     $body    = json_decode(file_get_contents('php://input'), true) ?? [];
     $token   = trim($body['token'] ?? '');
-    $comment = trim($body['comment'] ?? '');
+    $comment = safe_comment($body['comment'] ?? '');
 
     if (!$token) json_err('请输入 Token');
+    if (strlen($token) > 512 || preg_match('/[\x00-\x1F\x7F]/', $token)) {
+        json_err('Token 格式不合法');
+    }
 
     $entries = read_token_blacklist();
     foreach ($entries as $e) {
@@ -65,14 +68,15 @@ if ($method === 'POST') {
 
     $entries[] = ['token' => $token, 'comment' => $comment, 'added_at' => date('Y-m-d H:i')];
     if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
-    json_out(['ok' => true]);
+    invalidate_stats_cache();
+    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
 }
 
 // PATCH — 更新备注
 if ($method === 'PATCH') {
     $body    = json_decode(file_get_contents('php://input'), true) ?? [];
     $token   = trim($body['token'] ?? '');
-    $comment = trim($body['comment'] ?? '');
+    $comment = safe_comment($body['comment'] ?? '');
 
     if (!$token) json_err('缺少 token 参数');
 
@@ -85,7 +89,7 @@ if ($method === 'PATCH') {
 
     if (!$found) json_err('未找到该Token');
     if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
-    json_out(['ok' => true]);
+    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
 }
 
 // DELETE — 移除 Token 黑名单
@@ -97,7 +101,8 @@ if ($method === 'DELETE') {
 
     $entries = array_values(array_filter(read_token_blacklist(), fn($e) => $e['token'] !== $token));
     if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
-    json_out(['ok' => true]);
+    invalidate_stats_cache();
+    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
 }
 
 json_err('不支持的请求方式', 405);
@@ -111,5 +116,9 @@ function read_token_blacklist(): array {
 }
 
 function write_token_blacklist(array $entries): bool {
-    return file_put_contents(TOKEN_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
+    return write_token_blacklist_files($entries);
+}
+
+function invalidate_stats_cache(): void {
+    @unlink(dirname(TOKEN_BLACKLIST_JSON) . '/stats_cache.json');
 }

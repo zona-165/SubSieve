@@ -56,9 +56,20 @@ DEPLOY_SCRIPT_DIR=${SCRIPT_DIR#"$GIT_ROOT"/}
 [[ "$DEPLOY_SCRIPT_DIR" == "$SCRIPT_DIR" ]] && DEPLOY_SCRIPT_DIR="sgw"
 if git -C "$GIT_ROOT" diff --quiet -- "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null; then
     :
-elif [[ -z "$(git -C "$GIT_ROOT" diff --numstat -- "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null)" ]]; then
-    echo -e "${CYAN}检测到部署脚本仅权限变更，已自动还原以便更新${RESET}"
-    git -C "$GIT_ROOT" restore "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null || true
+else
+    DEPLOY_DIFF_NUMSTAT=$(git -C "$GIT_ROOT" diff --numstat -- "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null || true)
+    ONLY_MODE_CHANGES=true
+    while read -r ADDED REMOVED _PATH; do
+        [[ -z "${ADDED:-}" ]] && continue
+        if [[ "$ADDED" != "0" || "$REMOVED" != "0" ]]; then
+            ONLY_MODE_CHANGES=false
+            break
+        fi
+    done <<< "$DEPLOY_DIFF_NUMSTAT"
+    if [[ -n "$DEPLOY_DIFF_NUMSTAT" && "$ONLY_MODE_CHANGES" == "true" ]]; then
+        echo -e "${CYAN}检测到部署脚本仅权限变更，已自动还原以便更新${RESET}"
+        git -C "$GIT_ROOT" restore "$DEPLOY_SCRIPT_DIR/setup.sh" "$DEPLOY_SCRIPT_DIR/update.sh" 2>/dev/null || true
+    fi
 fi
 
 # 自动检测远程默认分支（main / master 均可）

@@ -6,6 +6,45 @@ mkdir -p /var/log/subscribe /etc/nginx/subscribe
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [entrypoint] $*" | tee -a "$LOG"; }
 
+load_persisted_gateway_settings() {
+    local settings="/etc/nginx/subscribe/admin_settings.json"
+    local backend host path derived_host loaded=0
+    [[ -s "$settings" ]] || return 0
+    jq -e 'type == "object"' "$settings" >/dev/null 2>&1 || {
+        log "[警告] admin_settings.json 格式无效，继续使用 .env 配置"
+        return 0
+    }
+
+    backend=$(jq -r 'if (.upstream_url | type) == "string" then .upstream_url else empty end' "$settings")
+    host=$(jq -r 'if (.upstream_host | type) == "string" then .upstream_host else empty end' "$settings")
+    path=$(jq -r 'if (.subscribe_path | type) == "string" then .subscribe_path else empty end' "$settings")
+
+    if [[ -n "$backend" ]]; then
+        derived_host="${backend#*://}"
+        derived_host="${derived_host%%/*}"
+        derived_host="${derived_host%%:*}"
+        [[ -z "$host" ]] && host="$derived_host"
+        if [[ "$backend" =~ ^[Hh][Tt][Tt][Pp][Ss]?://[^[:space:]\{\}\;\#]+$ && "$host" =~ ^[A-Za-z0-9._:\[\]-]+$ ]]; then
+            V2B_BACKEND="$backend"
+            V2B_HOST="$host"
+            loaded=1
+        else
+            log "[警告] 持久化上游配置不合法，继续使用 .env 配置"
+        fi
+    fi
+    if [[ -n "$path" && "$path" == /* && ! "$path" =~ [[:space:]\{\}\;\#] ]]; then
+        SUBSCRIBE_PATH="$path"
+        loaded=1
+    elif [[ -n "$path" ]]; then
+        log "[警告] 持久化 subscribe_path 不合法，继续使用 .env 配置"
+    fi
+
+    export V2B_BACKEND V2B_HOST SUBSCRIBE_PATH
+    [[ "$loaded" -eq 1 ]] && log "已加载后台持久化网关设置：${V2B_BACKEND}${SUBSCRIBE_PATH}"
+}
+
+load_persisted_gateway_settings
+
 [[ -z "${V2B_BACKEND:-}" ]] && { echo "❌ V2B_BACKEND 未设置"; exit 1; }
 [[ -z "${V2B_HOST:-}" ]]    && { echo "❌ V2B_HOST 未设置"; exit 1; }
 
@@ -128,9 +167,16 @@ cp /etc/nginx/templates-src/nginx.conf /etc/nginx/nginx.conf
 # 初始化空白名单
 [[ ! -f /etc/nginx/subscribe/whitelist_ips.txt ]] && touch /etc/nginx/subscribe/whitelist_ips.txt
 chmod 666 /etc/nginx/subscribe/whitelist_ips.txt
+if [[ ! -f /etc/nginx/subscribe/whitelist.conf ]]; then
+    cat > /etc/nginx/subscribe/whitelist.conf <<'WLEOF'
+geo $whitelist_ip {
+    default 0;
+}
+WLEOF
+fi
 
 # 生成白名单 geo 块
-SKIP_NGINX_RELOAD=1 /scripts/reload_whitelist.sh
+SKIP_NGINX_RELOAD=1 /scripts/reload_whitelist.sh || log "[警告] 白名单校验失败，继续使用上一版配置"
 
 # 初始化空黑名单
 [[ ! -f /etc/nginx/subscribe/blacklist.conf ]] && echo "# blacklist" > /etc/nginx/subscribe/blacklist.conf
@@ -161,6 +207,18 @@ UAWEOF
 fi
 [[ ! -f /etc/nginx/subscribe/ua_whitelist.json ]] && echo "[]" > /etc/nginx/subscribe/ua_whitelist.json
 chmod 666 /etc/nginx/subscribe/ua_whitelist.conf /etc/nginx/subscribe/ua_whitelist.json
+
+# 初始化 Token 黑名单
+if [[ ! -f /etc/nginx/subscribe/token_blacklist.conf ]]; then
+    cat > /etc/nginx/subscribe/token_blacklist.conf <<'TBEOF'
+# Token 黑名单 - 由 admin 自动生成
+map $arg_token $is_token_blacklisted {
+    default 0;
+}
+TBEOF
+fi
+[[ ! -f /etc/nginx/subscribe/token_blacklist.json ]] && echo "[]" > /etc/nginx/subscribe/token_blacklist.json
+chmod 666 /etc/nginx/subscribe/token_blacklist.conf /etc/nginx/subscribe/token_blacklist.json
 
 # 首次拉取云IP库
 if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf ]]; then

@@ -21,7 +21,7 @@ if ($method === 'POST') {
         foreach ($body['import_ips'] as $rawIp) {
             $ip = trim($rawIp);
             if (!$ip) continue;
-            if (!preg_match('/^[\d\.\/\:a-fA-F]+$/', $ip)) { $invalid++; continue; }
+            if (!is_valid_ip_or_cidr($ip, true)) { $invalid++; continue; }
             if (isset($existingSet[$ip])) { $skipped++; continue; }
             $newLines[] = $ip . '  # 从文件导入';
             $existingSet[$ip] = true;
@@ -38,7 +38,7 @@ if ($method === 'POST') {
     $ip      = trim($body['ip'] ?? '');
     $comment = safe_comment($body['comment'] ?? '');
 
-    if (!$ip || !preg_match('/^[\d\.\/\:a-fA-F]+$/', $ip)) {
+    if (!$ip || !is_valid_ip_or_cidr($ip, true)) {
         json_err('IP 格式不合法');
     }
 

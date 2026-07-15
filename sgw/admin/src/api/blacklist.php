@@ -28,7 +28,7 @@ if ($method === 'POST') {
             $ip = trim($rawIp);
             if (!$ip) continue;
             // 支持 IP 和 CIDR
-            if (!preg_match('/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/', $ip)) { $invalid++; continue; }
+            if (!is_valid_ip_or_cidr($ip, false)) { $invalid++; continue; }
             if (isset($existingSet[$ip])) { $skipped++; continue; }
             $entries[] = ['ip' => $ip, 'comment' => '从文件导入', 'added_at' => date('Y-m-d H:i')];
             $existingSet[$ip] = true;
@@ -47,7 +47,7 @@ if ($method === 'POST') {
     $ip      = trim($body['ip'] ?? '');
     $comment = safe_comment($body['comment'] ?? '');
 
-    if (!$ip || !preg_match('/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/', $ip)) {
+    if (!$ip || !is_valid_ip_or_cidr($ip, false)) {
         json_err('IP 格式不合法（仅支持 IPv4）');
     }
 
@@ -129,7 +129,7 @@ function write_blacklist(array $entries): bool {
     foreach ($entries as $e) {
         $ip = trim((string)($e['ip'] ?? ''));
         // 防御性校验 IP/CIDR，避免被篡改的 JSON 通过 IP 字段注入 nginx 指令
-        if (!preg_match('/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/', $ip)) continue;
+        if (!is_valid_ip_or_cidr($ip, false)) continue;
         $at      = safe_comment($e['added_at'] ?? '');
         $cmtText = safe_comment($e['comment'] ?? '');
         $cmt = $cmtText !== '' ? " # {$cmtText} ({$at})" : " # {$at}";

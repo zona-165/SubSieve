@@ -12,6 +12,8 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/blacklist.conf" ]    || echo "# blacklist" > "$SUBSCRIBE_DIR/blacklist.conf"
 [ -f "$SUBSCRIBE_DIR/ua_blacklist.json" ] || echo "[]" > "$SUBSCRIBE_DIR/ua_blacklist.json"
 [ -f "$SUBSCRIBE_DIR/ua_custom.conf" ]    || printf 'map $http_user_agent $is_custom_bad_ua {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/ua_custom.conf"
+[ -f "$SUBSCRIBE_DIR/token_blacklist.json" ] || echo "[]" > "$SUBSCRIBE_DIR/token_blacklist.json"
+[ -f "$SUBSCRIBE_DIR/token_blacklist.conf" ] || printf 'map $arg_token $is_token_blacklisted {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/token_blacklist.conf"
 [ -f "$SUBSCRIBE_DIR/whitelist_ips.txt" ] || touch "$SUBSCRIBE_DIR/whitelist_ips.txt"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
@@ -24,12 +26,17 @@ chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.conf" \
     "$SUBSCRIBE_DIR/ua_blacklist.json" \
     "$SUBSCRIBE_DIR/ua_custom.conf" \
+    "$SUBSCRIBE_DIR/token_blacklist.json" \
+    "$SUBSCRIBE_DIR/token_blacklist.conf" \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
     "$SUBSCRIBE_DIR/admin_settings.json" \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
     "$SUBSCRIBE_DIR/stats_cache.json" \
     "$SUBSCRIBE_DIR/alert_state.json" \
     "$SUBSCRIBE_DIR/alert_history.json"
+
+# 兼容旧版本：根据已有 JSON 生成 Token 拦截规则，并通知 gateway reload。
+php /var/www/html/maintenance.php sync-token-blacklist >/dev/null 2>&1 || true
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe

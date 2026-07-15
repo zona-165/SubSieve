@@ -130,7 +130,11 @@ if ($method === 'POST') {
         // 上游地址会直接拼入 proxy_pass，拒绝换行 / { } ; 等可篡改反代的字符
         $url = safe_conf_value($body['upstream_url']);
         // 自动加 https:// 前缀
-        if (!preg_match('#^https?://#', $url)) $url = 'https://' . $url;
+        if (!preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+        $urlParts = parse_url($url);
+        if (!is_array($urlParts) || !in_array(strtolower((string)($urlParts['scheme'] ?? '')), ['http', 'https'], true) || empty($urlParts['host'])) {
+            json_err('上游地址格式无效');
+        }
         $s['upstream_url'] = $url;
         // 自动提取 host（用于 proxy_set_header Host）
         $host = parse_url($url, PHP_URL_HOST);
@@ -141,6 +145,7 @@ if ($method === 'POST') {
         // 订阅路径会直接拼入 location ^~ ，同样拒绝结构字符
         $path = safe_conf_value($body['subscribe_path']);
         if (!str_starts_with($path, '/')) $path = '/' . $path;
+        if (str_contains($path, '?')) json_err('订阅路径不能包含查询参数');
         $s['subscribe_path'] = $path;
         $upstreamChanged = true;
     }
@@ -399,26 +404,32 @@ location ^~ $subscribePath {
     if (\$is_cloud_ip = 1)       { set \$block_reason "cloud"; }
     if (\$bad_subscribe_ua = 1)  { set \$block_reason "ua"; }
     if (\$is_custom_bad_ua = 1)  { set \$block_reason "ua"; }
+    if (\$is_token_blacklisted = 1) { set \$block_reason "token"; }
     if (\$is_ua_whitelisted = 1) { set \$block_reason ""; }
 
     if (\$whitelist_ip = 1) { set \$block_reason ""; }
 
     if (\$block_reason = "cloud") { return 403 "Forbidden: Cloud IP"; }
     if (\$block_reason = "ua")    { return 403 "Forbidden: Invalid Client"; }
+    if (\$block_reason = "token") { return 403 "Forbidden: Token Blocked"; }
 
     limit_req zone=subscribe_limit burst=5 nodelay;
     limit_req_status 429;
 
-    proxy_pass          $backend;
+    set \$upstream_backend $backend;
+    proxy_pass          \$upstream_backend;
     proxy_set_header    Host              $host;
     proxy_set_header    X-Real-IP         \$remote_addr;
     proxy_set_header    X-Forwarded-For   \$proxy_add_x_forwarded_for;
     proxy_set_header    REMOTE-HOST       \$remote_addr;
     proxy_ssl_server_name on;
+    proxy_ssl_name        $host;
     proxy_set_header    Upgrade           \$http_upgrade;
     proxy_set_header    Connection        \$connection_upgrade;
     proxy_http_version  1.1;
-    resolver            1.1.1.1           ipv6=off;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout    15s;
+    proxy_read_timeout    60s;
 
     add_header Cache-Control no-store;
     add_header X-Subscribe-Filter "active";

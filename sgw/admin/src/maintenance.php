@@ -16,6 +16,13 @@ if ($action === 'check-alerts') {
     echo json_encode($result, JSON_UNESCAPED_UNICODE) . PHP_EOL;
     exit($result['ok'] ? 0 : 1);
 }
+if ($action === 'sync-token-blacklist') {
+    $entries = read_json_file(TOKEN_BLACKLIST_JSON);
+    $ok = write_token_blacklist_files($entries);
+    if ($ok) nginx_reload();
+    echo json_encode(['ok' => $ok, 'entries' => count($entries)], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    exit($ok ? 0 : 1);
+}
 
 echo json_encode(['ok' => false, 'error' => 'unknown action'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
 exit(1);

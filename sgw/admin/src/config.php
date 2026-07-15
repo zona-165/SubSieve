@@ -16,6 +16,7 @@ define('UA_CUSTOM_CONF',    '/etc/nginx/subscribe/ua_custom.conf');
 define('UA_WHITELIST_JSON', '/etc/nginx/subscribe/ua_whitelist.json');
 define('UA_WHITELIST_CONF',    '/etc/nginx/subscribe/ua_whitelist.conf');
 define('TOKEN_BLACKLIST_JSON', '/etc/nginx/subscribe/token_blacklist.json');
+define('TOKEN_BLACKLIST_CONF', '/etc/nginx/subscribe/token_blacklist.conf');
 define('IP_INTEL_CACHE_JSON', '/etc/nginx/subscribe/ip_intel_cache.json');
 define('ALERT_STATE_JSON', '/etc/nginx/subscribe/alert_state.json');
 define('ALERT_HISTORY_JSON', '/etc/nginx/subscribe/alert_history.json');
@@ -82,8 +83,8 @@ function whitelist_reload(): bool {
  */
 function safe_conf_value(string $s): string {
     $s = trim($s);
-    if (preg_match('/[\r\n{};]/', $s)) {
-        json_err('包含非法字符（不允许换行或 { } ; 等字符）');
+    if ($s === '' || preg_match('/[\s{};#"\'\\\\$]/', $s)) {
+        json_err('包含非法字符（不允许空白或 nginx 结构字符）');
     }
     return $s;
 }
@@ -105,6 +106,62 @@ function safe_comment(string $s): string {
 function nginx_ua_pattern(string $ua): string {
     $p = preg_quote($ua, '~');
     return str_replace(['\\', '"'], ['\\\\', '\\"'], $p);
+}
+
+function write_token_blacklist_files(array $entries): bool {
+    $json = json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) return false;
+
+    $lines = ['# Token 黑名单 - 由 admin 自动生成 | ' . date('Y-m-d H:i:s')];
+    $lines[] = 'map $arg_token $is_token_blacklisted {';
+    $lines[] = '    default 0;';
+    foreach ($entries as $entry) {
+        $token = trim((string)($entry['token'] ?? ''));
+        if ($token === '' || strlen($token) > 512 || preg_match('/[\x00-\x1F\x7F]/', $token)) continue;
+        $lines[] = '    "~^' . nginx_ua_pattern($token) . '$" 1;';
+    }
+    $lines[] = '}';
+    $conf = implode("\n", $lines) . "\n";
+
+    $suffix = '.tmp.' . getmypid();
+    $jsonTmp = TOKEN_BLACKLIST_JSON . $suffix;
+    $confTmp = TOKEN_BLACKLIST_CONF . $suffix;
+    $jsonWritten = file_put_contents($jsonTmp, $json, LOCK_EX) !== false;
+    $confWritten = file_put_contents($confTmp, $conf, LOCK_EX) !== false;
+    if (!$jsonWritten || !$confWritten) {
+        @unlink($jsonTmp);
+        @unlink($confTmp);
+        return false;
+    }
+
+    @chmod($jsonTmp, 0666);
+    @chmod($confTmp, 0666);
+    $confReplaced = @rename($confTmp, TOKEN_BLACKLIST_CONF);
+    $jsonReplaced = $confReplaced && @rename($jsonTmp, TOKEN_BLACKLIST_JSON);
+    @unlink($jsonTmp);
+    @unlink($confTmp);
+    return $confReplaced && $jsonReplaced;
+}
+
+/**
+ * 严格校验单个 IP 或 CIDR，并根据地址族检查前缀长度。
+ */
+function is_valid_ip_or_cidr(string $value, bool $allowIpv6 = true): bool {
+    $value = trim($value);
+    if ($value === '') return false;
+
+    $parts = explode('/', $value);
+    if (count($parts) > 2) return false;
+    $ip = $parts[0];
+    $isV4 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
+    $isV6 = $allowIpv6 && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+    if (!$isV4 && !$isV6) return false;
+
+    if (count($parts) === 1) return true;
+    $prefix = $parts[1];
+    if ($prefix === '' || !ctype_digit($prefix)) return false;
+    $maxPrefix = $isV4 ? 32 : 128;
+    return (int)$prefix <= $maxPrefix;
 }
 
 // 出于安全考虑，后台默认不直连机场数据库。
