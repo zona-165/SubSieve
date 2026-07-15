@@ -39,7 +39,11 @@ ask() {
 }
 
 # ── 随机生成函数 ───────────────────────────────────────────────
-gen_random() { head -c 48 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c "$1"; }
+gen_random() {
+    local raw
+    raw=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+    printf '%s' "${raw:0:$1}"
+}
 
 # ── 检查 .env → 决定是否重新生成凭证 ─────────────────────────
 REGEN_CREDS=true
@@ -236,16 +240,12 @@ echo ""
 echo -e "${CYAN}正在构建并启动容器（首次约需 3-5 分钟）…${RESET}"
 docker compose up -d --build
 
-# ── 等待 gateway 初始化完成 ────────────────────────────────────
-echo -e "${CYAN}等待 gateway 初始化（拉取云IP库，请稍候）…${RESET}"
-for i in $(seq 1 60); do
-    if docker logs subscribe-gateway 2>&1 | grep -q "启动 nginx\|daemon off\|start worker"; then
-        break
-    fi
-    sleep 3
-    echo -n "."
-done
-echo ""
+# ── 等待两个服务真正可用 ──────────────────────────────────────
+echo -e "${CYAN}等待服务通过健康检查（首次会拉取云 IP 库）…${RESET}"
+if ! bash ./healthcheck.sh --wait 180; then
+    echo -e "${RED}❌ 服务未能在规定时间内就绪，请根据上方容器日志排查${RESET}"
+    exit 1
+fi
 
 # ── 打印访问信息 ──────────────────────────────────────────────
 print_summary() {

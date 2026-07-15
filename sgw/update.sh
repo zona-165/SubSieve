@@ -74,7 +74,7 @@ fi
 
 # 自动检测远程默认分支（main / master 均可）
 REMOTE_BRANCH=$(git -C "$GIT_ROOT" remote show origin 2>/dev/null \
-    | grep 'HEAD branch' | awk '{print $NF}')
+    | grep 'HEAD branch' | awk '{print $NF}' || true)
 REMOTE_BRANCH=${REMOTE_BRANCH:-main}
 
 echo -e "${CYAN}正在拉取最新代码…${RESET}"
@@ -95,7 +95,7 @@ if [[ -f .env.bak ]]; then
 fi
 
 # 从 gw_config volume 同步管理员在面板中保存的 gateway_port 到 .env
-GW_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep '_gw_config$' | head -1)
+GW_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep '_gw_config$' | head -1 || true)
 if [[ -n "$GW_VOL" ]]; then
     GW_VOL_PATH=$(docker volume inspect "$GW_VOL" --format '{{.Mountpoint}}' 2>/dev/null || true)
     SETTINGS_FILE="${GW_VOL_PATH}/admin_settings.json"
@@ -117,26 +117,13 @@ echo ""
 echo -e "${CYAN}正在重新构建容器…${RESET}"
 docker compose up -d --build
 
-# 清理旧镜像
-echo -e "${CYAN}清理旧镜像…${RESET}"
-docker image prune -f --filter "dangling=true" > /dev/null 2>&1 || true
-
 # 验证容器健康状态
 echo ""
 echo -e "${CYAN}验证容器状态…${RESET}"
-sleep 5
 HEALTH_OK=true
-for NAME in subscribe-gateway subscribe-admin; do
-    STATUS=$(docker inspect --format '{{.State.Status}}' "$NAME" 2>/dev/null || echo "missing")
-    if [[ "$STATUS" == "running" ]]; then
-        echo -e "  ✅ $NAME 运行中"
-    else
-        echo -e "  ❌ $NAME 状态异常（$STATUS）"
-        echo -e "${YELLOW}  最近日志：${RESET}"
-        docker logs --tail 30 "$NAME" 2>&1 | sed 's/^/    /' || true
-        HEALTH_OK=false
-    fi
-done
+if ! bash ./healthcheck.sh --wait 120; then
+    HEALTH_OK=false
+fi
 
 # 检查管理后台端口是否可达
 ADMIN_PORT=64444
@@ -151,6 +138,8 @@ fi
 
 echo ""
 if [[ "$HEALTH_OK" == "true" ]]; then
+    echo -e "${CYAN}清理旧镜像…${RESET}"
+    docker image prune -f --filter "dangling=true" > /dev/null 2>&1 || true
     echo -e "${BOLD}════════════════════════════════════════════${RESET}"
     echo -e "${GREEN}${BOLD}  ✅ 更新完成${RESET}"
     echo -e "${BOLD}════════════════════════════════════════════${RESET}"
@@ -166,5 +155,6 @@ else
     echo -e "    ${CYAN}docker logs subscribe-admin${RESET}  查看管理后台日志"
     echo -e "    ${CYAN}docker logs subscribe-gateway${RESET} 查看网关日志"
     echo -e "    ${CYAN}docker compose up -d${RESET}         尝试重新启动"
+    exit 1
 fi
 echo ""

@@ -12,6 +12,7 @@
 sgw/
 ├── setup.sh                 ← 首次部署向导（一键运行）
 ├── update.sh                ← 已安装用户更新脚本
+├── healthcheck.sh           ← 容器健康检查与排障入口
 ├── docker-compose.yml
 ├── .env                     ← 由 setup.sh 自动生成，含账号密码等敏感信息
 ├── DEPLOY_INFO.txt          ← 部署完成后生成，记录访问地址和账号
@@ -55,8 +56,8 @@ sgw/
 
 - 一台有公网 IP 的 VPS（Debian/Ubuntu 最低1c0.5g）
 - 已安装 Docker + Docker Compose
-- 如需自动申请 SSL 证书：提前把域名解析到本机（A 记录），且 **80 端口未被占用**
-- 不要装其他任何玩意儿
+- `80`、`64444` 以及计划使用的网关端口未被其他服务占用
+- 如需自动申请 SSL 证书：提前把域名解析到本机（A 记录）
 
 ### 一键部署
 
@@ -78,7 +79,8 @@ cd SubSieve/sgw
 | 网关端口 | 客户端订阅链接对外暴露的端口，默认 `443` |
 | 域名（SSL） | 输入已解析到本机的域名，脚本自动调用 acme.sh 申请证书；留空则手动放证书 |
 
-部署完成后，访问信息会打印在终端，同时保存到 `DEPLOY_INFO.txt`。
+部署脚本会等待 gateway 和 admin 均通过健康检查后再报告成功。访问信息会打印在终端，同时保存到 `DEPLOY_INFO.txt`。
+
 ## 食用方法
 部署完成后，将原订阅链接中的域名和端口替换为部署了本项目的域名和端口即可。
 ```
@@ -128,7 +130,7 @@ cd SubSieve/sgw
 ./update.sh
 ```
 
-脚本会自动 git pull 最新代码、保留 `.env`、重新构建容器。
+脚本会自动 git pull 最新代码、保留 `.env`、重新构建容器，并等待两个服务通过健康检查。若 nginx、PHP-FPM 或共享存储异常，脚本会打印容器日志并以非零状态退出，避免把启动失败误报为更新成功。
 
 > **注意**：如果在后台修改了**网关端口**，需要在宿主机执行一次 `./update.sh` 才能让新端口生效（`.env` 中的 `GATEWAY_PORT` 由该脚本同步更新）。
 
@@ -151,6 +153,8 @@ https://你的域名或IP:64444/<随机路径>
 ```
 
 路径和账号密码见 `DEPLOY_INFO.txt`，或查看 `.env` 中的 `ADMIN_SECRET_PATH` / `ADMIN_PASS`。
+
+后台会话 Cookie 默认启用 `Secure`、`HttpOnly` 和 `SameSite=Strict`，登录成功后会更换 Session ID。所有页面和 API 都必须先经过 Secret Path 路由，不能绕过隐藏路径直接执行 PHP 接口。
 
 ---
 
@@ -227,6 +231,9 @@ docker compose up -d --build
 # 检查分析统计缓存是否在自动更新
 docker exec subscribe-admin sh -lc 'ls -lh /etc/nginx/subscribe/stats_cache.json'
 
+# 检查 gateway / admin 容器健康状态，异常时自动显示最近日志
+bash healthcheck.sh --wait 30
+
 # 查看后台维护任务日志（统计预热 / 告警检查 / 日志清理）
 docker exec subscribe-admin sh -lc 'tail -50 /var/log/subscribe/maintenance.log'
 
@@ -238,6 +245,7 @@ docker exec -it subscribe-gateway sh
 
 ## 更新日志
 
+- 2026-07-15：新增运维与后台安全加固：容器级健康检查、安装/更新就绪等待和失败退出；后台统一经过 Secret Path 路由，强化 Session Cookie、登录会话更新、安全响应头及 FastCGI 大响应缓冲；修复无匹配 Docker volume 时更新器提前退出的问题。
 - 2026-07-15：完成稳定性修复包：Token 黑名单接入 nginx 实际拦截；后台上游和订阅路径跨重启持久化；严格校验 IP/CIDR；修复 chmod-only 更新冲突；恢复后台 IP 情报补全；降低 Clash 客户端误报；消除统计缓存空窗；云 IP 拉取失败时保留旧规则。
 - 2026-07-14：告警历史导入体验收尾，兼容当前页导出文件，预览显示文件名、大小、导出时间、来源筛选、关键词和备份新旧提示；导入成功后自动回到全部状态、全部时间和第 1 页。
 - 2026-07-13：告警历史管理增强，支持状态/时间/关键词筛选、分页、页码跳转、筛选摘要标签、单条删除、复制单条/当前页/摘要，以及当前页和全量 JSON 导出。

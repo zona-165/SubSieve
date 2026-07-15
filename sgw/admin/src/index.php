@@ -1,6 +1,6 @@
 <?php
-session_start();
 require_once __DIR__ . '/config.php';
+start_admin_session();
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = '/' . ltrim($uri, '/');
@@ -36,7 +36,7 @@ if (str_starts_with($uri, '/api/')) {
 
 // 退出
 if ($uri === '/logout') {
-    session_destroy();
+    destroy_admin_session();
     $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
     header('Location: ' . $base);
     exit;
@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($uri === '/' || $uri === '/index.p
 
     $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
     if ($user === ADMIN_USER && ADMIN_PASS !== '' && hash_equals(ADMIN_PASS, $pass)) {
+        session_regenerate_id(true);
         $_SESSION['auth'] = true;
         $_SESSION['ts']   = time();
         header('Location: ' . $base);
@@ -61,8 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($uri === '/' || $uri === '/index.p
 
 // Session 超时检查
 if (isset($_SESSION['auth']) && (time() - ($_SESSION['ts'] ?? 0)) > SESSION_LIFETIME) {
-    session_destroy();
-    session_start();
+    destroy_admin_session();
 }
 
 // 刷新 session 时间戳

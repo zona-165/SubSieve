@@ -48,6 +48,41 @@ define('PAGE_TITLE', $_sg['page_title'] ?? 'SubSieve Admin');
 
 // ── 辅助函数 ──────────────────────────────────────────────────
 
+function start_admin_session(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) return;
+
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.gc_maxlifetime', (string)SESSION_LIFETIME);
+    session_name('SUBSIEVESESSID');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+    session_start();
+}
+
+function destroy_admin_session(): void {
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires' => time() - 42000,
+            'path' => $params['path'] ?: '/',
+            'domain' => $params['domain'] ?? '',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+    }
+    session_destroy();
+}
+
 function json_out(array $data, int $code = 200): void {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
