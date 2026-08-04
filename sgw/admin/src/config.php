@@ -20,6 +20,9 @@ define('TOKEN_BLACKLIST_CONF', '/etc/nginx/subscribe/token_blacklist.conf');
 define('IP_INTEL_CACHE_JSON', '/etc/nginx/subscribe/ip_intel_cache.json');
 define('ALERT_STATE_JSON', '/etc/nginx/subscribe/alert_state.json');
 define('ALERT_HISTORY_JSON', '/etc/nginx/subscribe/alert_history.json');
+define('GUARD_CACHE_JSON', '/etc/nginx/subscribe/guard_cache.json');
+define('GUARD_REVIEW_JSON', '/etc/nginx/subscribe/guard_reviews.json');
+define('GUARD_SECRET_FILE', '/etc/nginx/subscribe/guard_secret');
 define('SETTINGS_JSON',     '/etc/nginx/subscribe/admin_settings.json');
 define('PROTECT_CONF',      '/etc/nginx/subscribe/protect.conf');
 define('DEPLOY_INFO_FILE',  '/var/log/subscribe/DEPLOY_INFO.txt');
@@ -100,11 +103,17 @@ function json_err(string $msg, int $code = 400): void {
  * 无需挂载 Docker socket，避免宿主机 root 权限暴露
  */
 function nginx_reload(): bool {
+    invalidate_guard_cache();
     return file_put_contents(NGINX_RELOAD_SIGNAL, '1', LOCK_EX) !== false;
 }
 
 function whitelist_reload(): bool {
+    invalidate_guard_cache();
     return file_put_contents(WHITELIST_RELOAD_SIGNAL, '1', LOCK_EX) !== false;
+}
+
+function invalidate_guard_cache(): void {
+    @unlink(GUARD_CACHE_JSON);
 }
 
 // ── 写入 nginx 配置前的安全过滤 ────────────────────────────────

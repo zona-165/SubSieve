@@ -255,6 +255,62 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .profile-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);color:var(--text2);font-size:12px}
 .profile-dot{display:inline-block;width:9px;height:9px;border-radius:999px;margin-right:5px;vertical-align:-1px}
 
+/* Security operations */
+.nav-section-label{padding:15px 11px 6px;color:var(--text3);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.security-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(130deg,rgba(16,185,129,.12),var(--bg3) 45%,rgba(14,165,233,.10));margin-bottom:14px}
+.security-hero::after{content:"";position:absolute;right:-50px;top:-70px;width:180px;height:180px;border-radius:50%;background:rgba(14,165,233,.12);pointer-events:none}
+.security-hero.attention{background:linear-gradient(130deg,rgba(245,158,11,.13),var(--bg3) 46%,rgba(239,68,68,.08))}
+.security-hero.degraded{background:linear-gradient(130deg,rgba(239,68,68,.16),var(--bg3) 48%,rgba(245,158,11,.08))}
+.security-state{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.security-state-icon{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:rgba(16,185,129,.14);color:#10b981;font-size:22px;font-weight:900}
+.attention .security-state-icon{background:rgba(245,158,11,.14);color:#f59e0b}
+.degraded .security-state-icon{background:rgba(239,68,68,.14);color:#ef4444}
+.security-state-title{font-size:20px;font-weight:850;color:var(--text)}
+.security-state-meta{color:var(--text2);font-size:12px;margin-top:3px}
+.security-hero-actions{position:relative;z-index:1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.security-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.security-metric{position:relative;overflow:hidden;min-height:104px;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)}
+.security-metric::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--metric,#6366f1)}
+.security-metric-label{color:var(--text3);font-size:11px;font-weight:800}
+.security-metric-value{font-size:25px;line-height:1.2;font-weight:900;color:var(--text);margin:8px 0 4px}
+.security-metric-note{color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.security-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:14px;align-items:start}
+.security-section{border:1px solid var(--border);border-radius:12px;background:var(--bg3);padding:18px;margin-bottom:14px;min-width:0}
+.security-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.security-section-title{font-size:14px;font-weight:850;color:var(--text)}
+.security-section-sub{color:var(--text3);font-size:11px;margin-top:3px}
+.mechanism-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mechanism-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;padding:11px;border:1px solid var(--border);border-radius:9px;background:rgba(100,116,139,.045)}
+.mechanism-dot{width:9px;height:9px;margin-top:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.10)}
+.mechanism-dot.warn{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.10)}
+.mechanism-dot.error{background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.10)}
+.mechanism-dot.paused,.mechanism-dot.optional{background:#94a3b8;box-shadow:0 0 0 4px rgba(148,163,184,.10)}
+.mechanism-title{font-size:12px;font-weight:800;color:var(--text)}
+.mechanism-detail{font-size:11px;color:var(--text3);margin-top:2px;overflow-wrap:anywhere}
+.health-list,.action-list{display:flex;flex-direction:column}
+.health-row,.action-row{display:grid;grid-template-columns:minmax(105px,.7fr) minmax(0,1.3fr);gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.health-row:last-child,.action-row:last-child{border-bottom:none}
+.health-label,.action-time{color:var(--text3);font-size:11px}
+.health-value,.action-main{color:var(--text2);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.risk-list{display:flex;flex-direction:column;border-top:1px solid var(--border)}
+.risk-item{padding:14px 0;border-bottom:1px solid var(--border);animation:listIn var(--motion-med) ease both}
+.risk-item:last-child{border-bottom:none}
+.risk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.risk-title{font-size:13px;font-weight:850;color:var(--text)}
+.risk-subject{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#818cf8;overflow-wrap:anywhere;margin-top:3px}
+.risk-score{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(239,68,68,.11);color:#ef4444;font-size:11px;font-weight:850}
+.risk-evidence{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0 6px;color:var(--text2);font-size:11px}
+.risk-evidence span{padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:rgba(100,116,139,.05)}
+.risk-reason{color:var(--text3);font-size:11px;line-height:1.6}
+.risk-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+.review-select{min-width:112px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:6px 8px;border-radius:8px;font-size:11px;outline:none}
+.rule-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
+.rule-field label{display:block;color:var(--text2);font-size:11px;margin-bottom:5px}
+.rule-field .ip-input{width:100%;min-width:0}
+.rule-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.scope-note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(14,165,233,.18);border-radius:9px;background:rgba(14,165,233,.07);color:var(--text2);font-size:11px;line-height:1.55;margin-bottom:14px}
+.security-empty{padding:24px 0;color:var(--text3);font-size:12px;text-align:center}
+
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.055)}
 .ip-input{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;font-size:13px;font-family:monospace;outline:none;flex:1;min-width:160px;transition:all .15s}
@@ -321,6 +377,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .nav-item{flex:0 0 auto;width:auto;padding:7px 10px;gap:5px;font-size:12px;white-space:nowrap}
   .nav-icon{width:24px;height:24px;font-size:14px;flex-shrink:0}
   .sidebar-bottom{margin-top:0;margin-left:auto;display:flex}
+  .nav-section-label{display:none}
   .main{min-width:0}
   .topbar{position:sticky;top:49px;z-index:15;padding:10px 12px;align-items:flex-start;gap:8px;flex-wrap:wrap}
   .topbar-title{font-size:14px;line-height:30px}
@@ -369,6 +426,19 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .apply-row{align-items:flex-start;flex-wrap:wrap}
   #panel-settings .stats-grid{grid-template-columns:1fr!important}
   #panel-settings .card [style*="display:flex;gap:8px;align-items:flex-end"]{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  .security-hero{padding:15px;align-items:flex-start;flex-direction:column}
+  .security-state-title{font-size:17px}
+  .security-hero-actions{width:100%;justify-content:flex-start}
+  .security-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .security-metric{min-height:92px;padding:12px}
+  .security-metric-value{font-size:21px}
+  .security-layout{grid-template-columns:1fr;gap:0}
+  .security-section{padding:13px;border-radius:9px;margin-bottom:10px}
+  .mechanism-grid{grid-template-columns:1fr}
+  .rule-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .risk-head{align-items:flex-start}
+  .risk-actions .mode-btn,.risk-actions .review-select{flex:1 1 calc(50% - 7px);min-height:34px}
+  .health-row,.action-row{grid-template-columns:90px minmax(0,1fr);gap:8px}
   #toast{left:10px;right:10px;bottom:12px;text-align:center}
 }
 </style>
@@ -377,25 +447,31 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
 
 <nav class="sidebar">
   <div class="logo"><?= htmlspecialchars(SITE_TITLE, ENT_QUOTES) ?></div>
-  <button class="nav-item active" onclick="switchTab('logs',this)">
-    <span class="nav-icon">📋</span>日志
+  <div class="nav-section-label">监控</div>
+  <button class="nav-item active" data-tab="security" onclick="switchTab('security',this)">
+    <span class="nav-icon">◈</span>安全状态
   </button>
-  <button class="nav-item" onclick="switchTab('stats',this)">
-    <span class="nav-icon">📊</span>分析
+  <button class="nav-item" data-tab="logs" onclick="switchTab('logs',this)">
+    <span class="nav-icon">📋</span>拉取记录
   </button>
-  <button class="nav-item" onclick="switchTab('ua_blacklist',this)">
-    <span class="nav-icon">🛡</span>UA
+  <button class="nav-item" data-tab="stats" onclick="switchTab('stats',this)">
+    <span class="nav-icon">📊</span>风险分析
   </button>
-  <button class="nav-item" onclick="switchTab('whitelist',this)">
+  <div class="nav-section-label">策略</div>
+  <button class="nav-item" data-tab="whitelist" onclick="switchTab('whitelist',this)">
     <span class="nav-icon">✅</span>IP白名单
   </button>
-  <button class="nav-item" onclick="switchTab('blacklist',this)">
+  <button class="nav-item" data-tab="blacklist" onclick="switchTab('blacklist',this)">
     <span class="nav-icon">🚫</span>IP黑名单
   </button>
-  <button class="nav-item" onclick="switchTab('token_blacklist',this)">
+  <button class="nav-item" data-tab="token_blacklist" onclick="switchTab('token_blacklist',this)">
     <span class="nav-icon">🔑</span>Token黑名单
   </button>
-  <button class="nav-item" onclick="switchTab('settings',this)">
+  <button class="nav-item" data-tab="ua_blacklist" onclick="switchTab('ua_blacklist',this)">
+    <span class="nav-icon">🛡</span>UA规则
+  </button>
+  <div class="nav-section-label">系统</div>
+  <button class="nav-item" data-tab="settings" onclick="switchTab('settings',this)">
     <span class="nav-icon">⚙</span>系统设置
   </button>
   <div class="sidebar-bottom">
@@ -407,7 +483,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
 
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title" id="tab-title">日志</div>
+    <div class="topbar-title" id="tab-title">安全状态</div>
     <div class="topbar-right">
       <span class="status-dot"></span>
       <span class="status-text">运行中</span>
@@ -419,8 +495,93 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
 
   <div class="content">
 
+    <!-- ─── 安全状态 ───────────────────────────────────────── -->
+    <div class="tab-panel active" id="panel-security">
+      <div id="security-hero" class="security-hero">
+        <div class="security-state">
+          <div class="security-state-icon">✓</div>
+          <div>
+            <div class="security-state-title" id="security-state-title">正在读取安全状态</div>
+            <div class="security-state-meta" id="security-state-meta">汇总网关、日志、规则和缓存状态</div>
+          </div>
+        </div>
+        <div class="security-hero-actions">
+          <button class="mode-btn" onclick="openPanelTab('logs')">查看拉取记录</button>
+          <button class="btn-primary" onclick="loadSecurity({force:true})">刷新诊断</button>
+        </div>
+      </div>
+
+      <div class="scope-note"><strong>独立边界</strong><span id="security-scope">只分析订阅网关日志，不连接机场用户、邮箱、订单或套餐数据库。</span></div>
+      <div id="security-metrics" class="security-metrics"><div class="loading">加载安全指标…</div></div>
+
+      <div class="security-layout">
+        <div>
+          <section class="security-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">防护机制</div><div class="security-section-sub">显示实际运行状态，不以配置项存在代替健康</div></div>
+              <button class="mode-btn" onclick="openPanelTab('settings')">系统设置</button>
+            </div>
+            <div id="security-mechanisms" class="mechanism-grid"><div class="loading">加载中…</div></div>
+          </section>
+
+          <section class="security-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">风险复核</div><div class="security-section-sub">阈值命中只进入复核队列，不会自动封禁</div></div>
+              <button class="mode-btn" onclick="openPanelTab('stats')">完整分析</button>
+            </div>
+            <div class="log-mode-btns" style="margin-bottom:10px">
+              <button class="mode-btn active" id="guard-filter-active" onclick="setGuardFilter('active')">待处理</button>
+              <button class="mode-btn" id="guard-filter-all" onclick="setGuardFilter('all')">全部</button>
+              <button class="mode-btn" id="guard-filter-trusted" onclick="setGuardFilter('trusted')">已判可信</button>
+              <span class="auto-timer" id="guard-review-summary"></span>
+            </div>
+            <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
+          </section>
+        </div>
+
+        <div>
+          <section class="security-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">运行健康</div><div class="security-section-sub">缓存、规则、日志和清理任务</div></div>
+            </div>
+            <div id="security-health" class="health-list"><div class="loading">加载中…</div></div>
+          </section>
+
+          <section class="security-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">观察阈值</div><div class="security-section-sub">统一规则入口，保存后下次扫描生效</div></div>
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:12px;margin-bottom:12px">
+              <input id="guard-observe-enabled" type="checkbox" style="width:18px;height:18px"> 开启行为阈值观察
+            </label>
+            <div class="rule-grid">
+              <div class="rule-field"><label>单 IP / 分钟</label><input class="ip-input" id="guard-ip-minute" type="number" min="5" max="5000"></div>
+              <div class="rule-field"><label>单 Token / 分钟</label><input class="ip-input" id="guard-token-minute" type="number" min="5" max="5000"></div>
+              <div class="rule-field"><label>Token / 小时不同 IP</label><input class="ip-input" id="guard-token-hour-ips" type="number" min="2" max="500"></div>
+              <div class="rule-field"><label>IP / 小时不同 Token</label><input class="ip-input" id="guard-ip-hour-tokens" type="number" min="2" max="1000"></div>
+              <div class="rule-field"><label>单 IP 五分钟 404</label><input class="ip-input" id="guard-ip-404" type="number" min="5" max="5000"></div>
+              <div class="rule-field"><label>扫描日志行数</label><input class="ip-input" id="guard-scan-lines" type="number" min="1000" max="100000" step="1000"></div>
+            </div>
+            <div class="rule-actions">
+              <button class="mode-btn" onclick="applyGuardPreset('strict')">严格</button>
+              <button class="mode-btn" onclick="applyGuardPreset('balanced')">均衡</button>
+              <button class="mode-btn" onclick="applyGuardPreset('quiet')">宽松</button>
+              <button class="btn-primary" onclick="saveGuardSettings()">保存阈值</button>
+            </div>
+          </section>
+
+          <section class="security-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">最近处理</div><div class="security-section-sub">名单操作与告警审计</div></div>
+            </div>
+            <div id="security-actions" class="action-list"><div class="loading">加载中…</div></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- ─── 日志 ─────────────────────────────────────────── -->
-    <div class="tab-panel active" id="panel-logs">
+    <div class="tab-panel" id="panel-logs">
       <div class="card">
         <!-- 日志模式切换 -->
         <div class="log-mode-btns">
@@ -671,7 +832,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
           <button class="btn-primary" onclick="tbAdd()">添加</button>
         </div>
         <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
-          ⚡ Token 黑名单<strong>不会直接拦截请求</strong>，仅用于监控追踪——黑名单内的 Token 不计入分析统计，此处显示今日各 IP 的拉取记录。如需真正阻断访问，请通过 IP 黑名单或 UA 封禁实现。
+          ⚡ Token 黑名单会在订阅入口进行精确匹配并立即返回 403；黑名单内 Token 同时从风险统计中排除，避免重复告警。
         </div>
         <div id="tb-list"><div class="loading">加载中…</div></div>
       </div>
@@ -878,6 +1039,8 @@ let blacklistIpSet = new Set();
 let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
+let securityData = null;
+let guardReviewFilter = 'active';
 let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10, profiles: 10};
 let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1, profiles: 1};
 let activeStatsDetail = '';
@@ -932,15 +1095,16 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
 });
 applyTheme();
 const TABS = {
-  logs:            {title:'日志',        loader:loadLogs},
-  stats:           {title:'分析',        loader:loadStats},
-  ua_blacklist:    {title:'UA',          loader:loadUaBlacklist},
+  security:        {title:'安全状态',    loader:loadSecurity},
+  logs:            {title:'拉取记录',    loader:loadLogs},
+  stats:           {title:'风险分析',    loader:loadStats},
+  ua_blacklist:    {title:'UA规则',      loader:loadUaBlacklist},
   whitelist:       {title:'IP白名单',    loader:loadWhitelist},
   blacklist:       {title:'IP黑名单',    loader:loadBlacklist},
   token_blacklist: {title:'Token黑名单', loader:loadTokenBlacklist},
   settings:        {title:'系统设置',    loader:loadSettings},
 };
-let currentTab = 'logs';
+let currentTab = 'security';
 
 async function loadTab(name, opts={}) {
   const {force=false, silent=false} = opts;
@@ -968,7 +1132,7 @@ function scheduleBackgroundPreload() {
   if (preloadStarted) return;
   preloadStarted = true;
   const run = async () => {
-    const names = Object.keys(TABS).filter(name => name !== 'logs');
+    const names = Object.keys(TABS).filter(name => name !== 'security');
     for (const name of names) {
       await loadTab(name, {silent:true}).catch(() => {});
       await new Promise(resolve => setTimeout(resolve, 120));
@@ -983,9 +1147,10 @@ function scheduleBackgroundPreload() {
 
 // ── Tab 切换 ──────────────────────────────────────────────────
 function switchTab(name, el) {
+  if (!TABS[name]) return;
   currentTab = name;
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
   panel.classList.add('active');
@@ -993,6 +1158,10 @@ function switchTab(name, el) {
   document.getElementById('tab-title').textContent = TABS[name].title;
   resetCountdown();
   loadTab(name);
+}
+
+function openPanelTab(name) {
+  switchTab(name, document.querySelector(`.nav-item[data-tab="${name}"]`));
 }
 
 function restartAnimation(el) {
@@ -3131,6 +3300,206 @@ async function importAlertHistory(input) {
 }
 
 
+// ── 安全状态 ──────────────────────────────────────────────────
+async function loadSecurity(opts={}) {
+  const query = opts.force ? '?refresh=1' : '';
+  const d = await apiFetch('/api/security.php' + query);
+  if (!d.ok) {
+    document.getElementById('security-state-title').textContent = '安全状态加载失败';
+    document.getElementById('security-state-meta').textContent = d.error || '服务器未返回有效数据';
+    throw new Error(d.error || '安全状态加载失败');
+  }
+  securityData = d;
+  renderSecurity();
+}
+
+function renderSecurity() {
+  if (!securityData) return;
+  const health = securityData.health || {};
+  const hero = document.getElementById('security-hero');
+  hero.classList.remove('attention', 'degraded');
+  if (health.state === 'attention') hero.classList.add('attention');
+  if (health.state === 'degraded') hero.classList.add('degraded');
+  hero.querySelector('.security-state-icon').textContent = health.state === 'healthy' ? '✓' : (health.state === 'attention' ? '!' : '×');
+  document.getElementById('security-state-title').textContent = health.label || '状态未知';
+  document.getElementById('security-state-meta').textContent = `${securityData.mode === 'observe' ? '观察模式' : '观察已暂停'} · 更新于 ${securityData.generated_at || '-'}${securityData.cached ? ' · 缓存' : ''}`;
+  document.getElementById('security-scope').textContent = securityData.scope || '独立网关日志分析';
+
+  renderSecurityMetrics();
+  renderSecurityMechanisms();
+  renderSecurityHealth();
+  renderGuardFindings();
+  renderGuardRules();
+  renderSecurityActions();
+}
+
+function renderSecurityMetrics() {
+  const m = securityData.metrics || {};
+  const c = securityData.policy_counts || {};
+  const rows = [
+    {label:'今日订阅请求', value:m.today_requests || 0, note:`成功 ${m.today_success || 0} 次`, color:'#0ea5e9'},
+    {label:'今日来源 IP', value:m.today_ips || 0, note:`扫描 ${m.observed_lines || 0} 行日志`, color:'#6366f1'},
+    {label:'今日 Token 指纹', value:m.today_tokens || 0, note:'不在总览返回明文', color:'#8b5cf6'},
+    {label:'风险复核队列', value:m.risk_findings || 0, note:`待处理 ${(securityData.review_summary || {}).pending || 0} 条`, color:'#f59e0b'},
+    {label:'今日网关拦截', value:m.today_blocked || 0, note:'403 / 429 / 444', color:'#ef4444'},
+    {label:'生效名单策略', value:(c.ip_blacklist || 0) + (c.token_blacklist || 0), note:`IP ${c.ip_blacklist || 0} · Token ${c.token_blacklist || 0}`, color:'#10b981'},
+  ];
+  document.getElementById('security-metrics').innerHTML = rows.map(row => `
+    <div class="security-metric" style="--metric:${row.color}">
+      <div class="security-metric-label">${esc(row.label)}</div>
+      <div class="security-metric-value">${Number(row.value).toLocaleString()}</div>
+      <div class="security-metric-note">${esc(row.note)}</div>
+    </div>`).join('');
+}
+
+function renderSecurityMechanisms() {
+  const rows = securityData.mechanisms || [];
+  document.getElementById('security-mechanisms').innerHTML = rows.length ? rows.map(row => `
+    <div class="mechanism-item">
+      <span class="mechanism-dot ${esc(row.state || '')}"></span>
+      <div><div class="mechanism-title">${esc(row.title || '-')}</div><div class="mechanism-detail">${esc(row.detail || '-')}</div></div>
+    </div>`).join('') : '<div class="security-empty">暂无机制状态</div>';
+}
+
+function renderSecurityHealth() {
+  const h = securityData.health || {};
+  const age = value => value === null || value === undefined ? '不存在' : formatDuration(Number(value) || 0);
+  const issues = Array.isArray(h.issues) && h.issues.length ? h.issues.join('；') : '未发现异常';
+  const rows = [
+    ['统计缓存', h.stats_cache_age == null ? '不存在' : `${age(h.stats_cache_age)}前更新`],
+    ['IDC 规则库', h.cloud_rules_age == null ? '不存在' : `${age(h.cloud_rules_age)}前更新`],
+    ['访问日志', `${formatFileSize(h.log_size || 0)} · ${h.log_writable ? '可读写' : '权限异常'}`],
+    ['日志清理', h.retention_days > 0 ? `保留 ${h.retention_days} 天` : '已关闭'],
+    ['告警巡检', h.alert_enabled ? (h.last_alert_check || '等待首次检查') : '未开启（可选）'],
+    ['诊断结果', issues],
+  ];
+  document.getElementById('security-health').innerHTML = rows.map(([label, value]) => `
+    <div class="health-row"><div class="health-label">${esc(label)}</div><div class="health-value">${esc(value)}</div></div>`).join('');
+}
+
+function setGuardFilter(filter) {
+  guardReviewFilter = filter;
+  ['active','all','trusted'].forEach(name => document.getElementById('guard-filter-' + name)?.classList.toggle('active', name === filter));
+  renderGuardFindings();
+}
+
+function renderGuardFindings() {
+  if (!securityData) return;
+  const summary = securityData.review_summary || {};
+  document.getElementById('guard-review-summary').textContent = `待复核 ${summary.pending || 0} · 观察 ${summary.watch || 0} · 可信 ${summary.trusted || 0} · 异常 ${summary.confirmed || 0}`;
+  let rows = securityData.findings || [];
+  if (guardReviewFilter === 'active') rows = rows.filter(row => ['pending','watch'].includes(row.review?.status || 'pending'));
+  if (guardReviewFilter === 'trusted') rows = rows.filter(row => row.review?.status === 'trusted');
+  rows = rows.slice(0, 30);
+  const target = document.getElementById('security-findings');
+  if (!rows.length) {
+    target.innerHTML = `<div class="security-empty">${guardReviewFilter === 'active' ? '当前没有待处理风险' : '当前筛选没有记录'}</div>`;
+    return;
+  }
+  target.innerHTML = rows.map((row, index) => {
+    const review = row.review || {status:'pending',note:''};
+    const subject = row.subject || '-';
+    const sampleIps = Array.isArray(row.sample_ips) && row.sample_ips.length ? `来源样本：${row.sample_ips.join('、')}` : '';
+    const meta = [
+      `${row.count || 0} / 阈值 ${row.threshold || 0}`,
+      row.window || '',
+      row.source || '',
+      row.last_seen ? `最后 ${row.last_seen}` : '',
+    ].filter(Boolean);
+    const canBlockIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(subject) && !blacklistIpSet.has(subject);
+    return `
+      <div class="risk-item">
+        <div class="risk-head">
+          <div><div class="risk-title">${esc(row.title || '风险事件')}</div><div class="risk-subject">${esc(subject)}</div></div>
+          <span class="risk-score">${esc(row.risk || '关注')} ${Number(row.score || 0)}</span>
+        </div>
+        <div class="risk-evidence">${meta.map(item => `<span>${esc(item)}</span>`).join('')}</div>
+        <div class="risk-reason">${esc(row.reason || '-')}${sampleIps ? `<br>${esc(sampleIps)}` : ''}${row.ua ? `<br>UA：${esc(row.ua)}` : ''}</div>
+        <div class="risk-actions">
+          <select class="review-select" id="guard-review-${index}">${guardReviewOptions(review.status)}</select>
+          <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
+          <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index})">保存判断</button>
+          ${canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function guardReviewOptions(selected) {
+  const options = {pending:'待复核', watch:'持续观察', trusted:'判定可信', confirmed:'确认异常'};
+  return Object.entries(options).map(([value,label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+async function saveGuardReview(key, index) {
+  const status = document.getElementById('guard-review-' + index)?.value || 'pending';
+  const note = document.getElementById('guard-note-' + index)?.value.trim() || '';
+  const d = await apiFetch('/api/security.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify({action:'review', key, status, note}),
+  });
+  if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+  const row = (securityData.findings || []).find(item => item.key === key);
+  if (row) row.review = d.review;
+  const summary = {pending:0,watch:0,trusted:0,confirmed:0};
+  (securityData.findings || []).forEach(item => summary[item.review?.status || 'pending']++);
+  securityData.review_summary = summary;
+  renderGuardFindings();
+  renderSecurityMetrics();
+  toast('复核状态已保存');
+}
+
+function renderGuardRules() {
+  const r = securityData.rules || {};
+  document.getElementById('guard-observe-enabled').checked = !!Number(r.guard_observe_enabled ?? 1);
+  document.getElementById('guard-ip-minute').value = r.guard_ip_per_minute ?? 30;
+  document.getElementById('guard-token-minute').value = r.guard_token_per_minute ?? 20;
+  document.getElementById('guard-token-hour-ips').value = r.guard_token_hour_ips ?? 8;
+  document.getElementById('guard-ip-hour-tokens').value = r.guard_ip_hour_tokens ?? 20;
+  document.getElementById('guard-ip-404').value = r.guard_ip_404_5m ?? 40;
+  document.getElementById('guard-scan-lines').value = r.guard_scan_lines ?? 30000;
+}
+
+function applyGuardPreset(name) {
+  const presets = {
+    strict:[20,15,5,12,25,30000],
+    balanced:[30,20,8,20,40,30000],
+    quiet:[60,45,15,40,80,50000],
+  };
+  const values = presets[name] || presets.balanced;
+  ['guard-ip-minute','guard-token-minute','guard-token-hour-ips','guard-ip-hour-tokens','guard-ip-404','guard-scan-lines']
+    .forEach((id, index) => document.getElementById(id).value = values[index]);
+}
+
+async function saveGuardSettings() {
+  const body = {
+    guard_observe_enabled: document.getElementById('guard-observe-enabled').checked ? 1 : 0,
+    guard_ip_per_minute: Number(document.getElementById('guard-ip-minute').value),
+    guard_token_per_minute: Number(document.getElementById('guard-token-minute').value),
+    guard_token_hour_ips: Number(document.getElementById('guard-token-hour-ips').value),
+    guard_ip_hour_tokens: Number(document.getElementById('guard-ip-hour-tokens').value),
+    guard_ip_404_5m: Number(document.getElementById('guard-ip-404').value),
+    guard_scan_lines: Number(document.getElementById('guard-scan-lines').value),
+  };
+  const d = await apiFetch('/api/settings.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(body),
+  });
+  if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+  toast('观察阈值已保存');
+  await loadSecurity({force:true});
+}
+
+function renderSecurityActions() {
+  const rows = securityData.recent_actions || [];
+  document.getElementById('security-actions').innerHTML = rows.length ? rows.map(row => `
+    <div class="action-row">
+      <div class="action-time">${esc(row.time || '-')}</div>
+      <div class="action-main"><strong>${esc(row.type || '-')}</strong>${row.subject ? ` · ${esc(row.subject)}` : ''}<br><span style="color:var(--text3)">${esc(row.detail || '-')}</span></div>
+    </div>`).join('') : '<div class="security-empty">暂无处理记录</div>';
+}
+
 // ── 快捷封禁 IP（从日志/分析页直接封） ──────────────────────────
 async function quickBlacklist(ip) {
   const cmt = prompt(`封禁 ${ip}，备注（可留空）：`);
@@ -3194,7 +3563,7 @@ async function importLogs(input) {
 // ── 初始化 ────────────────────────────────────────────────────
 async function initDashboard() {
   resetCountdown();
-  await loadTab('logs', {force:true}).catch(() => {});
+  await loadTab('security', {force:true}).catch(() => {});
   scheduleBackgroundPreload();
 }
 initDashboard();

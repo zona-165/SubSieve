@@ -151,6 +151,7 @@ if ($method === 'POST') {
     }
 
     $s = apply_alert_settings($s, $body);
+    $s = apply_guard_settings($s, $body);
 
     // 保存 settings.json
     if (!write_settings($s)) {
@@ -245,6 +246,30 @@ function apply_alert_settings(array $s, array $body): array {
             $s[$key] = $value;
         }
     }
+    return $s;
+}
+
+function apply_guard_settings(array $s, array $body): array {
+    if (array_key_exists('guard_observe_enabled', $body)) {
+        $s['guard_observe_enabled'] = !empty($body['guard_observe_enabled']) ? 1 : 0;
+    }
+    $fields = [
+        'guard_ip_per_minute' => [5, 5000, 30],
+        'guard_token_per_minute' => [5, 5000, 20],
+        'guard_token_hour_ips' => [2, 500, 8],
+        'guard_ip_hour_tokens' => [2, 1000, 20],
+        'guard_ip_404_5m' => [5, 5000, 40],
+        'guard_scan_lines' => [1000, 100000, 30000],
+    ];
+    $changed = false;
+    foreach ($fields as $key => [$min, $max, $default]) {
+        if (!array_key_exists($key, $body)) continue;
+        $value = is_numeric($body[$key]) ? (int)$body[$key] : $default;
+        $s[$key] = max($min, min($max, $value));
+        $changed = true;
+    }
+    if (array_key_exists('guard_observe_enabled', $body)) $changed = true;
+    if ($changed) invalidate_guard_cache();
     return $s;
 }
 

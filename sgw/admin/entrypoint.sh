@@ -20,6 +20,11 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
 [ -f "$SUBSCRIBE_DIR/alert_state.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_state.json"
 [ -f "$SUBSCRIBE_DIR/alert_history.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_history.json"
+[ -f "$SUBSCRIBE_DIR/guard_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/guard_cache.json"
+[ -f "$SUBSCRIBE_DIR/guard_reviews.json" ] || echo '{"entries":{}}' > "$SUBSCRIBE_DIR/guard_reviews.json"
+if [ ! -s "$SUBSCRIBE_DIR/guard_secret" ]; then
+    php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' > "$SUBSCRIBE_DIR/guard_secret"
+fi
 
 chmod 666 \
     "$SUBSCRIBE_DIR/blacklist.json" \
@@ -33,7 +38,11 @@ chmod 666 \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
     "$SUBSCRIBE_DIR/stats_cache.json" \
     "$SUBSCRIBE_DIR/alert_state.json" \
-    "$SUBSCRIBE_DIR/alert_history.json"
+    "$SUBSCRIBE_DIR/alert_history.json" \
+    "$SUBSCRIBE_DIR/guard_cache.json" \
+    "$SUBSCRIBE_DIR/guard_reviews.json"
+chown www-data:www-data "$SUBSCRIBE_DIR/guard_secret"
+chmod 600 "$SUBSCRIBE_DIR/guard_secret"
 
 # 兼容旧版本：根据已有 JSON 生成 Token 拦截规则，并通知 gateway reload。
 php /var/www/html/maintenance.php sync-token-blacklist >/dev/null 2>&1 || true
@@ -48,6 +57,7 @@ chmod 666 /var/log/subscribe/maintenance.log
 
 (while true; do
     php /var/www/html/api/stats.php >/dev/null 2>&1 || true
+    php /var/www/html/api/security.php >/dev/null 2>&1 || true
     sleep 60
 done) &
 
