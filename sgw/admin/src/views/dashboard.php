@@ -310,6 +310,37 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .rule-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .scope-note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(14,165,233,.18);border-radius:9px;background:rgba(14,165,233,.07);color:var(--text2);font-size:11px;line-height:1.55;margin-bottom:14px}
 .security-empty{padding:24px 0;color:var(--text3);font-size:12px;text-align:center}
+.pull-limit-panel{margin-bottom:14px;padding:18px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.pull-limit-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.limit-mode-badge{padding:5px 9px;border-radius:999px;border:1px solid rgba(14,165,233,.22);background:rgba(14,165,233,.09);color:#38bdf8;font-size:11px;font-weight:850;white-space:nowrap}
+.limit-mode-badge.enforce{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.10);color:#f59e0b}
+.limit-mode-badge.paused{border-color:var(--border);background:rgba(100,116,139,.07);color:var(--text3)}
+.pull-limit-rule-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pull-limit-rule{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;align-items:center;min-height:78px;padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--bg3)}
+.pull-limit-icon{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:rgba(14,165,233,.10);color:#38bdf8;font-size:17px;font-weight:900}
+.pull-limit-rule:nth-child(2) .pull-limit-icon{background:rgba(245,158,11,.11);color:#f59e0b}
+.pull-limit-rule:nth-child(3) .pull-limit-icon{background:rgba(244,63,94,.10);color:#fb7185}
+.pull-limit-rule-label{font-size:11px;color:var(--text3)}
+.pull-limit-rule-value{font-size:16px;font-weight:900;color:var(--text);margin-top:2px}
+.pull-limit-subhead{margin:16px 0 9px;color:var(--text2);font-size:12px;font-weight:850}
+.pull-limit-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pull-limit-summary-item{padding:12px 13px;border-left:3px solid var(--limit-color,#6366f1);background:rgba(100,116,139,.055);border-radius:7px;min-width:0}
+.pull-limit-summary-value{font-size:20px;font-weight:900;color:var(--text)}
+.pull-limit-summary-label{font-size:10px;color:var(--text3);margin-top:3px}
+.pull-limit-usage{margin-top:10px;border-top:1px solid var(--border)}
+.pull-limit-row{display:grid;grid-template-columns:minmax(150px,1.25fr) minmax(100px,.8fr) minmax(100px,.8fr) minmax(95px,.7fr) auto;gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--border);font-size:11px}
+.pull-limit-token{font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#818cf8;overflow-wrap:anywhere}
+.pull-limit-meter{height:5px;border-radius:999px;background:rgba(100,116,139,.14);overflow:hidden;margin-top:5px}
+.pull-limit-meter span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0ea5e9,#6366f1)}
+.pull-limit-meter.warn span{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+.pull-limit-status{font-weight:800;color:#10b981;white-space:nowrap}
+.pull-limit-status.warn{color:#f59e0b}.pull-limit-status.blocked{color:#ef4444}
+.pull-limit-controls{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.pull-limit-switches{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pull-limit-switches label{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:12px}
+.pull-limit-switches input{width:18px;height:18px}
+.pull-limit-actions{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pull-limit-note{color:var(--text3);font-size:11px;line-height:1.65;flex:1;min-width:240px}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.055)}
@@ -434,6 +465,12 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .security-metric-value{font-size:21px}
   .security-layout{grid-template-columns:1fr;gap:0}
   .security-section{padding:13px;border-radius:9px;margin-bottom:10px}
+  .pull-limit-panel{padding:14px 0}
+  .pull-limit-rule-grid{grid-template-columns:1fr}
+  .pull-limit-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .pull-limit-row{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:12px 2px}
+  .pull-limit-row>div:nth-child(2),.pull-limit-row>div:nth-child(3){grid-column:1/-1}
+  .pull-limit-controls{grid-template-columns:1fr}
   .mechanism-grid{grid-template-columns:1fr}
   .rule-grid{grid-template-columns:1fr 1fr;gap:8px}
   .risk-head{align-items:flex-start}
@@ -513,6 +550,30 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
 
       <div class="scope-note"><strong>独立边界</strong><span id="security-scope">只分析订阅网关日志，不连接机场用户、邮箱、订单或套餐数据库。</span></div>
       <div id="security-metrics" class="security-metrics"><div class="loading">加载安全指标…</div></div>
+
+      <section class="pull-limit-panel">
+        <div class="pull-limit-head">
+          <div><div class="security-section-title">Token 拉取限制</div><div class="security-section-sub">按 Token 指纹统计独立 IP 和拉取频率，自动暂停可独立启停</div></div>
+          <span id="pull-limit-mode" class="limit-mode-badge paused">读取中</span>
+        </div>
+        <div id="pull-limit-rules" class="pull-limit-rule-grid"><div class="loading">加载限制规则…</div></div>
+        <div class="pull-limit-subhead">当前使用（24 小时）</div>
+        <div id="pull-limit-summary" class="pull-limit-summary"><div class="loading">加载用量…</div></div>
+        <div id="pull-limit-usage" class="pull-limit-usage"></div>
+        <div class="pull-limit-controls">
+          <div class="pull-limit-switches">
+            <label><input id="pull-limit-enabled" type="checkbox"> 开启用量监控</label>
+            <label><input id="pull-limit-enforce" type="checkbox"> 超限后自动暂停</label>
+          </div>
+          <div class="rule-field"><label>24 小时不同 IP 上限</label><input class="ip-input" id="pull-limit-ips" type="number" min="2" max="200"></div>
+          <div class="rule-field"><label>每分钟拉取上限</label><input class="ip-input" id="pull-limit-minute" type="number" min="2" max="300"></div>
+          <div class="rule-field"><label>超限暂停时长（小时）</label><input class="ip-input" id="pull-limit-hours" type="number" min="1" max="168"></div>
+          <div class="pull-limit-actions">
+            <div class="pull-limit-note">IP 白名单不受该规则影响。监控模式只记录超限证据；开启自动暂停后，频率限制即时生效，跨 IP 规则由后台巡检执行。</div>
+            <button class="btn-primary" onclick="savePullLimitSettings()">保存限制规则</button>
+          </div>
+        </div>
+      </section>
 
       <div class="security-layout">
         <div>
@@ -3326,6 +3387,7 @@ function renderSecurity() {
   document.getElementById('security-scope').textContent = securityData.scope || '独立网关日志分析';
 
   renderSecurityMetrics();
+  renderPullLimits();
   renderSecurityMechanisms();
   renderSecurityHealth();
   renderGuardFindings();
@@ -3352,6 +3414,98 @@ function renderSecurityMetrics() {
     </div>`).join('');
 }
 
+function renderPullLimits() {
+  const data = securityData.pull_limits || {};
+  const rules = data.settings || {};
+  const summary = data.summary || {};
+  const usage = Array.isArray(data.usage) ? data.usage : [];
+  const mode = document.getElementById('pull-limit-mode');
+  mode.className = 'limit-mode-badge ' + (!rules.enabled ? 'paused' : (rules.enforce ? 'enforce' : ''));
+  mode.textContent = !rules.enabled ? '已关闭' : (rules.enforce ? '自动暂停已启用' : '监控模式');
+
+  const ruleRows = [
+    {icon:'▣', label:'24 小时独立 IP 上限', value:`${rules.max_ips_24h || 10} 个不同 IP`},
+    {icon:'ϟ', label:'拉取频率限制', value:`${rules.max_per_minute || 10} 次/分钟`},
+    {icon:'◷', label:'超限暂停时长', value:`${rules.suspend_hours || 24} 小时`},
+  ];
+  document.getElementById('pull-limit-rules').innerHTML = ruleRows.map(row => `
+    <div class="pull-limit-rule">
+      <span class="pull-limit-icon">${esc(row.icon)}</span>
+      <div><div class="pull-limit-rule-label">${esc(row.label)}</div><div class="pull-limit-rule-value">${esc(row.value)}</div></div>
+    </div>`).join('');
+
+  const summaryRows = [
+    {value:summary.active_tokens || 0,label:'活跃 Token',color:'#0ea5e9'},
+    {value:`${summary.max_unique_ips_24h || 0}/${rules.max_ips_24h || 10}`,label:'最高独立 IP 用量',color:'#6366f1'},
+    {value:`${summary.max_per_minute || 0}/${rules.max_per_minute || 10}`,label:'最高每分钟拉取',color:'#f59e0b'},
+    {value:summary.suspended_tokens || 0,label:rules.enforce ? '当前暂停' : '模拟超限',color:'#ef4444'},
+  ];
+  if (!rules.enforce) summaryRows[3].value = summary.pending_violations || 0;
+  document.getElementById('pull-limit-summary').innerHTML = summaryRows.map(row => `
+    <div class="pull-limit-summary-item" style="--limit-color:${row.color}">
+      <div class="pull-limit-summary-value">${esc(String(row.value))}</div>
+      <div class="pull-limit-summary-label">${esc(row.label)}</div>
+    </div>`).join('');
+
+  const target = document.getElementById('pull-limit-usage');
+  if (!usage.length) {
+    target.innerHTML = '<div class="security-empty">24 小时内暂无可统计 Token</div>';
+  } else {
+    target.innerHTML = usage.slice(0, 8).map(row => {
+      const ipRatio = Math.min(100, Math.round((Number(row.unique_ips_24h || 0) / Math.max(1, Number(rules.max_ips_24h || 10))) * 100));
+      const minuteRatio = Math.min(100, Math.round((Number(row.peak_per_minute || 0) / Math.max(1, Number(rules.max_per_minute || 10))) * 100));
+      const flagged = row.suspended || row.would_suspend;
+      const statusClass = row.suspended ? 'blocked' : (row.would_suspend ? 'warn' : '');
+      const status = row.suspended ? `暂停至 ${row.suspended_until || '-'}` : (row.would_suspend ? (rules.enforce ? '等待巡检' : '模拟超限') : '正常');
+      return `<div class="pull-limit-row">
+        <div><div class="pull-limit-token">${esc(row.fingerprint || '-')}</div><div style="color:var(--text3);margin-top:3px">${Number(row.requests_24h || 0).toLocaleString()} 次 · 最后 ${esc(row.last_seen || '-')}</div></div>
+        <div><span style="color:var(--text2)">独立 IP ${row.unique_ips_24h || 0}/${rules.max_ips_24h || 10}</span><div class="pull-limit-meter ${flagged ? 'warn' : ''}"><span style="width:${ipRatio}%"></span></div></div>
+        <div><span style="color:var(--text2)">峰值 ${row.peak_per_minute || 0}/${rules.max_per_minute || 10}</span><div class="pull-limit-meter ${minuteRatio >= 100 ? 'warn' : ''}"><span style="width:${minuteRatio}%"></span></div></div>
+        <div class="pull-limit-status ${statusClass}">${esc(status)}</div>
+        <div>${row.suspended ? `<button class="mode-btn danger" onclick="releasePullLimit(${jsArg(row.fingerprint)})">解除</button>` : ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('pull-limit-enabled').checked = !!rules.enabled;
+  document.getElementById('pull-limit-enforce').checked = !!rules.enforce;
+  document.getElementById('pull-limit-ips').value = rules.max_ips_24h || 10;
+  document.getElementById('pull-limit-minute').value = rules.max_per_minute || 10;
+  document.getElementById('pull-limit-hours').value = rules.suspend_hours || 24;
+}
+
+async function savePullLimitSettings() {
+  const enforce = document.getElementById('pull-limit-enforce').checked;
+  if (enforce && !confirm('开启后，超过规则的 Token 将暂停拉取。确认启用自动暂停？')) return;
+  const body = {
+    guard_pull_limit_enabled: document.getElementById('pull-limit-enabled').checked ? 1 : 0,
+    guard_pull_limit_enforce: enforce ? 1 : 0,
+    guard_pull_limit_24h_ips: Number(document.getElementById('pull-limit-ips').value),
+    guard_pull_limit_per_minute: Number(document.getElementById('pull-limit-minute').value),
+    guard_pull_limit_suspend_hours: Number(document.getElementById('pull-limit-hours').value),
+  };
+  const d = await apiFetch('/api/settings.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(body),
+  });
+  if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+  toast(enforce ? '限制规则已保存，自动暂停已启用' : '限制规则已保存，当前为监控模式');
+  await loadSecurity({force:true});
+}
+
+async function releasePullLimit(fingerprint) {
+  if (!confirm(`解除 ${fingerprint} 的临时暂停？`)) return;
+  const d = await apiFetch('/api/security.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify({action:'release_pull_limit', fingerprint}),
+  });
+  if (!d.ok) { toast(d.error || '解除失败', 'err'); return; }
+  toast('临时暂停已解除');
+  await loadSecurity({force:true});
+}
+
 function renderSecurityMechanisms() {
   const rows = securityData.mechanisms || [];
   document.getElementById('security-mechanisms').innerHTML = rows.length ? rows.map(row => `
@@ -3367,6 +3521,7 @@ function renderSecurityHealth() {
   const issues = Array.isArray(h.issues) && h.issues.length ? h.issues.join('；') : '未发现异常';
   const rows = [
     ['统计缓存', h.stats_cache_age == null ? '不存在' : `${age(h.stats_cache_age)}前更新`],
+    ['Token 限制状态', h.token_limit_state_age == null ? '等待首次巡检' : `${age(h.token_limit_state_age)}前更新`],
     ['IDC 规则库', h.cloud_rules_age == null ? '不存在' : `${age(h.cloud_rules_age)}前更新`],
     ['访问日志', `${formatFileSize(h.log_size || 0)} · ${h.log_writable ? '可读写' : '权限异常'}`],
     ['日志清理', h.retention_days > 0 ? `保留 ${h.retention_days} 天` : '已关闭'],

@@ -220,6 +220,32 @@ fi
 [[ ! -f /etc/nginx/subscribe/token_blacklist.json ]] && echo "[]" > /etc/nginx/subscribe/token_blacklist.json
 chmod 666 /etc/nginx/subscribe/token_blacklist.conf /etc/nginx/subscribe/token_blacklist.json
 
+# 初始化 Token 拉取频率与临时暂停规则。后台会按设置原子更新这些文件。
+if [[ ! -f /etc/nginx/subscribe/token_limit.conf ]]; then
+    cat > /etc/nginx/subscribe/token_limit.conf <<'TLEOF'
+map $arg_token $is_token_temporarily_suspended {
+    default 0;
+}
+TLEOF
+fi
+if [[ ! -f /etc/nginx/subscribe/token_limit_rate.conf ]]; then
+    cat > /etc/nginx/subscribe/token_limit_rate.conf <<'TLREOF'
+map "$whitelist_ip:$arg_token" $token_pull_rate_key {
+    default "";
+}
+limit_req_zone $token_pull_rate_key zone=token_pull_limit:10m rate=10r/m;
+TLREOF
+fi
+if [[ ! -f /etc/nginx/subscribe/token_limit_apply.conf ]]; then
+    echo 'limit_req zone=token_pull_limit burst=9 nodelay;' > /etc/nginx/subscribe/token_limit_apply.conf
+fi
+[[ ! -f /etc/nginx/subscribe/token_limit_state.json ]] && echo '{"entries":{},"history":[]}' > /etc/nginx/subscribe/token_limit_state.json
+chmod 666 \
+    /etc/nginx/subscribe/token_limit.conf \
+    /etc/nginx/subscribe/token_limit_rate.conf \
+    /etc/nginx/subscribe/token_limit_apply.conf \
+    /etc/nginx/subscribe/token_limit_state.json
+
 # 首次拉取云IP库
 if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf ]]; then
     log "首次启动：拉取云厂商IP库..."

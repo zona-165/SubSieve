@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/_auth.php';
+require_once dirname(__DIR__) . '/lib/guard.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -151,6 +152,14 @@ if ($method === 'POST') {
     }
 
     $s = apply_alert_settings($s, $body);
+    $pullLimitKeys = [
+        'guard_pull_limit_enabled',
+        'guard_pull_limit_enforce',
+        'guard_pull_limit_24h_ips',
+        'guard_pull_limit_per_minute',
+        'guard_pull_limit_suspend_hours',
+    ];
+    $pullLimitChanged = count(array_intersect($pullLimitKeys, array_keys($body))) > 0;
     $s = apply_guard_settings($s, $body);
 
     // 保存 settings.json
@@ -174,6 +183,12 @@ if ($method === 'POST') {
         }
     }
 
+    $pullLimitResult = null;
+    if ($pullLimitChanged) {
+        $pullLimitResult = guard_refresh_pull_limits($s);
+        $nginxReloaded = $nginxReloaded || !empty($pullLimitResult['config_changed']);
+    }
+
     // 更新 DEPLOY_INFO.txt
     update_deploy_info($s);
 
@@ -186,6 +201,7 @@ if ($method === 'POST') {
         'nginx_reloaded'       => $nginxReloaded,
         'protect_updated'      => $protectUpdated,
         'gateway_port_changed' => $gatewayPortChanged,
+        'pull_limit_refreshed' => $pullLimitChanged,
         'msg'                  => $msg,
     ]);
     } catch (Throwable $e) {
@@ -253,6 +269,9 @@ function apply_guard_settings(array $s, array $body): array {
     if (array_key_exists('guard_observe_enabled', $body)) {
         $s['guard_observe_enabled'] = !empty($body['guard_observe_enabled']) ? 1 : 0;
     }
+    foreach (['guard_pull_limit_enabled', 'guard_pull_limit_enforce'] as $key) {
+        if (array_key_exists($key, $body)) $s[$key] = !empty($body[$key]) ? 1 : 0;
+    }
     $fields = [
         'guard_ip_per_minute' => [5, 5000, 30],
         'guard_token_per_minute' => [5, 5000, 20],
@@ -260,6 +279,9 @@ function apply_guard_settings(array $s, array $body): array {
         'guard_ip_hour_tokens' => [2, 1000, 20],
         'guard_ip_404_5m' => [5, 5000, 40],
         'guard_scan_lines' => [1000, 100000, 30000],
+        'guard_pull_limit_24h_ips' => [2, 200, 10],
+        'guard_pull_limit_per_minute' => [2, 300, 10],
+        'guard_pull_limit_suspend_hours' => [1, 168, 24],
     ];
     $changed = false;
     foreach ($fields as $key => [$min, $max, $default]) {
@@ -268,7 +290,9 @@ function apply_guard_settings(array $s, array $body): array {
         $s[$key] = max($min, min($max, $value));
         $changed = true;
     }
-    if (array_key_exists('guard_observe_enabled', $body)) $changed = true;
+    if (array_key_exists('guard_observe_enabled', $body)
+        || array_key_exists('guard_pull_limit_enabled', $body)
+        || array_key_exists('guard_pull_limit_enforce', $body)) $changed = true;
     if ($changed) invalidate_guard_cache();
     return $s;
 }
@@ -429,9 +453,10 @@ location ^~ $subscribePath {
     if (\$is_custom_bad_ua = 1)  { set \$block_reason "ua"; }
     if (\$is_ua_whitelisted = 1) { set \$block_reason ""; }
 
-    # UA 白名单只能豁免 UA 规则，不能绕过云 IP 或 Token 黑名单。
+    # UA 白名单只能豁免 UA 规则，不能绕过云 IP 或 Token 规则。
     if (\$is_cloud_ip = 1)       { set \$block_reason "cloud"; }
     if (\$is_token_blacklisted = 1) { set \$block_reason "token"; }
+    if (\$is_token_temporarily_suspended = 1) { set \$block_reason "token_limit"; }
 
     # 显式 IP 白名单保持最高放行优先级。
     if (\$whitelist_ip = 1) { set \$block_reason ""; }
@@ -439,7 +464,9 @@ location ^~ $subscribePath {
     if (\$block_reason = "cloud") { return 403 "Forbidden: Cloud IP"; }
     if (\$block_reason = "ua")    { return 403 "Forbidden: Invalid Client"; }
     if (\$block_reason = "token") { return 403 "Forbidden: Token Blocked"; }
+    if (\$block_reason = "token_limit") { return 429 "Too Many Requests: Token Suspended"; }
 
+    include /etc/nginx/subscribe/token_limit_apply.conf;
     limit_req zone=subscribe_limit burst=5 nodelay;
     limit_req_status 429;
 

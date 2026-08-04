@@ -10,8 +10,14 @@ $method = PHP_SAPI === 'cli' ? 'CLI' : ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
-    if (($body['action'] ?? '') !== 'review') json_err('不支持的操作');
-    save_guard_review($body);
+    $action = (string)($body['action'] ?? '');
+    if ($action === 'review') save_guard_review($body);
+    if ($action === 'release_pull_limit') {
+        $fingerprint = trim((string)($body['fingerprint'] ?? ''));
+        if (!guard_release_pull_limit($fingerprint)) json_err('暂停记录不存在或已解除', 404);
+        json_out(['ok' => true, 'fingerprint' => $fingerprint]);
+    }
+    json_err('不支持的操作');
 }
 
 if (!in_array($method, ['GET', 'CLI'], true)) json_err('不支持的请求方式', 405);
@@ -36,13 +42,26 @@ function build_security_snapshot(): array {
     $subscribePath = trim((string)($settings['subscribe_path'] ?? '/api/v1/client/subscribe'));
     if ($subscribePath === '') $subscribePath = '/api/v1/client/subscribe';
     $secret = guard_secret();
+    $logLines = iterator_to_array(guard_tail_log_lines(LOG_FILE, $rules['guard_scan_lines']), false);
     $analysis = guard_analyze_logs(
-        guard_tail_log_lines(LOG_FILE, $rules['guard_scan_lines']),
+        $logLines,
         $rules,
         time(),
         $subscribePath,
         $secret
     );
+    $pullLimits = guard_analyze_pull_limits(
+        $logLines,
+        $rules,
+        time(),
+        $subscribePath,
+        $secret,
+        guard_read_json(TOKEN_LIMIT_STATE_JSON),
+        false
+    );
+    foreach ($pullLimits['usage'] as &$row) unset($row['_raw_token']);
+    unset($row);
+    unset($pullLimits['_state'], $pullLimits['_all_usage']);
 
     $statsCacheFile = dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json';
     $statsCache = guard_read_json($statsCacheFile);
@@ -56,6 +75,7 @@ function build_security_snapshot(): array {
     $metrics['risk_findings'] = count($findings);
     $metrics['blocked_ips'] = $counts['ip_blacklist'];
     $metrics['blocked_tokens'] = $counts['token_blacklist'];
+    $metrics['suspended_tokens'] = (int)($pullLimits['summary']['suspended_tokens'] ?? 0);
 
     return [
         'ok' => true,
@@ -67,7 +87,8 @@ function build_security_snapshot(): array {
         'policy_counts' => $counts,
         'rules' => $rules,
         'health' => $health,
-        'mechanisms' => guard_mechanisms($settings, $counts, $health),
+        'mechanisms' => guard_mechanisms($rules, $counts, $health),
+        'pull_limits' => $pullLimits,
         'findings' => $findings,
         'recent_actions' => $actions,
     ];
@@ -165,6 +186,7 @@ function guard_secret(): string {
 }
 
 function guard_policy_counts(): array {
+    $limitState = guard_read_json(TOKEN_LIMIT_STATE_JSON);
     return [
         'ip_blacklist' => count_json_entries(BLACKLIST_JSON),
         'token_blacklist' => count_json_entries(TOKEN_BLACKLIST_JSON),
@@ -173,6 +195,7 @@ function guard_policy_counts(): array {
         'ip_whitelist' => count_list_entries(WHITELIST_IPS),
         'cloud_cidrs' => count_cloud_cidrs(),
         'ip_intel_cache' => count(guard_read_json(IP_INTEL_CACHE_JSON)),
+        'token_suspended' => count(is_array($limitState['entries'] ?? null) ? $limitState['entries'] : []),
     ];
 }
 
@@ -205,12 +228,15 @@ function guard_health_snapshot(array $settings, array $counts, string $statsCach
     $cloudAge = file_exists(CLOUD_GEO_CONF) ? max(0, time() - (int)filemtime(CLOUD_GEO_CONF)) : null;
     $logSize = file_exists(LOG_FILE) ? (int)filesize(LOG_FILE) : 0;
     $alertHistory = guard_read_json(ALERT_HISTORY_JSON);
+    $limitState = guard_read_json(TOKEN_LIMIT_STATE_JSON);
+    $limitAge = isset($limitState['updated_ts']) ? max(0, time() - (int)$limitState['updated_ts']) : null;
     $lastAlertCheck = (string)($alertHistory['status']['last_check'] ?? '');
     $issues = [];
     if (!file_exists(PROTECT_CONF) || !str_contains((string)@file_get_contents(PROTECT_CONF), 'limit_req')) $issues[] = '订阅保护配置缺失';
     if (!is_readable(LOG_FILE) || !is_writable(LOG_FILE)) $issues[] = '日志文件不可读写';
     if ($statsAge === null || $statsAge > 180) $issues[] = '统计缓存超过 3 分钟未更新';
     if ($counts['cloud_cidrs'] <= 0) $issues[] = '云厂商 CIDR 规则为空';
+    if (!file_exists(TOKEN_LIMIT_RATE_CONF) || !file_exists(TOKEN_LIMIT_CONF)) $issues[] = 'Token 拉取限制配置缺失';
 
     return [
         'state' => count($issues) === 0 ? 'healthy' : (count($issues) <= 2 ? 'attention' : 'degraded'),
@@ -224,6 +250,7 @@ function guard_health_snapshot(array $settings, array $counts, string $statsCach
         'last_alert_check' => $lastAlertCheck,
         'retention_days' => LOG_RETENTION_DAYS,
         'alert_enabled' => !empty($settings['alert_enabled']),
+        'token_limit_state_age' => $limitAge,
     ];
 }
 
@@ -239,6 +266,7 @@ function guard_mechanisms(array $settings, array $counts, array $health): array 
         ['key' => 'ip_policy', 'title' => 'IP 名单策略', 'state' => $ipPolicyReady ? 'active' : 'error', 'detail' => '白名单 ' . $counts['ip_whitelist'] . ' / 黑名单 ' . $counts['ip_blacklist']],
         ['key' => 'ua_policy', 'title' => 'UA 识别与策略', 'state' => str_contains($uaConf, 'is_custom_bad_ua') ? 'active' : 'error', 'detail' => '放行 ' . $counts['ua_whitelist'] . ' / 拦截 ' . $counts['ua_blacklist']],
         ['key' => 'token_policy', 'title' => 'Token 精确拦截', 'state' => str_contains($tokenConf, 'is_token_blacklisted') ? 'active' : 'error', 'detail' => $counts['token_blacklist'] . ' 个 Token 规则'],
+        ['key' => 'pull_limit', 'title' => 'Token 拉取限制', 'state' => empty($settings['guard_pull_limit_enabled']) ? 'paused' : (!empty($settings['guard_pull_limit_enforce']) ? 'active' : 'optional'), 'detail' => empty($settings['guard_pull_limit_enabled']) ? '监控已关闭' : (!empty($settings['guard_pull_limit_enforce']) ? '自动暂停生效 · 当前 ' . $counts['token_suspended'] . ' 个' : '监控中 · 自动暂停未开启')],
         ['key' => 'observation', 'title' => '行为阈值观察', 'state' => !empty($settings['guard_observe_enabled']) ? 'active' : 'paused', 'detail' => !empty($settings['guard_observe_enabled']) ? '只观察，不自动封禁' : '已暂停观察'],
         ['key' => 'stats_cache', 'title' => '后台统计预热', 'state' => ($health['stats_cache_age'] !== null && $health['stats_cache_age'] <= 180) ? 'active' : 'warn', 'detail' => $health['stats_cache_age'] === null ? '缓存不存在' : $health['stats_cache_age'] . ' 秒前更新'],
         ['key' => 'intel', 'title' => '多源 IP 情报', 'state' => 'active', 'detail' => $counts['ip_intel_cache'] . ' 个缓存画像'],
@@ -267,6 +295,25 @@ function guard_recent_actions(string $secret): array {
             'subject' => $token !== '' ? guard_token_fingerprint($token, $secret) : '-',
             'detail' => (string)($row['comment'] ?? '手动添加'),
             'status' => 'active',
+        ];
+    }
+    $limitState = guard_read_json(TOKEN_LIMIT_STATE_JSON);
+    foreach ($limitState['entries'] ?? [] as $row) {
+        $actions[] = [
+            'time' => (string)($row['started_at'] ?? ''),
+            'type' => 'Token 临时暂停',
+            'subject' => (string)($row['fingerprint'] ?? ''),
+            'detail' => '暂停至 ' . (string)($row['until'] ?? '-'),
+            'status' => 'active',
+        ];
+    }
+    foreach (array_slice($limitState['history'] ?? [], 0, 12) as $row) {
+        $actions[] = [
+            'time' => (string)($row['released_at'] ?? $row['started_at'] ?? ''),
+            'type' => 'Token 暂停解除',
+            'subject' => (string)($row['fingerprint'] ?? ''),
+            'detail' => (string)($row['status'] ?? 'released'),
+            'status' => 'released',
         ];
     }
     $history = guard_read_json(ALERT_HISTORY_JSON);

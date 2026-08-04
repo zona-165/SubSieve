@@ -22,6 +22,10 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/alert_history.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_history.json"
 [ -f "$SUBSCRIBE_DIR/guard_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/guard_cache.json"
 [ -f "$SUBSCRIBE_DIR/guard_reviews.json" ] || echo '{"entries":{}}' > "$SUBSCRIBE_DIR/guard_reviews.json"
+[ -f "$SUBSCRIBE_DIR/token_limit_state.json" ] || echo '{"entries":{},"history":[]}' > "$SUBSCRIBE_DIR/token_limit_state.json"
+[ -f "$SUBSCRIBE_DIR/token_limit.conf" ] || printf 'map $arg_token $is_token_temporarily_suspended {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/token_limit.conf"
+[ -f "$SUBSCRIBE_DIR/token_limit_rate.conf" ] || printf 'map "$whitelist_ip:$arg_token" $token_pull_rate_key {\n    default "";\n}\nlimit_req_zone $token_pull_rate_key zone=token_pull_limit:10m rate=10r/m;\n' > "$SUBSCRIBE_DIR/token_limit_rate.conf"
+[ -f "$SUBSCRIBE_DIR/token_limit_apply.conf" ] || printf 'limit_req zone=token_pull_limit burst=9 nodelay;\n' > "$SUBSCRIBE_DIR/token_limit_apply.conf"
 if [ ! -s "$SUBSCRIBE_DIR/guard_secret" ]; then
     php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' > "$SUBSCRIBE_DIR/guard_secret"
 fi
@@ -40,12 +44,17 @@ chmod 666 \
     "$SUBSCRIBE_DIR/alert_state.json" \
     "$SUBSCRIBE_DIR/alert_history.json" \
     "$SUBSCRIBE_DIR/guard_cache.json" \
-    "$SUBSCRIBE_DIR/guard_reviews.json"
+    "$SUBSCRIBE_DIR/guard_reviews.json" \
+    "$SUBSCRIBE_DIR/token_limit_state.json" \
+    "$SUBSCRIBE_DIR/token_limit.conf" \
+    "$SUBSCRIBE_DIR/token_limit_rate.conf" \
+    "$SUBSCRIBE_DIR/token_limit_apply.conf"
 chown www-data:www-data "$SUBSCRIBE_DIR/guard_secret"
 chmod 600 "$SUBSCRIBE_DIR/guard_secret"
 
 # 兼容旧版本：根据已有 JSON 生成 Token 拦截规则，并通知 gateway reload。
 php /var/www/html/maintenance.php sync-token-blacklist >/dev/null 2>&1 || true
+php /var/www/html/maintenance.php refresh-token-limits >/dev/null 2>&1 || true
 
 # 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
 mkdir -p /var/log/subscribe
@@ -59,6 +68,11 @@ chmod 666 /var/log/subscribe/maintenance.log
     php /var/www/html/api/stats.php >/dev/null 2>&1 || true
     php /var/www/html/api/security.php >/dev/null 2>&1 || true
     sleep 60
+done) &
+
+(while true; do
+    php /var/www/html/maintenance.php refresh-token-limits >> /var/log/subscribe/maintenance.log 2>&1 || true
+    sleep 30
 done) &
 
 (while true; do

@@ -5,9 +5,10 @@ location ^~ ${SUBSCRIBE_PATH} {
     if ($is_custom_bad_ua = 1)  { set $block_reason "ua"; }
     if ($is_ua_whitelisted = 1) { set $block_reason ""; }
 
-    # UA 白名单只能豁免 UA 规则，不能绕过云 IP 或 Token 黑名单。
+    # UA 白名单只能豁免 UA 规则，不能绕过云 IP 或 Token 规则。
     if ($is_cloud_ip = 1)       { set $block_reason "cloud"; }
     if ($is_token_blacklisted = 1) { set $block_reason "token"; }
+    if ($is_token_temporarily_suspended = 1) { set $block_reason "token_limit"; }
 
     # 显式 IP 白名单保持最高放行优先级。
     if ($whitelist_ip = 1) { set $block_reason ""; }
@@ -15,7 +16,9 @@ location ^~ ${SUBSCRIBE_PATH} {
     if ($block_reason = "cloud") { return 403 "Forbidden: Cloud IP"; }
     if ($block_reason = "ua")    { return 403 "Forbidden: Invalid Client"; }
     if ($block_reason = "token") { return 403 "Forbidden: Token Blocked"; }
+    if ($block_reason = "token_limit") { return 429 "Too Many Requests: Token Suspended"; }
 
+    include /etc/nginx/subscribe/token_limit_apply.conf;
     limit_req zone=subscribe_limit burst=5 nodelay;
     limit_req_status 429;
 

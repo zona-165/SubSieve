@@ -9,6 +9,11 @@ function guard_default_settings(): array {
         'guard_ip_hour_tokens' => 20,
         'guard_ip_404_5m' => 40,
         'guard_scan_lines' => 30000,
+        'guard_pull_limit_enabled' => 1,
+        'guard_pull_limit_enforce' => 0,
+        'guard_pull_limit_24h_ips' => 10,
+        'guard_pull_limit_per_minute' => 10,
+        'guard_pull_limit_suspend_hours' => 24,
     ];
 }
 
@@ -27,7 +32,22 @@ function guard_normalize_settings(array $settings): array {
     $result['guard_observe_enabled'] = array_key_exists('guard_observe_enabled', $settings)
         ? (!empty($settings['guard_observe_enabled']) ? 1 : 0)
         : 1;
+    $result['guard_pull_limit_enabled'] = array_key_exists('guard_pull_limit_enabled', $settings)
+        ? (!empty($settings['guard_pull_limit_enabled']) ? 1 : 0)
+        : 1;
+    $result['guard_pull_limit_enforce'] = array_key_exists('guard_pull_limit_enforce', $settings)
+        ? (!empty($settings['guard_pull_limit_enforce']) ? 1 : 0)
+        : 0;
     foreach ($ranges as $key => [$min, $max]) {
+        $value = is_numeric($settings[$key] ?? null) ? (int)$settings[$key] : $defaults[$key];
+        $result[$key] = max($min, min($max, $value));
+    }
+    $pullRanges = [
+        'guard_pull_limit_24h_ips' => [2, 200],
+        'guard_pull_limit_per_minute' => [2, 300],
+        'guard_pull_limit_suspend_hours' => [1, 168],
+    ];
+    foreach ($pullRanges as $key => [$min, $max]) {
         $value = is_numeric($settings[$key] ?? null) ? (int)$settings[$key] : $defaults[$key];
         $result[$key] = max($min, min($max, $value));
     }
@@ -266,4 +286,328 @@ function guard_write_json_atomic(string $file, array $data): bool {
     $ok = @rename($tmp, $file);
     @unlink($tmp);
     return $ok;
+}
+
+function guard_analyze_pull_limits(
+    iterable $lines,
+    array $settings,
+    int $now,
+    string $subscribePath,
+    string $secret,
+    array $storedState = [],
+    bool $mutate = false
+): array {
+    $rules = guard_normalize_settings($settings);
+    $usage = [];
+    $cutoff = $now - 86400;
+    $state = is_array($storedState) ? $storedState : [];
+    $entries = is_array($state['entries'] ?? null) ? $state['entries'] : [];
+    $history = is_array($state['history'] ?? null) ? $state['history'] : [];
+    $resetCutoffs = [];
+    foreach ($history as $entry) {
+        $fingerprint = (string)($entry['fingerprint'] ?? '');
+        if ($fingerprint === '') continue;
+        $releasedTs = strtotime((string)($entry['released_at'] ?? '')) ?: 0;
+        $status = (string)($entry['status'] ?? 'expired');
+        $resetTs = in_array($status, ['released', 'disabled'], true)
+            ? $releasedTs
+            : max((int)($entry['until_ts'] ?? 0), $releasedTs);
+        $resetCutoffs[$fingerprint] = max(
+            $resetCutoffs[$fingerprint] ?? 0,
+            $resetTs
+        );
+    }
+    foreach ($entries as $entry) {
+        $fingerprint = (string)($entry['fingerprint'] ?? '');
+        if ($fingerprint === '') continue;
+        $resetCutoffs[$fingerprint] = max($resetCutoffs[$fingerprint] ?? 0, (int)($entry['until_ts'] ?? 0));
+    }
+
+    foreach ($lines as $line) {
+        $entry = guard_parse_log_line((string)$line);
+        if (!$entry || !guard_path_matches($entry['path'], $subscribePath)) continue;
+        if ($entry['token'] === '' || $entry['ts'] < $cutoff || $entry['ts'] > $now + 300) continue;
+
+        $fingerprint = guard_token_fingerprint($entry['token'], $secret);
+        if (!isset($usage[$fingerprint])) {
+            $usage[$fingerprint] = [
+                'fingerprint' => $fingerprint,
+                'raw_token' => $entry['token'],
+                'ips' => [],
+                'minute_buckets' => [],
+                'rule_ips' => [],
+                'rule_minute_buckets' => [],
+                'requests_24h' => 0,
+                'last_seen_ts' => 0,
+            ];
+        }
+        $bucket = (int)floor($entry['ts'] / 60);
+        $usage[$fingerprint]['ips'][$entry['ip']] = true;
+        $usage[$fingerprint]['minute_buckets'][$bucket] = ($usage[$fingerprint]['minute_buckets'][$bucket] ?? 0) + 1;
+        if ($entry['ts'] > ($resetCutoffs[$fingerprint] ?? 0)) {
+            $usage[$fingerprint]['rule_ips'][$entry['ip']] = true;
+            $usage[$fingerprint]['rule_minute_buckets'][$bucket] = ($usage[$fingerprint]['rule_minute_buckets'][$bucket] ?? 0) + 1;
+        }
+        $usage[$fingerprint]['requests_24h']++;
+        $usage[$fingerprint]['last_seen_ts'] = max($usage[$fingerprint]['last_seen_ts'], $entry['ts']);
+    }
+
+    foreach ($entries as $fingerprint => $entry) {
+        if ((int)($entry['until_ts'] ?? 0) > $now) continue;
+        if ($mutate) {
+            $entry['status'] = 'expired';
+            $entry['released_at'] = date('Y-m-d H:i:s', $now);
+            array_unshift($history, $entry);
+            unset($entries[$fingerprint]);
+        }
+    }
+
+    if ($mutate && (empty($rules['guard_pull_limit_enabled']) || empty($rules['guard_pull_limit_enforce']))) {
+        foreach ($entries as $entry) {
+            $entry['status'] = 'disabled';
+            $entry['released_at'] = date('Y-m-d H:i:s', $now);
+            array_unshift($history, $entry);
+        }
+        $entries = [];
+    }
+
+    $rows = [];
+    $pending = 0;
+    $maxIps = 0;
+    $maxMinute = 0;
+    foreach ($usage as $fingerprint => $item) {
+        $ipCount = count($item['ips']);
+        $peakMinute = empty($item['minute_buckets']) ? 0 : max($item['minute_buckets']);
+        $ruleIpCount = count($item['rule_ips']);
+        $rulePeakMinute = empty($item['rule_minute_buckets']) ? 0 : max($item['rule_minute_buckets']);
+        $violations = [];
+        if ($ruleIpCount > $rules['guard_pull_limit_24h_ips']) $violations[] = '24h_unique_ips';
+        if ($rulePeakMinute > $rules['guard_pull_limit_per_minute']) $violations[] = 'minute_rate';
+        if ($violations) $pending++;
+
+        $active = isset($entries[$fingerprint]) && (int)($entries[$fingerprint]['until_ts'] ?? 0) > $now;
+        if ($mutate && !$active && $violations && !empty($rules['guard_pull_limit_enabled']) && !empty($rules['guard_pull_limit_enforce'])) {
+            $until = $now + ($rules['guard_pull_limit_suspend_hours'] * 3600);
+            $entries[$fingerprint] = [
+                'fingerprint' => $fingerprint,
+                'status' => 'suspended',
+                'reasons' => $violations,
+                'started_ts' => $now,
+                'started_at' => date('Y-m-d H:i:s', $now),
+                'until_ts' => $until,
+                'until' => date('Y-m-d H:i:s', $until),
+                'unique_ips_24h' => $ruleIpCount,
+                'peak_per_minute' => $rulePeakMinute,
+                'requests_24h' => $item['requests_24h'],
+                'last_seen' => date('Y-m-d H:i:s', $item['last_seen_ts']),
+            ];
+            $active = true;
+        }
+
+        $rows[] = [
+            'fingerprint' => $fingerprint,
+            'unique_ips_24h' => $ipCount,
+            'requests_24h' => $item['requests_24h'],
+            'peak_per_minute' => $peakMinute,
+            'last_seen' => $item['last_seen_ts'] > 0 ? date('Y-m-d H:i:s', $item['last_seen_ts']) : '',
+            'last_seen_ts' => $item['last_seen_ts'],
+            'violations' => $violations,
+            'would_suspend' => !empty($violations),
+            'suspended' => $active,
+            'suspended_until' => $active ? (string)($entries[$fingerprint]['until'] ?? '') : '',
+            '_raw_token' => $item['raw_token'],
+        ];
+        $maxIps = max($maxIps, $ipCount);
+        $maxMinute = max($maxMinute, $peakMinute);
+    }
+
+    usort($rows, fn(array $a, array $b) => ((int)$b['suspended'] <=> (int)$a['suspended'])
+        ?: ($b['unique_ips_24h'] <=> $a['unique_ips_24h'])
+        ?: ($b['peak_per_minute'] <=> $a['peak_per_minute'])
+        ?: ($b['requests_24h'] <=> $a['requests_24h']));
+
+    $state = [
+        'updated_at' => date('Y-m-d H:i:s', $now),
+        'updated_ts' => $now,
+        'entries' => $entries,
+        'history' => array_slice($history, 0, 100),
+    ];
+
+    return [
+        'settings' => [
+            'enabled' => (bool)$rules['guard_pull_limit_enabled'],
+            'enforce' => (bool)$rules['guard_pull_limit_enforce'],
+            'max_ips_24h' => $rules['guard_pull_limit_24h_ips'],
+            'max_per_minute' => $rules['guard_pull_limit_per_minute'],
+            'suspend_hours' => $rules['guard_pull_limit_suspend_hours'],
+        ],
+        'summary' => [
+            'active_tokens' => count($usage),
+            'suspended_tokens' => count($entries),
+            'pending_violations' => $pending,
+            'max_unique_ips_24h' => $maxIps,
+            'max_per_minute' => $maxMinute,
+        ],
+        'usage' => array_slice($rows, 0, 20),
+        'updated_at' => date('Y-m-d H:i:s', $now),
+        '_state' => $state,
+        '_all_usage' => $rows,
+    ];
+}
+
+function guard_refresh_pull_limits(?array $settings = null): array {
+    $settings = $settings ?? guard_read_json(SETTINGS_JSON);
+    $rules = guard_normalize_settings($settings);
+    $subscribePath = trim((string)($settings['subscribe_path'] ?? '/api/v1/client/subscribe'));
+    if ($subscribePath === '') $subscribePath = '/api/v1/client/subscribe';
+    $secret = function_exists('guard_secret') ? guard_secret() : guard_runtime_secret();
+    $lines = iterator_to_array(guard_tail_log_lines(LOG_FILE, $rules['guard_scan_lines']), false);
+    $result = guard_analyze_pull_limits(
+        $lines,
+        $settings,
+        time(),
+        $subscribePath,
+        $secret,
+        guard_read_json(TOKEN_LIMIT_STATE_JSON),
+        true
+    );
+
+    $state = $result['_state'];
+    $activeTokens = [];
+    foreach ($result['_all_usage'] as $row) {
+        if (!empty($row['suspended']) && !empty($row['_raw_token'])) {
+            $activeTokens[$row['fingerprint']] = $row['_raw_token'];
+        }
+    }
+    $changedFiles = [];
+    if (guard_write_if_changed(TOKEN_LIMIT_CONF, guard_token_limit_map_content($state['entries'], $activeTokens))) $changedFiles[] = TOKEN_LIMIT_CONF;
+    if (guard_write_if_changed(TOKEN_LIMIT_RATE_CONF, guard_token_limit_rate_content($rules))) $changedFiles[] = TOKEN_LIMIT_RATE_CONF;
+    if (guard_write_if_changed(TOKEN_LIMIT_APPLY_CONF, guard_token_limit_apply_content($rules))) $changedFiles[] = TOKEN_LIMIT_APPLY_CONF;
+    guard_write_json_atomic(TOKEN_LIMIT_STATE_JSON, $state);
+    $changed = count($changedFiles) > 0;
+    if ($changed && function_exists('nginx_reload')) guard_signal_token_limit_reload($changedFiles);
+
+    foreach ($result['usage'] as &$row) unset($row['_raw_token']);
+    unset($row);
+    unset($result['_state'], $result['_all_usage']);
+    $result['config_changed'] = $changed;
+    return $result;
+}
+
+function guard_release_pull_limit(string $fingerprint): bool {
+    if (!preg_match('/^TKN-[A-F0-9]{16}$/', $fingerprint)) return false;
+    $state = guard_read_json(TOKEN_LIMIT_STATE_JSON);
+    $entries = is_array($state['entries'] ?? null) ? $state['entries'] : [];
+    if (!isset($entries[$fingerprint])) return false;
+    $entry = $entries[$fingerprint];
+    unset($entries[$fingerprint]);
+    $entry['status'] = 'released';
+    $entry['released_at'] = date('Y-m-d H:i:s');
+    $history = is_array($state['history'] ?? null) ? $state['history'] : [];
+    array_unshift($history, $entry);
+    $state['entries'] = $entries;
+    $state['history'] = array_slice($history, 0, 100);
+    $state['updated_at'] = date('Y-m-d H:i:s');
+    $state['updated_ts'] = time();
+    guard_write_json_atomic(TOKEN_LIMIT_STATE_JSON, $state);
+    $changed = guard_write_if_changed(TOKEN_LIMIT_CONF, guard_token_limit_map_content($entries, []));
+    if ($changed && function_exists('nginx_reload')) guard_signal_token_limit_reload([TOKEN_LIMIT_CONF]);
+    if (function_exists('invalidate_guard_cache')) invalidate_guard_cache();
+    return true;
+}
+
+function guard_token_limit_map_content(array $entries, array $rawTokens): string {
+    $existing = guard_existing_token_limit_lines();
+    $lines = [
+        '# Temporary Token suspensions - generated by SubSieve',
+        'map $arg_token $is_token_temporarily_suspended {',
+        '    default 0;',
+    ];
+    foreach ($entries as $fingerprint => $entry) {
+        if ((int)($entry['until_ts'] ?? 0) <= time()) continue;
+        if (isset($rawTokens[$fingerprint])) {
+            $token = trim((string)$rawTokens[$fingerprint]);
+            if ($token === '' || strlen($token) > 512 || preg_match('/[\x00-\x1F\x7F]/', $token)) continue;
+            $pattern = preg_quote($token, '~');
+            $pattern = str_replace(['\\', '"'], ['\\\\', '\\"'], $pattern);
+            $line = '    "~^' . $pattern . '$" 1;';
+        } elseif (isset($existing[$fingerprint])) {
+            $line = $existing[$fingerprint];
+        } else {
+            continue;
+        }
+        $lines[] = '    # ' . $fingerprint;
+        $lines[] = $line;
+    }
+    $lines[] = '}';
+    return implode("\n", $lines) . "\n";
+}
+
+function guard_existing_token_limit_lines(): array {
+    if (!file_exists(TOKEN_LIMIT_CONF)) return [];
+    $result = [];
+    $fingerprint = '';
+    foreach (file(TOKEN_LIMIT_CONF, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+        if (preg_match('/^\s*#\s*(TKN-[A-F0-9]{16})\s*$/', $line, $match)) {
+            $fingerprint = $match[1];
+            continue;
+        }
+        if ($fingerprint !== '' && preg_match('/^\s+"~\^.*\$"\s+1;\s*$/', $line)) {
+            $result[$fingerprint] = $line;
+            $fingerprint = '';
+        }
+    }
+    return $result;
+}
+
+function guard_token_limit_rate_content(array $rules): string {
+    $enabled = !empty($rules['guard_pull_limit_enabled']) && !empty($rules['guard_pull_limit_enforce']);
+    $rate = max(2, min(300, (int)$rules['guard_pull_limit_per_minute']));
+    $lines = [
+        '# Token pull rate - generated by SubSieve',
+        'map "$whitelist_ip:$arg_token" $token_pull_rate_key {',
+        '    default "";',
+    ];
+    if ($enabled) $lines[] = '    "~^0:.+$" $arg_token;';
+    $lines[] = '}';
+    $lines[] = 'limit_req_zone $token_pull_rate_key zone=token_pull_limit:10m rate=' . $rate . 'r/m;';
+    return implode("\n", $lines) . "\n";
+}
+
+function guard_token_limit_apply_content(array $rules): string {
+    $burst = max(1, min(299, (int)$rules['guard_pull_limit_per_minute'] - 1));
+    return '# Token pull rate application - generated by SubSieve' . "\n"
+        . 'limit_req zone=token_pull_limit burst=' . $burst . ' nodelay;' . "\n";
+}
+
+function guard_write_if_changed(string $file, string $content): bool {
+    if (file_exists($file) && hash_equals(hash('sha256', (string)file_get_contents($file)), hash('sha256', $content))) return false;
+    $tmp = $file . '.tmp.' . getmypid();
+    if (@file_put_contents($tmp, $content, LOCK_EX) === false) throw new RuntimeException('cannot write ' . basename($file));
+    @chmod($tmp, 0660);
+    if (file_exists($file) && !@copy($file, $file . '.prev')) {
+        @unlink($tmp);
+        throw new RuntimeException('cannot backup ' . basename($file));
+    }
+    if (!@rename($tmp, $file)) {
+        @unlink($tmp);
+        throw new RuntimeException('cannot replace ' . basename($file));
+    }
+    return true;
+}
+
+function guard_signal_token_limit_reload(array $files): void {
+    $allowed = [TOKEN_LIMIT_CONF, TOKEN_LIMIT_RATE_CONF, TOKEN_LIMIT_APPLY_CONF];
+    $names = [];
+    foreach ($files as $file) {
+        if (in_array($file, $allowed, true)) $names[] = basename($file);
+    }
+    if (!$names) return;
+    guard_write_if_changed(TOKEN_LIMIT_RELOAD_MARKER, implode("\n", array_unique($names)) . "\n");
+    nginx_reload();
+}
+
+function guard_runtime_secret(): string {
+    $secret = file_exists(GUARD_SECRET_FILE) ? trim((string)@file_get_contents(GUARD_SECRET_FILE)) : '';
+    return preg_match('/^[a-f0-9]{64}$/', $secret) ? $secret : hash('sha256', 'SubSieve-Guard');
 }

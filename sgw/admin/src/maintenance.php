@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/guard.php';
 
 if (PHP_SAPI !== 'cli') {
     json_err('maintenance only supports CLI', 403);
@@ -22,6 +23,11 @@ if ($action === 'sync-token-blacklist') {
     if ($ok) nginx_reload();
     echo json_encode(['ok' => $ok, 'entries' => count($entries)], JSON_UNESCAPED_UNICODE) . PHP_EOL;
     exit($ok ? 0 : 1);
+}
+if ($action === 'refresh-token-limits') {
+    $result = guard_refresh_pull_limits();
+    echo json_encode(['ok' => true, 'result' => $result], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    exit(0);
 }
 
 echo json_encode(['ok' => false, 'error' => 'unknown action'], JSON_UNESCAPED_UNICODE) . PHP_EOL;

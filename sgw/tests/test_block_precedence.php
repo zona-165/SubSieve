@@ -30,6 +30,7 @@ function assertRuleOrder(string $name, string $content): void
         'if ($is_ua_whitelisted = 1)',
         'if ($is_cloud_ip = 1)',
         'if ($is_token_blacklisted = 1)',
+        'if ($is_token_temporarily_suspended = 1)',
         'if ($whitelist_ip = 1)',
     ];
 
@@ -62,6 +63,9 @@ function blockReason(array $state): string
     if ($state['token']) {
         $reason = 'token';
     }
+    if ($state['token_limit']) {
+        $reason = 'token_limit';
+    }
     if ($state['ip_whitelist']) {
         $reason = '';
     }
@@ -79,6 +83,7 @@ $defaults = [
     'ua_whitelist' => false,
     'cloud' => false,
     'token' => false,
+    'token_limit' => false,
     'ip_whitelist' => false,
 ];
 $cases = [
@@ -88,8 +93,11 @@ $cases = [
     'UA 白名单不能绕过 IDC' => [['cloud' => true, 'ua_whitelist' => true], 'cloud'],
     'UA 白名单不能绕过 Token' => [['token' => true, 'ua_whitelist' => true], 'token'],
     'Token 黑名单保持最高拦截原因' => [['cloud' => true, 'token' => true], 'token'],
+    '临时暂停覆盖普通 Token 状态' => [['token' => true, 'token_limit' => true], 'token_limit'],
+    'UA 白名单不能绕过临时暂停' => [['token_limit' => true, 'ua_whitelist' => true], 'token_limit'],
     '显式 IP 白名单可豁免 IDC' => [['cloud' => true, 'ip_whitelist' => true], ''],
     '显式 IP 白名单可豁免 Token' => [['token' => true, 'ip_whitelist' => true], ''],
+    '显式 IP 白名单可豁免临时暂停' => [['token_limit' => true, 'ip_whitelist' => true], ''],
 ];
 
 foreach ($cases as $name => [$overrides, $expected]) {
