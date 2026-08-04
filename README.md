@@ -215,7 +215,7 @@ SubSieve 保持独立网关边界，不连接机场用户、邮箱、订单、�
 
 云厂商 IP 库每周自动更新，候选配置通过 nginx 语法检查后才会替换并重载；校验或重载失败会恢复上一版。更新日志见容器内 `/var/log/subscribe/update_cloud_geo.log`。
 
-部署主机可运行 `bash sgw/tests/runtime_idc_block.sh` 做无真实 Token 的运行时自检：脚本从已加载的 AWS CIDR 中选择测试地址，并确认即使 UA 命中白名单仍返回 `403 Forbidden: Cloud IP`。测试使用隔离端口，不会访问机场后端。
+部署主机可运行 `bash sgw/tests/runtime_idc_block.sh` 做无真实 Token 的 IDC 运行时自检；运行 `bash sgw/tests/runtime_token_limit.sh` 可在隔离端口验证 Token 频率规则前 10 次放行、第 11 次返回 429。两个测试都不会访问机场后端。
 
 脚本/扫描器报告中的 IP 情报由后台预热任务通过 `ip-api`、`ipwho.is`、`GeoJS` 和 `RIPEstat` 多源查询：前三者交叉验证国家、地区、城市、ASN 与运营商，`RIPEstat` 补充 BGP 宣告 ASN 和路由网段；报告会展示来源数量、一致性和置信度。网页请求本身不会等待外部接口，每轮最多补全 5 个新 IP；`ipwho.is` 设有每日调用预算并预留余量。结果按来源完整度和置信度缓存 6 小时至 7 天，失败结果 10 分钟后重试；单个来源不可用时仍会合并其他可用结果并缩短重查周期。
 
