@@ -87,20 +87,27 @@ geo \$is_cloud_ip {
 EOF
 
 TOTAL=0
+IPV4_CIDR_RE='^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$'
 
 for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; do
     SAFE_NAME="$(echo "$NAME" | tr ' ' '_')"
     TMPFILE="$TEMP_DIR/${SAFE_NAME}.txt"
+    CIDRFILE="$TEMP_DIR/${SAFE_NAME}.cidrs"
     KEY="isp_${SAFE_NAME}"
     if [[ "${RESULTS[$KEY]:-fail}" == "ok" ]] && [[ -s "$TMPFILE" ]]; then
-        COUNT=$(grep -cE '^[0-9]' "$TMPFILE" || true)
-        TOTAL=$((TOTAL + COUNT))
-        echo "    # === $NAME ===" >> "$OUTPUT_TMP"
-        grep -E '^[0-9]{1,3}\.' "$TMPFILE" | while read -r cidr; do
-            echo "    $cidr 1;" >> "$OUTPUT_TMP"
-        done || true
-        echo "" >> "$OUTPUT_TMP"
-        log "  $NAME: ${COUNT} 条"
+        grep -E "$IPV4_CIDR_RE" "$TMPFILE" | sort -u > "$CIDRFILE" || true
+        COUNT=$(wc -l < "$CIDRFILE" | tr -d ' ')
+        if [[ "$COUNT" -gt 0 ]]; then
+            TOTAL=$((TOTAL + COUNT))
+            echo "    # === $NAME ===" >> "$OUTPUT_TMP"
+            while read -r cidr; do
+                echo "    $cidr 1;" >> "$OUTPUT_TMP"
+            done < "$CIDRFILE"
+            echo "" >> "$OUTPUT_TMP"
+            log "  $NAME: ${COUNT} 条"
+        else
+            log "  [警告] $NAME 未解析到有效 IPv4 CIDR"
+        fi
     else
         log "  [警告] $NAME 拉取失败"
     fi
@@ -108,30 +115,44 @@ done
 
 for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
     TMPFILE="$TEMP_DIR/${NAME}.json"
+    CIDRFILE="$TEMP_DIR/${NAME}.cidrs"
     KEY="asn_${NAME}"
     if [[ "${RESULTS[$KEY]:-fail}" == "ok" ]] && [[ -s "$TMPFILE" ]]; then
-        COUNT=$( { grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" || true; } | sed 's/"prefix":"//;s/"//' | wc -l | tr -d ' ')
-        TOTAL=$((TOTAL + COUNT))
-        echo "    # === $NAME ===" >> "$OUTPUT_TMP"
-        grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | while read -r cidr; do
-            echo "    $cidr 1;" >> "$OUTPUT_TMP"
-        done || true
-        echo "" >> "$OUTPUT_TMP"
-        log "  $NAME: ${COUNT} 条"
+        jq -r '.data.prefixes[]?.prefix // empty' "$TMPFILE" \
+            | grep -E "$IPV4_CIDR_RE" | sort -u > "$CIDRFILE" || true
+        COUNT=$(wc -l < "$CIDRFILE" | tr -d ' ')
+        if [[ "$COUNT" -gt 0 ]]; then
+            TOTAL=$((TOTAL + COUNT))
+            echo "    # === $NAME ===" >> "$OUTPUT_TMP"
+            while read -r cidr; do
+                echo "    $cidr 1;" >> "$OUTPUT_TMP"
+            done < "$CIDRFILE"
+            echo "" >> "$OUTPUT_TMP"
+            log "  $NAME: ${COUNT} 条"
+        else
+            log "  [警告] $NAME 未解析到有效 IPv4 CIDR"
+        fi
     else
         log "  [警告] $NAME 拉取失败"
     fi
 done
 
 if [[ "${RESULTS[aws]:-fail}" == "ok" ]] && [[ -s "$AWS_TMP" ]]; then
-    AWS_COUNT=$( { grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" || true; } | sed 's/"ip_prefix":"//;s/"//' | sort -u | wc -l | tr -d ' ')
-    TOTAL=$((TOTAL + AWS_COUNT))
-    echo "    # === AWS ===" >> "$OUTPUT_TMP"
-    grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" | sed 's/"ip_prefix":"//;s/"//' | sort -u | while read -r cidr; do
-        echo "    $cidr 1;" >> "$OUTPUT_TMP"
-    done || true
-    log "  AWS: ${AWS_COUNT} 条"
-    echo "" >> "$OUTPUT_TMP"
+    AWS_CIDRS="$TEMP_DIR/aws.cidrs"
+    jq -r '.prefixes[]?.ip_prefix // empty' "$AWS_TMP" \
+        | grep -E "$IPV4_CIDR_RE" | sort -u > "$AWS_CIDRS" || true
+    AWS_COUNT=$(wc -l < "$AWS_CIDRS" | tr -d ' ')
+    if [[ "$AWS_COUNT" -gt 0 ]]; then
+        TOTAL=$((TOTAL + AWS_COUNT))
+        echo "    # === AWS ===" >> "$OUTPUT_TMP"
+        while read -r cidr; do
+            echo "    $cidr 1;" >> "$OUTPUT_TMP"
+        done < "$AWS_CIDRS"
+        log "  AWS: ${AWS_COUNT} 条"
+        echo "" >> "$OUTPUT_TMP"
+    else
+        log "  [警告] AWS 未解析到有效 IPv4 CIDR"
+    fi
 else
     log "  [警告] AWS 拉取失败"
 fi

@@ -109,6 +109,9 @@ if ($candidateTest !== false && $atomicMove !== false && $fullTest !== false) {
     check($atomicMove < $fullTest, '完整配置必须在替换后、重载前校验');
 }
 check(str_contains($updater, 'restore_previous'), '云 IP 更新脚本缺少上一版回滚逻辑');
+check(str_contains($updater, ".data.prefixes[]?.prefix // empty"), 'RIPE CIDR 必须使用 jq 结构化解析');
+check(str_contains($updater, ".prefixes[]?.ip_prefix // empty"), 'AWS CIDR 必须使用 jq 结构化解析');
+check(!str_contains($updater, "grep -o '\"ip_prefix\":\""), 'AWS CIDR 不得依赖固定 JSON 空格格式');
 
 if ($failures !== []) {
     fwrite(STDERR, "封禁规则测试失败：\n- " . implode("\n- ", $failures) . "\n");
