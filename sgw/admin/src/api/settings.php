@@ -398,15 +398,17 @@ function delete_alert_history_entry(array $body): int {
 function write_protect_conf(string $subscribePath, string $backend, string $host): bool {
     $conf = <<<NGINX
 location ^~ $subscribePath {
+    set \$block_reason "";
 
-    if (\$whitelist_ip = 1) { set \$block_reason ""; }
-
-    if (\$is_cloud_ip = 1)       { set \$block_reason "cloud"; }
     if (\$bad_subscribe_ua = 1)  { set \$block_reason "ua"; }
     if (\$is_custom_bad_ua = 1)  { set \$block_reason "ua"; }
-    if (\$is_token_blacklisted = 1) { set \$block_reason "token"; }
     if (\$is_ua_whitelisted = 1) { set \$block_reason ""; }
 
+    # UA 白名单只能豁免 UA 规则，不能绕过云 IP 或 Token 黑名单。
+    if (\$is_cloud_ip = 1)       { set \$block_reason "cloud"; }
+    if (\$is_token_blacklisted = 1) { set \$block_reason "token"; }
+
+    # 显式 IP 白名单保持最高放行优先级。
     if (\$whitelist_ip = 1) { set \$block_reason ""; }
 
     if (\$block_reason = "cloud") { return 403 "Forbidden: Cloud IP"; }

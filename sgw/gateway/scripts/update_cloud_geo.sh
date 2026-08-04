@@ -3,12 +3,22 @@ set -euo pipefail
 
 OUTPUT="/etc/nginx/subscribe/cloud_geo.conf"
 OUTPUT_TMP="${OUTPUT}.tmp"
+OUTPUT_BACKUP="${OUTPUT}.bak.$$"
 LOG_FILE="/var/log/subscribe/update_cloud_geo.log"
 TEMP_DIR=$(mktemp -d)
+TEST_CONF="$TEMP_DIR/nginx-cloud-candidate.conf"
 SKIP_NGINX_RELOAD="${SKIP_NGINX_RELOAD:-0}"
+HAD_PREVIOUS=0
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
-cleanup() { rm -rf "$TEMP_DIR" "$OUTPUT_TMP" 2>/dev/null || true; }
+cleanup() { rm -rf "$TEMP_DIR" "$OUTPUT_TMP" "$OUTPUT_BACKUP" 2>/dev/null || true; }
+restore_previous() {
+    if [[ "$HAD_PREVIOUS" == "1" && -s "$OUTPUT_BACKUP" ]]; then
+        mv -f "$OUTPUT_BACKUP" "$OUTPUT"
+    else
+        rm -f "$OUTPUT"
+    fi
+}
 trap cleanup EXIT
 
 declare -A SOURCES=(
@@ -155,10 +165,47 @@ if [[ "$TOTAL" -eq 0 ]]; then
     log "[警告] 首次启动未取得云 IP 数据，将使用最小规则并在下次周期重试"
 fi
 
-# 原子替换：写完整再覆盖，避免容器被杀时生成损坏的配置文件
+# 先在隔离的 http 上下文中检查候选文件，避免无效规则替换当前配置。
+cat > "$TEST_CONF" <<EOF
+pid $TEMP_DIR/nginx.pid;
+error_log stderr emerg;
+events {}
+http {
+    include $OUTPUT_TMP;
+}
+EOF
+
+if ! nginx -t -c "$TEST_CONF" -p /tmp >/dev/null 2>&1; then
+    log "❌ 候选云 IP 配置语法无效，已保留上一版规则"
+    exit 1
+fi
+
+if [[ -s "$OUTPUT" ]]; then
+    cp -p "$OUTPUT" "$OUTPUT_BACKUP"
+    HAD_PREVIOUS=1
+fi
+
+# 原子替换后再检查完整配置；任何失败都会恢复上一版。
 mv "$OUTPUT_TMP" "$OUTPUT"
 
-if [[ "$SKIP_NGINX_RELOAD" != "1" ]]; then
-    nginx -t 2>/dev/null && nginx -s reload && log "✅ Nginx 重载成功" || log "❌ 配置测试失败"
+if ! nginx -t >/dev/null 2>&1; then
+    restore_previous
+    log "❌ Nginx 完整配置测试失败，已恢复上一版云 IP 规则"
+    exit 1
 fi
+
+if [[ "$SKIP_NGINX_RELOAD" != "1" ]]; then
+    if nginx -s reload >/dev/null 2>&1; then
+        log "✅ Nginx 重载成功，云 IP 规则已生效"
+    else
+        restore_previous
+        nginx -t >/dev/null 2>&1 && nginx -s reload >/dev/null 2>&1 || true
+        log "❌ Nginx 重载失败，已恢复并尝试重载上一版云 IP 规则"
+        exit 1
+    fi
+else
+    log "✅ 云 IP 规则已通过启动前配置检查"
+fi
+
+rm -f "$OUTPUT_BACKUP"
 log "完成。"

@@ -297,6 +297,7 @@ tr:hover td{background:rgba(99,102,241,.055)}
 /* IDC 汇总区域 */
 .idc-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .idc-section .card-title{margin-bottom:10px}
+.idc-note{margin:-2px 0 10px;color:var(--text3);font-size:11px;line-height:1.55}
 
 @keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes itemIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -2153,6 +2154,7 @@ async function loadBlacklist() {
   if (idcSummary.length) {
     html += `<div class="idc-section">
       <div class="card-title">系统内置IDC封禁（自动拦截，共 ${idcSummary.reduce((s,r)=>s+r.count,0)} 条CIDR）</div>
+      <div class="idc-note">订阅请求命中后返回 403；UA 白名单不能绕过，显式 IP 白名单除外。</div>
       <div class="table-wrap">
       <table><thead><tr><th>云服务商 / IDC</th><th>CIDR数量</th></tr></thead>
       <tbody>${idcSummary.map(s => `
