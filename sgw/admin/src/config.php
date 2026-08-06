@@ -18,6 +18,7 @@ define('UA_WHITELIST_CONF',    '/etc/nginx/subscribe/ua_whitelist.conf');
 define('TOKEN_BLACKLIST_JSON', '/etc/nginx/subscribe/token_blacklist.json');
 define('TOKEN_BLACKLIST_CONF', '/etc/nginx/subscribe/token_blacklist.conf');
 define('IP_INTEL_CACHE_JSON', '/etc/nginx/subscribe/ip_intel_cache.json');
+define('IP_INTEL_QUEUE_JSON', '/etc/nginx/subscribe/ip_intel_queue.json');
 define('ALERT_STATE_JSON', '/etc/nginx/subscribe/alert_state.json');
 define('ALERT_HISTORY_JSON', '/etc/nginx/subscribe/alert_history.json');
 define('GUARD_CACHE_JSON', '/etc/nginx/subscribe/guard_cache.json');

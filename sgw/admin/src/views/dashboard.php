@@ -150,6 +150,21 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .log-ip-count>strong{color:var(--accent);font-size:12px}
 .log-ip-breakdown{color:var(--text3);font-size:10px;font-variant-numeric:tabular-nums}
 .log-ip-breakdown .s200{color:#22c55e}.log-ip-breakdown .s403{color:#ef4444}.log-ip-breakdown .s429{color:#eab308}.log-ip-breakdown .s444{color:#64748b}
+.log-intel-cell{min-width:260px;max-width:320px}
+.log-intel{display:grid;gap:4px;padding:2px 0;color:var(--text2);font-size:10px;line-height:1.35}
+.log-intel-primary{display:flex;align-items:center;gap:6px;min-width:0}
+.log-intel-location{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:760}
+.log-intel-risk{flex:0 0 auto;padding:2px 5px;border-radius:5px;font-size:9px;font-weight:850}
+.log-intel-risk.high{background:rgba(239,68,68,.13);color:#ef4444}.log-intel-risk.review{background:rgba(234,179,8,.14);color:#d97706}.log-intel-risk.low{background:rgba(34,197,94,.12);color:#16a34a}.log-intel-risk.unknown{background:rgba(100,116,139,.12);color:#64748b}
+.log-intel-detail{display:flex;align-items:center;gap:5px;min-width:0;color:var(--text3)}
+.log-intel-detail span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-intel-asn{flex:0 0 auto;color:var(--accent);font-weight:760}
+.log-intel-meta{color:var(--text3);font-size:9px}
+.log-intel-links{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.log-intel-links a{color:var(--accent);font-size:9px;font-weight:760;text-decoration:none}
+.log-intel-links a:hover{text-decoration:underline}
+.log-intel-pending{display:flex;align-items:center;gap:7px;color:var(--text3);font-size:10px}
+.log-intel-pending::before{content:"";width:7px;height:7px;border-radius:999px;background:#eab308;box-shadow:0 0 0 3px rgba(234,179,8,.12)}
 .mode-btn{background:linear-gradient(180deg,var(--border),color-mix(in srgb,var(--border) 82%,var(--bg3) 18%));border:1px solid var(--border2);color:var(--text2);padding:6px 14px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s}
 .mode-btn:hover{border-color:var(--accent);color:var(--accent)}
 .mode-btn.active{background:linear-gradient(135deg,#6366f1,#4f46e5);border-color:rgba(99,102,241,.85);color:#fff;box-shadow:0 9px 20px rgba(99,102,241,.22)}
@@ -447,7 +462,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .log-table-wrap,.table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:0 8px}
-  .log-table-wrap table{min-width:1080px}
+  .log-table-wrap table{min-width:1360px}
   .table-wrap table{min-width:640px}
   th,td{padding:7px 8px}
   .req-cell-wrap{max-width:220px}
@@ -900,11 +915,11 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
           <table>
             <thead>
               <tr>
-                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th title="当前筛选范围内：总次数与成功 / 403 / 429 / 444 分布">该 IP 计数</th><th>Token</th>
+                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th title="当前筛选范围内：总次数与成功 / 403 / 429 / 444 分布">该 IP 计数</th><th>IP 情报</th><th>Token</th>
                 <th>请求</th><th>UA</th>
               </tr>
             </thead>
-            <tbody id="log-tbody"><tr><td colspan="8" class="loading">加载中…</td></tr></tbody>
+            <tbody id="log-tbody"><tr><td colspan="9" class="loading">加载中…</td></tr></tbody>
           </table>
         </div>
         <!-- 分页控件（瀑布流模式下隐藏） -->
@@ -1319,6 +1334,7 @@ let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
 let logLimit = 50;       // 0=瀑布流（无限制）
 let logPage = 1;         // 当前页（分页模式）
+let logIpIntel = new Map();
 let blacklistIpSet = new Set();
 let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
@@ -1695,7 +1711,7 @@ function isCloudIp(ip) {
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
-  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="8" class="loading">加载中…</td></tr>';
+  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="9" class="loading">加载中…</td></tr>';
   document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">统计加载中…</span></div>';
   const [logsData, blData, cloudData, wlData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
@@ -1709,7 +1725,7 @@ async function loadLogs() {
   wlCommentMap = {}; (wlData.entries || []).forEach(e => wlCommentMap[e.ip] = e.comment || '');
   blCommentMap = {}; (blData.entries || []).forEach(e => blCommentMap[e.ip] = e.comment || '');
   if (!logsData.ok) {
-    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="8" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
+    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
     document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">暂时无法统计</span></div>';
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
   }
@@ -1769,7 +1785,7 @@ function renderLogs() {
 
     if (!displayRows.length) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="8" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="9" class="empty">暂无匹配记录</td></tr>';
       return;
     }
     renderLogRows(displayRows, ipStatusStats);
@@ -1779,7 +1795,7 @@ function renderLogs() {
     document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
     if (!total) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="8" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="9" class="empty">暂无匹配记录</td></tr>';
       return;
     }
     renderLogRows(rows, ipStatusStats);
@@ -1819,6 +1835,69 @@ function renderLogStatusSummary(rows, ipStats) {
       <span class="log-status-item log-status-429">限速 429 <strong>${totals.s429}</strong></span>
       <span class="log-status-item log-status-444">断连 444 <strong>${totals.s444}</strong></span>
     </div>`;
+}
+
+function renderExternalIpLinks(ip) {
+  const encoded = encodeURIComponent(ip);
+  return `<div class="log-intel-links" aria-label="外部 IP 情报源">
+    <a href="https://ipwho.is/${encoded}" target="_blank" rel="noopener noreferrer">ipwho.is</a>
+    <a href="https://stat.ripe.net/app/launchpad/${encoded}" target="_blank" rel="noopener noreferrer">RIPEstat</a>
+    <a href="https://ip.ipyard.com/" target="_blank" rel="noopener noreferrer" data-ip="${esc(ip)}" onclick="copyText(this.dataset.ip)" title="打开 IPYard，并已复制该 IP">IPYard</a>
+  </div>`;
+}
+
+function renderLogIpIntel(ip) {
+  const intel = logIpIntel.get(ip);
+  const links = renderExternalIpLinks(ip);
+  if (!intel || intel.status === 'loading' || intel.status === 'pending') {
+    const label = intel?.status === 'pending' ? '后台查询中，稍后刷新' : '正在读取 IP 情报';
+    return `<div class="log-intel"><div class="log-intel-pending">${label}</div>${links}</div>`;
+  }
+  if (intel.status !== 'ready') {
+    return `<div class="log-intel"><div class="log-intel-pending">情报暂不可用</div>${links}</div>`;
+  }
+  const level = ['high','review','low'].includes(intel.risk_level) ? intel.risk_level : 'unknown';
+  const stale = intel.fresh === false ? ' · 待更新' : '';
+  return `<div class="log-intel">
+    <div class="log-intel-primary"><span class="log-intel-location" title="${esc(intel.location || '')}">${esc(intel.location || '未知地区')}</span><span class="log-intel-risk ${level}" title="${esc(intel.risk_reason || '')}">${esc(intel.risk_label || '未评估')}</span></div>
+    <div class="log-intel-detail"><span class="log-intel-asn">${esc(intel.asn || '未知 ASN')}</span><span title="${esc(intel.operator || '')}">${esc(intel.operator || '未知运营商')}</span></div>
+    <div class="log-intel-meta" title="${esc(intel.source || '')}">${esc(intel.network_type || '未知网络')} · ${Number(intel.source_count || 0)} 源 · 置信度 ${esc(intel.confidence || '未评估')}${stale}</div>
+    ${links}
+  </div>`;
+}
+
+function updateVisibleLogIntelCells() {
+  document.querySelectorAll('[data-intel-ip]').forEach(cell => {
+    cell.innerHTML = renderLogIpIntel(cell.dataset.intelIp || '');
+  });
+}
+
+async function requestLogIpIntel(rows) {
+  const now = Date.now();
+  const ips = [...new Set(rows.map(row => row.ip).filter(Boolean))];
+  const pending = ips.filter(ip => {
+    const current = logIpIntel.get(ip);
+    if (!current) return true;
+    if (current.status === 'loading') return false;
+    return current.status === 'pending' && now - Number(current.requested_at || 0) > 60000;
+  });
+  if (!pending.length) return;
+  pending.forEach(ip => logIpIntel.set(ip, {status:'loading', requested_at:now}));
+  updateVisibleLogIntelCells();
+  const data = await apiFetch('/api/ip_intel.php?ips=' + encodeURIComponent(pending.join(',')));
+  if (!data.ok) {
+    pending.forEach(ip => logIpIntel.set(ip, {status:'error', requested_at:now}));
+    updateVisibleLogIntelCells();
+    return;
+  }
+  const received = new Set();
+  (data.entries || []).forEach(item => {
+    if (!item.ip) return;
+    received.add(item.ip);
+    logIpIntel.set(item.ip, {...item, requested_at:now});
+  });
+  pending.filter(ip => !received.has(ip)).forEach(ip => logIpIntel.set(ip, {status:'pending', requested_at:now}));
+  updateVisibleLogIntelCells();
 }
 
 function updateSubscribePathLabel() {
@@ -1932,12 +2011,14 @@ function renderLogRows(rows, ipStatusStats) {
       ${commentCell}
       <td>${statusBadge(l.status)}</td>
       <td><div class="log-ip-count"><strong>${ipStats.total}次</strong><span class="log-ip-breakdown" title="成功 / 拦截403 / 限速429 / 断连444"><span class="s200">${ipStats.s200}</span>/<span class="s403">${ipStats.s403}</span>/<span class="s429">${ipStats.s429}</span>/<span class="s444">${ipStats.s444}</span></span></div></td>
+      <td class="log-intel-cell" data-intel-ip="${esc(l.ip)}">${renderLogIpIntel(l.ip)}</td>
       <td style="min-width:100px;max-width:200px">${tokenHtml}</td>
       <td><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">复制</button></div></td>
       <td><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">复制</button>` : ''}</div></td>
     </tr>`;
   }).join('');
   attachCommentCells(tbody);
+  requestLogIpIntel(rows);
 }
 
 async function deleteLogs() {

@@ -4,6 +4,7 @@ if (PHP_SAPI === 'cli') {
 } else {
     require_once __DIR__ . '/_auth.php';
 }
+require_once dirname(__DIR__) . '/lib/ip_intel_queue.php';
 
 if (!defined('STATS_CACHE_JSON')) {
     define('STATS_CACHE_JSON', dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
@@ -131,6 +132,7 @@ $topIps = [];
 foreach (array_slice($ips, 0, 500, true) as $ip => $v) {
     $topIps[] = array_merge(['ip' => $ip], $v);
 }
+if (PHP_SAPI === 'cli') warm_ip_intel_candidates(array_column($topIps, 'ip'), 5);
 
 // Top Token（今日，最多返回500条，前端负责显示限制）
 uasort($tokens, fn($a,$b) => $b['count'] - $a['count']);
@@ -431,20 +433,22 @@ function write_ip_intel_cache(array $cache): void {
     @unlink($tmp);
 }
 
-function is_ip_intel_cache_fresh($entry): bool {
-    if (!is_array($entry)) return false;
-    $age = time() - (int)($entry['ts'] ?? 0);
-    $data = is_array($entry['data'] ?? null) ? $entry['data'] : [];
-    $failed = !empty($data['query_failed'])
-        || ($data['location'] ?? '') === '查询失败'
-        || in_array('情报查询失败', is_array($data['tags'] ?? null) ? $data['tags'] : [], true);
-    if (!$failed && (int)($data['intel_version'] ?? 0) < 2) return false;
-    if ($failed) $ttl = 600;
-    elseif (($data['confidence'] ?? '') === '高' && (int)($data['source_count'] ?? 0) >= 4) $ttl = 604800;
-    elseif (($data['confidence'] ?? '') === '高') $ttl = 259200;
-    elseif (($data['confidence'] ?? '') === '中') $ttl = 86400;
-    else $ttl = 21600;
-    return $age >= 0 && $age < $ttl;
+function warm_ip_intel_candidates(array $fallbackIps, int $limit): void {
+    $limit = max(1, min(10, $limit));
+    $cache = read_ip_intel_cache();
+    $candidates = ip_intel_take($limit);
+    foreach ($fallbackIps as $ip) {
+        if (count($candidates) >= $limit) break;
+        if (!ip_intel_is_public((string)$ip) || in_array($ip, $candidates, true)) continue;
+        if (!isset($cache[$ip]) || !is_ip_intel_cache_fresh($cache[$ip])) $candidates[] = $ip;
+    }
+    if (!$candidates) return;
+    $dirty = false;
+    foreach ($candidates as $ip) {
+        if (isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip])) continue;
+        get_ip_intel($ip, $cache, $dirty);
+    }
+    if ($dirty) write_ip_intel_cache($cache);
 }
 
 function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
@@ -457,6 +461,8 @@ function get_ip_intel(string $ip, array &$cache, bool &$dirty): ?array {
         $intel = [
             'location' => '查询失败',
             'asn' => '查询失败',
+            'asn_number' => '',
+            'operator' => '未知运营商',
             'source' => '多源查询',
             'sources' => [],
             'source_count' => 0,
@@ -767,6 +773,8 @@ function merge_ip_intel_sources(array $sources): array {
         'location' => $locationParts ? implode(' / ', $locationParts) : ($countryCode ?: '未知地区'),
         'country_code' => $countryCode,
         'asn' => $asnParts ? implode(' ', $asnParts) : '未查询',
+        'asn_number' => $selectedAsn,
+        'operator' => $organizations ? implode(' / ', $organizations) : '未知运营商',
         'route_prefix' => $routePrefix,
         'source' => implode('、', $sourceNames),
         'sources' => $sourceNames,

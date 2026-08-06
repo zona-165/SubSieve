@@ -94,6 +94,25 @@ if (str_starts_with($path, '/api/')) {
         echo json_encode(['ok' => true, 'logs' => $previewLogs], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($path === '/api/ip_intel.php') {
+        $ips = preg_split('/[\s,]+/', (string)($_GET['ips'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $entries = [];
+        foreach (array_values(array_unique($ips)) as $i => $ip) {
+            $entries[] = [
+                'ip' => $ip, 'status' => 'ready', 'fresh' => true,
+                'location' => $i % 2 ? '中国 / 广东 / 广州' : '中国 / 浙江 / 杭州',
+                'operator' => $i % 2 ? 'China Mobile Communications Group' : 'CHINANET-BACKBONE',
+                'asn' => $i % 2 ? 'AS9808' : 'AS4134',
+                'route_prefix' => '', 'network_type' => $i === 1 ? '机房/托管' : '普通运营商网络',
+                'risk_level' => $i === 1 ? 'high' : 'low', 'risk_label' => $i === 1 ? '高风险' : '低风险',
+                'risk_reason' => $i === 1 ? '机房/托管' : '未发现代理或机房信号',
+                'source' => 'ip-api、ipwho.is、GeoJS、RIPEstat', 'source_count' => 4,
+                'confidence' => '高', 'consensus' => '国家3/3｜ASN4/4',
+            ];
+        }
+        echo json_encode(['ok' => true, 'entries' => $entries, 'queued' => 0], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($path === '/api/stats.php') {
         echo json_encode([
             'ok' => true, 'scan_limit' => 30000,

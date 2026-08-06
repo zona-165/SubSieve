@@ -17,6 +17,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/whitelist_ips.txt" ] || touch "$SUBSCRIBE_DIR/whitelist_ips.txt"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
+[ -f "$SUBSCRIBE_DIR/ip_intel_queue.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_queue.json"
 [ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
 [ -f "$SUBSCRIBE_DIR/alert_state.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_state.json"
 [ -f "$SUBSCRIBE_DIR/alert_history.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_history.json"
@@ -40,6 +41,7 @@ chmod 666 \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
     "$SUBSCRIBE_DIR/admin_settings.json" \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
+    "$SUBSCRIBE_DIR/ip_intel_queue.json" \
     "$SUBSCRIBE_DIR/stats_cache.json" \
     "$SUBSCRIBE_DIR/alert_state.json" \
     "$SUBSCRIBE_DIR/alert_history.json" \
