@@ -533,6 +533,34 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .stats-detail-head,.stats-detail-card .top-row,.profile-segment,.scanner-report{border-radius:8px;background:var(--bg3)}
 .scope-note{border-radius:7px}
 
+.stats-overview{display:block;max-width:1180px;margin:0 auto}
+.analysis-overview-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:14px;padding:4px 2px 15px;border-bottom:1px solid var(--border)}
+.analysis-overview-title{font-size:20px;font-weight:850;color:var(--text)}
+.analysis-overview-meta{margin-top:5px;color:var(--text3);font-size:11px}
+.analysis-window{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg2);color:var(--text3);font-size:10px}
+.analysis-window strong{color:var(--text2);font-size:11px}
+.analysis-core-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.analysis-core-grid .stats-card{display:flex;min-height:174px;flex-direction:column;padding:19px 20px;border-width:1px;background:var(--bg3);box-shadow:none}
+.analysis-core-grid .stats-card:hover{border-color:var(--tone);box-shadow:0 12px 28px rgba(0,0,0,.10)}
+.analysis-core-grid .stats-card-title{margin-bottom:18px}
+.stats-card-count-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.stats-card-main{font-size:30px;font-weight:850;letter-spacing:0}
+.stats-card-unit{margin-left:5px;color:var(--text2);font-size:12px;font-weight:750}
+.stats-card-status{padding:4px 8px;border-radius:6px;background:var(--tone-soft);color:var(--tone);font-size:10px;font-weight:850;white-space:nowrap}
+.stats-card-sub{min-height:34px;margin-top:9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.stats-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--border);color:var(--text3);font-size:10px;font-weight:750}
+.stats-card-foot strong{color:var(--tone);font-size:15px;line-height:1}
+
+.review-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.review-toolbar .log-mode-btns{margin:0!important}
+.review-size-control{display:flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--text3);font-size:10px}
+.review-size-control .mode-btn{min-width:32px;padding:5px 8px}
+.review-pagination{display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.review-page-summary{color:var(--text3);font-size:11px;white-space:nowrap}
+.review-page-actions{display:flex;align-items:center;gap:6px}
+.review-page-jump{width:48px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:5px 6px;border-radius:6px;font-size:11px;outline:none;text-align:center}
+.review-page-jump:focus{border-color:var(--accent)}
+
 .workspace-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
 .workspace-intro h1{font-size:22px;line-height:1.2;font-weight:850}
 .workspace-intro p{max-width:760px;margin-top:7px;color:var(--text2);font-size:12px;line-height:1.65}
@@ -605,6 +633,14 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .log-filter{width:100%;min-width:0}
   .radio-group,.log-controls>div:last-child{grid-column:1/-1;margin-left:0!important}
   .security-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .analysis-overview-head{align-items:flex-start;flex-direction:column;gap:9px}
+  .analysis-core-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .analysis-core-grid .stats-card{min-height:156px;padding:15px}
+  .review-toolbar{align-items:flex-start;flex-direction:column}
+  .review-size-control{width:100%;justify-content:flex-start}
+  .review-pagination{align-items:flex-start;flex-direction:column}
+  .review-page-actions{width:100%}
+  .review-page-actions .mode-btn{flex:1}
 }
 
 @media (max-width:420px){
@@ -726,13 +762,22 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <div><div class="security-section-title">风险复核</div><div class="security-section-sub">阈值命中只进入复核队列，不会自动封禁</div></div>
               <button class="mode-btn" onclick="openPanelTab('stats')">完整分析</button>
             </div>
-            <div class="log-mode-btns" style="margin-bottom:10px">
-              <button class="mode-btn active" id="guard-filter-active" onclick="setGuardFilter('active')">待处理</button>
-              <button class="mode-btn" id="guard-filter-all" onclick="setGuardFilter('all')">全部</button>
-              <button class="mode-btn" id="guard-filter-trusted" onclick="setGuardFilter('trusted')">已判可信</button>
-              <span class="auto-timer" id="guard-review-summary"></span>
+            <div class="review-toolbar">
+              <div class="log-mode-btns">
+                <button class="mode-btn active" id="guard-filter-active" onclick="setGuardFilter('active')">待处理</button>
+                <button class="mode-btn" id="guard-filter-all" onclick="setGuardFilter('all')">全部</button>
+                <button class="mode-btn" id="guard-filter-trusted" onclick="setGuardFilter('trusted')">已判可信</button>
+                <span class="auto-timer" id="guard-review-summary"></span>
+              </div>
+              <div class="review-size-control" aria-label="每页显示数量">
+                <span>每页</span>
+                <button class="mode-btn active" id="guard-size-5" onclick="setGuardPageSize(5)">5</button>
+                <button class="mode-btn" id="guard-size-10" onclick="setGuardPageSize(10)">10</button>
+                <button class="mode-btn" id="guard-size-20" onclick="setGuardPageSize(20)">20</button>
+              </div>
             </div>
             <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
+            <div id="guard-pagination" class="review-pagination"></div>
           </section>
         </div>
 
@@ -1261,6 +1306,8 @@ let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let securityData = null;
 let guardReviewFilter = 'active';
+let guardReviewPage = 1;
+let guardReviewPageSize = 5;
 let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10, profiles: 10};
 let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1, profiles: 1};
 let activeStatsDetail = '';
@@ -1411,7 +1458,7 @@ applyTheme();
 const TABS = {
   security:   {title:'运行总览', subtitle:'网关健康、防护状态与待处理风险', loader:loadSecurity},
   logs:       {title:'拉取记录', subtitle:'检索订阅请求、状态码、Token 与客户端特征', loader:loadLogs},
-  stats:      {title:'风险分析', subtitle:'按 IP、Token、UA、扫描器与用户画像聚合', loader:loadStats},
+  stats:      {title:'风险分析', subtitle:'聚焦可疑 Token、可疑 IP、扫描器与来源画像', loader:loadStats},
   protection: {title:'防护策略', subtitle:'Token 拉取限制与行为观察阈值', loader:loadProtection},
   access:     {title:'访问控制', subtitle:'统一维护 IP、Token 与 UA 放行和拦截规则', loader:loadAccessControl},
   settings:   {title:'系统设置', subtitle:'界面账户、网关上游、证书与告警运维', loader:loadSettings},
@@ -1460,6 +1507,7 @@ function scheduleBackgroundPreload() {
 // ── Tab 切换 ──────────────────────────────────────────────────
 function switchTab(name, el) {
   if (!TABS[name]) return;
+  if (name === 'stats' && currentTab !== 'stats') activeStatsDetail = '';
   currentTab = name;
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -2132,27 +2180,13 @@ function renderUserProfileSegment(seg) {
 function renderStatsOverview(data) {
   const cards = [
     {
-      key: 'ips',
-      tone: 'blue',
-      icon: '⌁',
-      title: '今日 Top IP',
-      main: `${(data.top_ips || []).length} 个IP`,
-      sub: topSummary(data.top_ips, 'ip', 'total', '暂无请求记录'),
-    },
-    {
-      key: 'tokens',
-      tone: 'violet',
-      icon: '#',
-      title: '今日 Top Token',
-      main: `${(data.top_tokens || []).length} 个Token`,
-      sub: topSummary(data.top_tokens, 'token_full', 'count', '暂无 Token 拉取'),
-    },
-    {
       key: 'suspTokens',
       tone: 'amber',
       icon: '!',
       title: '可疑 Token',
-      main: `${(data.susp_tokens || []).length} 个`,
+      value: (data.susp_tokens || []).length,
+      unit: '个 Token',
+      status: (data.susp_tokens || []).length ? '需要复核' : '暂无异常',
       sub: (data.susp_tokens || [])[0] ? `${esc((data.susp_tokens || [])[0].ip_count)} 个不同IP拉取` : '暂无多 IP 拉取',
     },
     {
@@ -2160,7 +2194,9 @@ function renderStatsOverview(data) {
       tone: 'rose',
       icon: '!',
       title: '可疑 IP',
-      main: `${(data.susp_ips || []).length} 个`,
+      value: (data.susp_ips || []).length,
+      unit: '个 IP',
+      status: (data.susp_ips || []).length ? '需要复核' : '暂无异常',
       sub: (data.susp_ips || [])[0] ? `${esc((data.susp_ips || [])[0].risk || '可疑')} ${esc((data.susp_ips || [])[0].score || '')}` : '暂无多 Token 拉取',
     },
     {
@@ -2168,7 +2204,9 @@ function renderStatsOverview(data) {
       tone: 'cyan',
       icon: '⌘',
       title: '脚本/扫描器',
-      main: `${(data.scanner_reports || []).length} 条`,
+      value: (data.scanner_reports || []).length,
+      unit: '条记录',
+      status: (data.scanner_reports || []).length ? '需要复核' : '暂无异常',
       sub: (data.scanner_reports || [])[0] ? `${esc((data.scanner_reports || [])[0].ip)}｜${esc((data.scanner_reports || [])[0].ua || '空UA')}` : '暂无脚本拉取记录',
     },
     {
@@ -2176,36 +2214,33 @@ function renderStatsOverview(data) {
       tone: 'sky',
       icon: '▦',
       title: '用户画像',
-      main: `${(data.user_profiles || []).length} 个IP段`,
+      value: (data.user_profiles || []).length,
+      unit: '个 IP 段',
+      status: (data.user_profiles || []).length ? '已生成' : '暂无数据',
       sub: (data.user_profiles || [])[0] ? `${esc((data.user_profiles || [])[0].range)}｜最近 ${esc(data.scan_limit || 30000)} 行` : '暂无画像数据',
-    },
-    {
-      key: 'uas',
-      tone: 'emerald',
-      icon: 'A',
-      title: 'UA TOP',
-      main: `${(data.bad_uas || []).length} 个UA`,
-      sub: topSummary(data.bad_uas, 'ua', 'count', '今日暂无可疑UA'),
     },
   ];
   const el = document.getElementById('stats-overview');
   if (!el) return;
-  el.innerHTML = cards.map(c => `
-    <button class="stats-card tone-${esc(c.tone)}" onclick="showStatsDetail('${c.key}')">
-      <div class="stats-card-title">
-        <span class="stats-card-kicker"><span class="stats-card-icon">${esc(c.icon)}</span>${esc(c.title)}</span>
-        <span class="stats-card-action">查看</span>
-      </div>
-      <div class="stats-card-main">${esc(c.main)}</div>
-      <div class="stats-card-sub">${c.sub}</div>
-    </button>`).join('');
-}
-
-function topSummary(rows, labelKey, countKey, emptyText) {
-  const first = (rows || [])[0];
-  if (!first) return esc(emptyText);
-  const label = String(first[labelKey] || '').slice(0, 28);
-  return `${esc(label)} · ${esc(first[countKey] || 0)} 次`;
+  el.innerHTML = `
+    <div class="analysis-overview-head">
+      <div><div class="workspace-kicker">核心检测</div><div class="analysis-overview-title">核心分析</div><div class="analysis-overview-meta">风险识别、扫描检测与来源画像</div></div>
+      <div class="analysis-window"><span>统计窗口</span><strong>最近 ${esc(data.scan_limit || 30000)} 行</strong></div>
+    </div>
+    <div class="analysis-core-grid">${cards.map(c => {
+      return `
+      <button class="stats-card tone-${esc(c.tone)}" onclick="showStatsDetail('${c.key}')">
+        <div class="stats-card-title">
+          <span class="stats-card-kicker"><span class="stats-card-icon">${esc(c.icon)}</span>${esc(c.title)}</span>
+        </div>
+        <div class="stats-card-count-row">
+          <div class="stats-card-main">${esc(c.value)}<span class="stats-card-unit">${esc(c.unit)}</span></div>
+          <span class="stats-card-status">${esc(c.status)}</span>
+        </div>
+        <div class="stats-card-sub">${c.sub}</div>
+        <div class="stats-card-foot"><span>进入详情</span><strong>→</strong></div>
+      </button>`;
+    }).join('')}</div>`;
 }
 
 function showStatsDetail(key) {
@@ -2244,7 +2279,7 @@ function updateStatsView() {
     uas: 'tone-emerald',
   };
   const inDetail = !!activeStatsDetail;
-  overview.style.display = inDetail ? 'none' : 'grid';
+  overview.style.display = inDetail ? 'none' : 'block';
   detailHead.style.display = inDetail ? 'flex' : 'none';
   detailGrid.classList.toggle('active', inDetail);
   const toneClasses = Object.values(tones);
@@ -3794,8 +3829,48 @@ function renderSecurityHealth() {
 
 function setGuardFilter(filter) {
   guardReviewFilter = filter;
+  guardReviewPage = 1;
   ['active','all','trusted'].forEach(name => document.getElementById('guard-filter-' + name)?.classList.toggle('active', name === filter));
   renderGuardFindings();
+}
+
+function setGuardPageSize(size) {
+  guardReviewPageSize = [5,10,20].includes(Number(size)) ? Number(size) : 5;
+  guardReviewPage = 1;
+  [5,10,20].forEach(value => document.getElementById('guard-size-' + value)?.classList.toggle('active', value === guardReviewPageSize));
+  renderGuardFindings();
+}
+
+function changeGuardPage(delta) {
+  guardReviewPage += Number(delta) || 0;
+  renderGuardFindings();
+}
+
+function jumpGuardPage() {
+  const input = document.getElementById('guard-page-jump');
+  guardReviewPage = Math.max(1, Number(input?.value) || 1);
+  renderGuardFindings();
+}
+
+function renderGuardPagination(total) {
+  const target = document.getElementById('guard-pagination');
+  if (!target || total <= 0) {
+    if (target) target.style.display = 'none';
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(total / guardReviewPageSize));
+  guardReviewPage = Math.max(1, Math.min(guardReviewPage, totalPages));
+  const start = (guardReviewPage - 1) * guardReviewPageSize + 1;
+  const end = Math.min(total, guardReviewPage * guardReviewPageSize);
+  target.style.display = 'flex';
+  target.innerHTML = `
+    <div class="review-page-summary">${start}-${end} / ${total} 条 · 第 ${guardReviewPage}/${totalPages} 页</div>
+    <div class="review-page-actions">
+      <button class="mode-btn" onclick="changeGuardPage(-1)" ${guardReviewPage <= 1 ? 'disabled' : ''}>上一页</button>
+      <input class="review-page-jump" id="guard-page-jump" type="number" min="1" max="${totalPages}" value="${guardReviewPage}" aria-label="跳转页码" onkeydown="if(event.key==='Enter')jumpGuardPage()">
+      <button class="mode-btn" onclick="jumpGuardPage()">跳转</button>
+      <button class="mode-btn" onclick="changeGuardPage(1)" ${guardReviewPage >= totalPages ? 'disabled' : ''}>下一页</button>
+    </div>`;
 }
 
 function renderGuardFindings() {
@@ -3805,12 +3880,15 @@ function renderGuardFindings() {
   let rows = securityData.findings || [];
   if (guardReviewFilter === 'active') rows = rows.filter(row => ['pending','watch'].includes(row.review?.status || 'pending'));
   if (guardReviewFilter === 'trusted') rows = rows.filter(row => row.review?.status === 'trusted');
-  rows = rows.slice(0, 30);
   const target = document.getElementById('security-findings');
   if (!rows.length) {
     target.innerHTML = `<div class="security-empty">${guardReviewFilter === 'active' ? '当前没有待处理风险' : '当前筛选没有记录'}</div>`;
+    renderGuardPagination(0);
     return;
   }
+  renderGuardPagination(rows.length);
+  const pageStart = (guardReviewPage - 1) * guardReviewPageSize;
+  rows = rows.slice(pageStart, pageStart + guardReviewPageSize);
   target.innerHTML = rows.map((row, index) => {
     const review = row.review || {status:'pending',note:''};
     const subject = row.subject || '-';

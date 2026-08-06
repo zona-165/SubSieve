@@ -7,6 +7,26 @@ if (str_starts_with($path, '/api/')) {
     header('Content-Type: application/json; charset=utf-8');
     $empty = ['ok' => true, 'entries' => []];
     if ($path === '/api/security.php') {
+        $previewFindings = [];
+        $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
+        for ($i = 1; $i <= 13; $i++) {
+            $status = $i <= 7 ? 'pending' : ($i <= 9 ? 'watch' : ($i <= 12 ? 'trusted' : 'confirmed'));
+            $previewSummary[$status]++;
+            $previewFindings[] = [
+                'key' => 'ip_minute:' . substr(hash('sha256', 'preview-' . $i), 0, 24),
+                'title' => $i % 2 === 0 ? '日志窗口内 IP 拉取多 Token' : '单 IP 高频拉取',
+                'subject' => '198.51.100.' . (20 + $i),
+                'count' => 30 + $i,
+                'threshold' => 30,
+                'window' => $i % 2 === 0 ? '最近日志窗口' : '1 分钟',
+                'source' => '本地日志',
+                'last_seen' => date('Y-m-d H:i:s', time() - $i * 90),
+                'risk' => $i <= 4 ? '高危' : '关注',
+                'score' => max(62, 96 - $i * 2),
+                'reason' => '请求行为达到观察阈值，等待管理员复核。',
+                'review' => ['status' => $status, 'note' => ''],
+            ];
+        }
         echo json_encode([
             'ok' => true,
             'mode' => 'observe',
@@ -38,13 +58,8 @@ if (str_starts_with($path, '/api/')) {
                 ['state' => 'active', 'title' => 'Token 拉取限制', 'detail' => '自动暂停生效 · 当前 2 个'],
                 ['state' => 'active', 'title' => '多源 IP 情报', 'detail' => '142 个缓存画像'],
             ],
-            'review_summary' => ['pending' => 1, 'watch' => 1, 'trusted' => 1, 'confirmed' => 0],
-            'findings' => [[
-                'key' => 'preview:risk', 'title' => '单 IP 高频拉取', 'subject' => '198.51.100.24',
-                'count' => 36, 'threshold' => 30, 'window' => '1 分钟', 'source' => '本地日志',
-                'last_seen' => date('Y-m-d H:i:s'), 'risk' => '关注', 'score' => 72,
-                'reason' => '短时间请求频率达到观察阈值', 'review' => ['status' => 'pending', 'note' => ''],
-            ]],
+            'review_summary' => $previewSummary,
+            'findings' => $previewFindings,
             'rules' => [
                 'guard_observe_enabled' => 1, 'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 20,
                 'guard_token_hour_ips' => 8, 'guard_ip_hour_tokens' => 20, 'guard_ip_404_5m' => 40,
@@ -69,7 +84,34 @@ if (str_starts_with($path, '/api/')) {
             'ok' => true, 'scan_limit' => 30000,
             'top_ips' => [['ip' => '198.51.100.24', 'total' => 36, 's200' => 34, 's403' => 1, 's429' => 1, 's444' => 0]],
             'top_tokens' => [['token_full' => 'TKN-PREVIEW12345678', 'count' => 22, 'last_time' => date('H:i:s')]],
-            'susp_tokens' => [], 'susp_ips' => [], 'scanner_reports' => [], 'user_profiles' => [], 'bad_uas' => [],
+            'susp_tokens' => [[
+                'token' => 'preview-token-fingerprint', 'ip_count' => 7,
+            ]],
+            'susp_ips' => [[
+                'ip' => '198.51.100.24', 'token_count' => 6, 'request_count' => 42,
+                'risk' => '高危', 'score' => 92, 'paths' => ['/api/v1/client/subscribe'],
+                'uas' => ['python-requests/2.32'], 'tokens' => ['preview-token'],
+                'reasons' => ['同一 IP 在统计窗口内拉取多个 Token'],
+            ]],
+            'scanner_reports' => [[
+                'ip' => '203.0.113.18', 'token' => 'preview-token', 'risk' => '高危', 'score' => 90,
+                'location' => '中国 / 浙江 / 杭州', 'asn' => 'AS4134 CHINANET-BACKBONE',
+                'network_type' => '普通运营商网络', 'query_source' => '本地预览',
+                'path' => '/api/v1/client/subscribe', 'ua' => 'python-requests/2.32',
+                'reason' => 'automation_client', 'time' => date('Y-m-d H:i:s'),
+            ]],
+            'user_profiles' => [[
+                'range' => '198.51.100.0 - 198.51.100.255', 'ip_count' => 4, 'total' => 80,
+                'last_time' => date('Y-m-d H:i:s'),
+                'summary' => ['V' => 0, 'O' => 1, 'T' => 0, 'P' => 2, 'B' => 1],
+                'cells' => [
+                    ['ip' => '198.51.100.21', 'kind' => 'P', 'label' => 'P', 'count' => 22, 'token_count' => 3],
+                    ['ip' => '198.51.100.24', 'kind' => 'B', 'label' => 'B', 'count' => 36, 'token_count' => 6],
+                    ['ip' => '198.51.100.30', 'kind' => 'O', 'label' => 'O', 'count' => 12, 'token_count' => 2],
+                    ['ip' => '198.51.100.42', 'kind' => 'P', 'label' => 'P', 'count' => 10, 'token_count' => 2],
+                ],
+            ]],
+            'bad_uas' => [],
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
