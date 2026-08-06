@@ -137,6 +137,19 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .log-filter:focus{border-color:var(--accent)}
 .log-filter:focus,.ip-input:focus,.comment-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12)}
 .log-mode-btns{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.log-status-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
+.log-status-heading{display:flex;align-items:baseline;gap:8px;min-width:0}
+.log-status-title{color:var(--text);font-size:12px;font-weight:820;white-space:nowrap}
+.log-status-caption{min-width:0;color:var(--text3);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-status-legend{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.log-status-item{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text3);font-size:10px;white-space:nowrap}
+.log-status-item::before{content:"";width:7px;height:7px;border-radius:999px;background:var(--status-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--status-color) 14%,transparent)}
+.log-status-item strong{color:var(--status-color);font-size:11px}
+.log-status-success{--status-color:#22c55e}.log-status-403{--status-color:#ef4444}.log-status-429{--status-color:#eab308}.log-status-444{--status-color:#64748b}
+.log-ip-count{display:flex;align-items:baseline;gap:8px;min-width:142px;white-space:nowrap}
+.log-ip-count>strong{color:var(--accent);font-size:12px}
+.log-ip-breakdown{color:var(--text3);font-size:10px;font-variant-numeric:tabular-nums}
+.log-ip-breakdown .s200{color:#22c55e}.log-ip-breakdown .s403{color:#ef4444}.log-ip-breakdown .s429{color:#eab308}.log-ip-breakdown .s444{color:#64748b}
 .mode-btn{background:linear-gradient(180deg,var(--border),color-mix(in srgb,var(--border) 82%,var(--bg3) 18%));border:1px solid var(--border2);color:var(--text2);padding:6px 14px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s}
 .mode-btn:hover{border-color:var(--accent);color:var(--accent)}
 .mode-btn.active{background:linear-gradient(135deg,#6366f1,#4f46e5);border-color:rgba(99,102,241,.85);color:#fff;box-shadow:0 9px 20px rgba(99,102,241,.22)}
@@ -428,10 +441,13 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .alert-history-action{grid-column:auto;align-self:stretch}
   .alert-history-chip{max-width:100%}
   .log-filter{width:auto;flex:1 1 calc(50% - 6px);min-width:138px}
+  .log-status-summary{align-items:flex-start;flex-direction:column;gap:8px}
+  .log-status-legend{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-content:stretch}
+  .log-status-item{justify-content:flex-start}
   .radio-group{width:100%;margin-left:0;gap:10px;align-items:flex-start;flex-wrap:wrap}
   #active-subscribe-path{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .log-table-wrap,.table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:0 8px}
-  .log-table-wrap table{min-width:920px}
+  .log-table-wrap table{min-width:1080px}
   .table-wrap table{min-width:640px}
   th,td{padding:7px 8px}
   .req-cell-wrap{max-width:220px}
@@ -877,15 +893,18 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             <button class="mode-btn" id="limit-btn-inf" onclick="setLogLimit(0)">瀑布流</button>
           </div>
         </div>
+        <div id="log-status-summary" class="log-status-summary" aria-live="polite">
+          <div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">统计加载中…</span></div>
+        </div>
         <div class="log-table-wrap">
           <table>
             <thead>
               <tr>
-                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th>Token</th>
+                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th title="当前筛选范围内：总次数与成功 / 403 / 429 / 444 分布">该 IP 计数</th><th>Token</th>
                 <th>请求</th><th>UA</th>
               </tr>
             </thead>
-            <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
+            <tbody id="log-tbody"><tr><td colspan="8" class="loading">加载中…</td></tr></tbody>
           </table>
         </div>
         <!-- 分页控件（瀑布流模式下隐藏） -->
@@ -1676,7 +1695,8 @@ function isCloudIp(ip) {
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
-  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
+  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="8" class="loading">加载中…</td></tr>';
+  document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">统计加载中…</span></div>';
   const [logsData, blData, cloudData, wlData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
     apiFetch('/api/blacklist.php?no_idc=1'),
@@ -1689,7 +1709,8 @@ async function loadLogs() {
   wlCommentMap = {}; (wlData.entries || []).forEach(e => wlCommentMap[e.ip] = e.comment || '');
   blCommentMap = {}; (blData.entries || []).forEach(e => blCommentMap[e.ip] = e.comment || '');
   if (!logsData.ok) {
-    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
+    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="8" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
+    document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">暂时无法统计</span></div>';
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
   }
   allLogs = logsData.logs || [];
@@ -1712,6 +1733,9 @@ function renderLogs() {
     if (fUa     && !(l.ua || '').toLowerCase().includes(fUa)) return false;
     return true;
   });
+
+  const ipStatusStats = buildLogIpStatusStats(rows);
+  renderLogStatusSummary(rows, ipStatusStats);
 
   // 最新的在最上面
   rows = rows.slice().reverse();
@@ -1745,21 +1769,56 @@ function renderLogs() {
 
     if (!displayRows.length) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="8" class="empty">暂无匹配记录</td></tr>';
       return;
     }
-    renderLogRows(displayRows);
+    renderLogRows(displayRows, ipStatusStats);
   } else {
     // 瀑布流：显示全部，隐藏分页
     pg.style.display = 'none';
     document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
     if (!total) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="8" class="empty">暂无匹配记录</td></tr>';
       return;
     }
-    renderLogRows(rows);
+    renderLogRows(rows, ipStatusStats);
   }
+}
+
+function buildLogIpStatusStats(rows) {
+  const stats = new Map();
+  rows.forEach(l => {
+    if (!stats.has(l.ip)) stats.set(l.ip, {total:0,s200:0,s403:0,s429:0,s444:0});
+    const item = stats.get(l.ip);
+    item.total++;
+    if (l.status == 200) item.s200++;
+    else if (l.status == 403) item.s403++;
+    else if (l.status == 429) item.s429++;
+    else if (l.status == 444) item.s444++;
+  });
+  return stats;
+}
+
+function renderLogStatusSummary(rows, ipStats) {
+  const totals = {s200:0,s403:0,s429:0,s444:0};
+  ipStats.forEach(item => {
+    totals.s200 += item.s200;
+    totals.s403 += item.s403;
+    totals.s429 += item.s429;
+    totals.s444 += item.s444;
+  });
+  document.getElementById('log-status-summary').innerHTML = `
+    <div class="log-status-heading">
+      <span class="log-status-title">当前筛选</span>
+      <span class="log-status-caption">${rows.length} 条请求 · ${ipStats.size} 个 IP</span>
+    </div>
+    <div class="log-status-legend" title="表格右侧计数顺序与此处一致">
+      <span class="log-status-item log-status-success">成功 <strong>${totals.s200}</strong></span>
+      <span class="log-status-item log-status-403">拦截 403 <strong>${totals.s403}</strong></span>
+      <span class="log-status-item log-status-429">限速 429 <strong>${totals.s429}</strong></span>
+      <span class="log-status-item log-status-444">断连 444 <strong>${totals.s444}</strong></span>
+    </div>`;
 }
 
 function updateSubscribePathLabel() {
@@ -1843,7 +1902,7 @@ async function startEditComment(td) {
   });
 }
 
-function renderLogRows(rows) {
+function renderLogRows(rows, ipStatusStats) {
   const tbody = document.getElementById('log-tbody');
   tbody.innerHTML = rows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
@@ -1859,6 +1918,7 @@ function renderLogRows(rows) {
     const tokenHtml = l.token
       ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
+    const ipStats = ipStatusStats.get(l.ip) || {total:0,s200:0,s403:0,s429:0,s444:0};
     // 备注列：从白名单/黑名单备注映射获取，支持行内编辑
     const commentCell = isWhitelisted
       ? makeCommentCell('/api/whitelist.php', 'ip', l.ip, wlCommentMap[l.ip] || '')
@@ -1871,6 +1931,7 @@ function renderLogRows(rows) {
       <td class="ip-cell"><div style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap"><span>${esc(l.ip)}</span><button class="copy-btn" data-val="${esc(l.ip)}" onclick="copyText(this.dataset.val)">复制</button><span style="display:inline-block;width:2px"></span>${ipBtn}</div></td>
       ${commentCell}
       <td>${statusBadge(l.status)}</td>
+      <td><div class="log-ip-count"><strong>${ipStats.total}次</strong><span class="log-ip-breakdown" title="成功 / 拦截403 / 限速429 / 断连444"><span class="s200">${ipStats.s200}</span>/<span class="s403">${ipStats.s403}</span>/<span class="s429">${ipStats.s429}</span>/<span class="s444">${ipStats.s444}</span></span></div></td>
       <td style="min-width:100px;max-width:200px">${tokenHtml}</td>
       <td><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">复制</button></div></td>
       <td><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">复制</button>` : ''}</div></td>

@@ -72,11 +72,26 @@ if (str_starts_with($path, '/api/')) {
         exit;
     }
     if ($path === '/api/logs.php') {
-        echo json_encode(['ok' => true, 'logs' => [[
-            'time' => date('Y-m-d H:i:s'), 'ip' => '198.51.100.24', 'status' => 200,
-            'token' => 'preview-token-fingerprint', 'request' => 'GET /api/v1/client/subscribe?token=preview HTTP/2',
-            'ua' => 'Clash.Meta/1.18',
-        ]]], JSON_UNESCAPED_UNICODE);
+        $previewLogs = [];
+        $samples = [
+            ['198.51.100.24', 200, 'Clash.Meta/1.18'],
+            ['198.51.100.24', 200, 'Clash.Meta/1.18'],
+            ['198.51.100.24', 403, 'python-requests/2.32'],
+            ['198.51.100.24', 429, 'Clash.Meta/1.18'],
+            ['203.0.113.18', 200, 'Shadowrocket/2.2'],
+            ['203.0.113.18', 444, 'curl/8.7'],
+            ['203.0.113.18', 404, 'Mozilla/5.0'],
+            ['192.0.2.66', 200, 'sing-box/1.11'],
+        ];
+        foreach ($samples as $i => [$ip, $status, $ua]) {
+            $previewLogs[] = [
+                'time' => date('Y-m-d H:i:s', time() - $i * 37), 'ip' => $ip, 'status' => $status,
+                'token' => 'preview-token-' . (($i % 3) + 1),
+                'request' => 'GET /api/v1/client/subscribe?token=preview-' . (($i % 3) + 1) . ' HTTP/2',
+                'ua' => $ua,
+            ];
+        }
+        echo json_encode(['ok' => true, 'logs' => $previewLogs], JSON_UNESCAPED_UNICODE);
         exit;
     }
     if ($path === '/api/stats.php') {
