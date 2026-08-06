@@ -478,49 +478,185 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .health-row,.action-row{grid-template-columns:90px minmax(0,1fr);gap:8px}
   #toast{left:10px;right:10px;bottom:12px;text-align:center}
 }
+
+/* 2026 workspace information architecture and layout refresh */
+:root{
+  --bg:#101214;--bg2:#171a1d;--bg3:#1d2125;--bg-input:#121517;
+  --border:#2a2f34;--border2:#3a4249;
+  --text:#f1f5f4;--text2:#b2bcb9;--text3:#7f8b87;
+  --accent:#14b8a6;--accent-strong:#0f766e;--accent-soft:rgba(20,184,166,.11);
+}
+[data-theme="light"]{
+  --bg:#f3f5f4;--bg2:#ffffff;--bg3:#ffffff;--bg-input:#f8faf9;
+  --border:#dfe5e2;--border2:#c8d2ce;
+  --text:#17201d;--text2:#4f5f59;--text3:#7f918a;
+  --accent:#0f766e;--accent-strong:#115e59;--accent-soft:rgba(15,118,110,.09);
+}
+body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.sidebar{width:224px;padding:18px 12px 14px;background:var(--bg2);border-color:var(--border);box-shadow:none}
+.logo{display:flex;align-items:center;gap:10px;padding:2px 8px 20px;font-size:14px;font-weight:800}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;background:var(--accent);color:#fff;font-size:15px;box-shadow:0 8px 18px rgba(15,118,110,.20)}
+.brand-copy{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.brand-copy small{margin-top:4px;color:var(--text3);font-size:9px;font-weight:650}
+.nav-scroll{display:flex;flex:1;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;scrollbar-width:thin}
+.nav-section-label{padding:18px 11px 6px;color:var(--text3);font-size:10px;font-weight:850;text-transform:uppercase}
+.nav-section-label:first-child{padding-top:2px}
+.nav-item{min-height:40px;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:720;color:var(--text2)}
+.nav-item::before{inset:7px auto 7px 0;width:2px;background:var(--accent)}
+.nav-item:hover{background:rgba(127,145,138,.08);border-color:var(--border);color:var(--text)}
+.nav-item.active{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 24%,var(--border));color:var(--accent);box-shadow:none}
+.nav-icon{width:27px;height:27px;border-radius:7px;background:rgba(127,145,138,.09);font-size:14px;font-weight:850}
+.nav-item:hover .nav-icon,.nav-item.active .nav-icon{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.sidebar-bottom{padding-top:10px;border-top:1px solid var(--border)}
+.topbar{position:sticky;top:0;z-index:12;min-height:70px;padding:12px 24px;background:color-mix(in srgb,var(--bg2) 94%,transparent);backdrop-filter:blur(16px);border-color:var(--border)}
+.topbar-copy{min-width:0}
+.topbar-title{font-size:17px;font-weight:820}
+.topbar-subtitle{margin-top:2px;color:var(--text3);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-right{gap:9px}
+.refresh-btn,.theme-btn,.mode-btn{border-radius:7px;background:var(--bg3);border-color:var(--border2)}
+.content{padding:22px 24px 32px;background:var(--bg);overflow-x:hidden}
+.tab-panel{width:100%;max-width:1680px;margin:0 auto}
+.card{padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);box-shadow:0 8px 22px rgba(0,0,0,.06)}
+.card::before{display:none}
+.card-title{font-size:13px;font-weight:820}
+.card-title::before{width:3px;height:16px;border-radius:2px;background:var(--accent);box-shadow:none}
+.log-controls,.log-table-wrap,.table-wrap{border-radius:8px;background:var(--bg3)}
+.mode-btn.active,.btn-primary{background:var(--accent);border-color:var(--accent);box-shadow:none}
+.mode-btn.active:hover,.btn-primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}
+.security-hero{padding:20px;border-radius:8px;background:var(--bg3);border-left:4px solid #10b981;box-shadow:none}
+.security-hero::after,.stats-card::after{display:none}
+.security-metric{border-radius:8px;background:var(--bg3)}
+.security-metric::before{inset:0 auto 0 0;width:3px;height:auto}
+.security-section{border-radius:8px;background:var(--bg3)}
+.stats-card{min-height:118px;border-radius:8px;background:var(--bg3);box-shadow:none}
+.stats-card:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.09)}
+.stats-detail-head,.stats-detail-card .top-row,.profile-segment,.scanner-report{border-radius:8px;background:var(--bg3)}
+.scope-note{border-radius:7px}
+
+.workspace-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
+.workspace-intro h1{font-size:22px;line-height:1.2;font-weight:850}
+.workspace-intro p{max-width:760px;margin-top:7px;color:var(--text2);font-size:12px;line-height:1.65}
+.workspace-kicker{margin-bottom:5px;color:var(--accent);font-size:10px;font-weight:900;text-transform:uppercase}
+.protection-stack{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:14px;align-items:start}
+.protection-stack>.pull-limit-panel,.protection-stack>.security-section{margin:0;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)}
+.protection-stack>.pull-limit-panel{grid-row:span 2}
+.pull-limit-controls{border-top-color:var(--border)}
+
+.control-tabs{display:flex;gap:4px;margin-bottom:14px;padding:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);overflow-x:auto;scrollbar-width:none}
+.control-tabs::-webkit-scrollbar{display:none}
+.control-tab{flex:0 0 auto;min-height:36px;padding:7px 14px;border:0;border-radius:6px;background:transparent;color:var(--text2);font:700 12px/1 system-ui;cursor:pointer;transition:background var(--motion-fast),color var(--motion-fast)}
+.control-tab:hover{color:var(--text);background:rgba(127,145,138,.08)}
+.control-tab.active{background:var(--accent);color:#fff}
+.access-stage{min-width:0}
+.access-pane{display:none;min-width:0}
+.access-pane.active{display:block;animation:panelIn var(--motion-med) ease both}
+.access-pane>.card{margin-bottom:12px}
+
+.settings-groups{display:flex;flex-direction:column;gap:24px}
+.settings-cluster{min-width:0}
+.settings-cluster-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:10px;padding:0 2px}
+.settings-cluster-title{font-size:14px;font-weight:850}
+.settings-cluster-sub{margin-top:3px;color:var(--text3);font-size:11px}
+.settings-cluster-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.settings-cluster[data-settings-group="gateway"] .settings-cluster-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.settings-cluster-grid>.card{height:100%;margin:0}
+
+@media (max-width: 1120px){
+  .protection-stack{grid-template-columns:1fr}
+  .settings-cluster[data-settings-group="gateway"] .settings-cluster-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media (max-width:760px){
+  body{padding:0;overflow-x:hidden}
+  .sidebar{position:sticky;top:0;z-index:30;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;width:100%;height:64px;padding:8px 10px;border-right:0;border-bottom:1px solid var(--border);overflow:hidden}
+  .logo{padding:0;gap:7px}
+  .brand-mark{width:32px;height:32px}
+  .brand-copy{font-size:12px}
+  .brand-copy small{display:none}
+  .nav-scroll{display:flex;min-width:0;flex-direction:row;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .nav-scroll::-webkit-scrollbar{display:none}
+  .nav-section-label,.sidebar-bottom{display:none}
+  .nav-item{min-height:42px;padding:6px 9px;gap:5px;border-radius:7px}
+  .nav-item::before{display:none}
+  .nav-icon{width:24px;height:24px;font-size:12px}
+  .nav-label{font-size:11px}
+  .topbar{top:64px;display:grid;grid-template-columns:minmax(0,1fr) auto;min-height:58px;padding:8px 10px;align-items:center}
+  .topbar-title{font-size:14px;line-height:1.25}
+  .topbar-subtitle{max-width:50vw;font-size:9px}
+  .topbar-right{margin:0;gap:5px;flex-wrap:nowrap}
+  .topbar-right>.status-text:not(.auto-timer){display:none}
+  .status-dot{width:7px;height:7px}
+  .auto-timer{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .refresh-btn,.theme-btn{padding:6px 8px;font-size:10px}
+  .content{width:100%;padding:12px 10px 24px;overflow-x:hidden}
+  .tab-panel{max-width:100%;min-width:0}
+  .workspace-intro{align-items:flex-start;flex-direction:column;padding-bottom:12px;margin-bottom:12px}
+  .workspace-intro h1{font-size:18px}
+  .workspace-intro p{font-size:11px}
+  .protection-stack{display:block}
+  .protection-stack>.pull-limit-panel,.protection-stack>.security-section{padding:13px;margin-bottom:10px}
+  .control-tabs{width:100%;margin-bottom:10px}
+  .control-tab{padding:7px 11px}
+  .settings-cluster-head{align-items:flex-start;flex-direction:column;gap:3px}
+  .settings-cluster-grid,.settings-cluster[data-settings-group="gateway"] .settings-cluster-grid{grid-template-columns:minmax(0,1fr)}
+  .settings-groups{gap:18px}
+  .log-table-wrap,.table-wrap{max-width:calc(100vw - 20px);padding:0;overflow-x:auto}
+  .log-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}
+  .log-filter{width:100%;min-width:0}
+  .radio-group,.log-controls>div:last-child{grid-column:1/-1;margin-left:0!important}
+  .security-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media (max-width:420px){
+  .brand-copy{display:none}
+  .sidebar{grid-template-columns:34px minmax(0,1fr);gap:5px;padding-inline:7px}
+  .nav-item{padding-inline:8px}
+  .topbar-subtitle,.auto-timer{display:none}
+  .security-metrics,.pull-limit-summary,.rule-grid{grid-template-columns:minmax(0,1fr)}
+  .log-mode-btns .mode-btn,.log-controls .mode-btn{flex-basis:100%}
+}
 </style>
 </head>
 <body>
 
-<nav class="sidebar">
-  <div class="logo"><?= htmlspecialchars(SITE_TITLE, ENT_QUOTES) ?></div>
-  <div class="nav-section-label">监控</div>
-  <button class="nav-item active" data-tab="security" onclick="switchTab('security',this)">
-    <span class="nav-icon">◈</span>安全状态
-  </button>
-  <button class="nav-item" data-tab="logs" onclick="switchTab('logs',this)">
-    <span class="nav-icon">📋</span>拉取记录
-  </button>
-  <button class="nav-item" data-tab="stats" onclick="switchTab('stats',this)">
-    <span class="nav-icon">📊</span>风险分析
-  </button>
-  <div class="nav-section-label">策略</div>
-  <button class="nav-item" data-tab="whitelist" onclick="switchTab('whitelist',this)">
-    <span class="nav-icon">✅</span>IP白名单
-  </button>
-  <button class="nav-item" data-tab="blacklist" onclick="switchTab('blacklist',this)">
-    <span class="nav-icon">🚫</span>IP黑名单
-  </button>
-  <button class="nav-item" data-tab="token_blacklist" onclick="switchTab('token_blacklist',this)">
-    <span class="nav-icon">🔑</span>Token黑名单
-  </button>
-  <button class="nav-item" data-tab="ua_blacklist" onclick="switchTab('ua_blacklist',this)">
-    <span class="nav-icon">🛡</span>UA规则
-  </button>
-  <div class="nav-section-label">系统</div>
-  <button class="nav-item" data-tab="settings" onclick="switchTab('settings',this)">
-    <span class="nav-icon">⚙</span>系统设置
-  </button>
+<nav class="sidebar" aria-label="主导航">
+  <div class="logo"><span class="brand-mark">S</span><span class="brand-copy"><?= htmlspecialchars(SITE_TITLE, ENT_QUOTES) ?><small>订阅网关控制台</small></span></div>
+  <div class="nav-scroll">
+    <div class="nav-section-label">工作台</div>
+    <button class="nav-item active" data-tab="security" onclick="switchTab('security',this)">
+      <span class="nav-icon">⌂</span><span class="nav-label">运行总览</span>
+    </button>
+    <button class="nav-item" data-tab="logs" onclick="switchTab('logs',this)">
+      <span class="nav-icon">≡</span><span class="nav-label">拉取记录</span>
+    </button>
+    <button class="nav-item" data-tab="stats" onclick="switchTab('stats',this)">
+      <span class="nav-icon">▥</span><span class="nav-label">风险分析</span>
+    </button>
+    <div class="nav-section-label">防护</div>
+    <button class="nav-item" data-tab="protection" onclick="switchTab('protection',this)">
+      <span class="nav-icon">◇</span><span class="nav-label">防护策略</span>
+    </button>
+    <button class="nav-item" data-tab="access" onclick="switchTab('access',this)">
+      <span class="nav-icon">✓</span><span class="nav-label">访问控制</span>
+    </button>
+    <div class="nav-section-label">系统</div>
+    <button class="nav-item" data-tab="settings" onclick="switchTab('settings',this)">
+      <span class="nav-icon">⚙</span><span class="nav-label">系统设置</span>
+    </button>
+  </div>
   <div class="sidebar-bottom">
     <a href="<?= ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/logout' : '/logout' ?>" style="text-decoration:none">
-      <button class="nav-item logout"><span class="nav-icon">↩</span>退出</button>
+      <button class="nav-item logout"><span class="nav-icon">↩</span><span class="nav-label">退出登录</span></button>
     </a>
   </div>
 </nav>
 
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title" id="tab-title">安全状态</div>
+    <div class="topbar-copy">
+      <div class="topbar-title" id="tab-title">运行总览</div>
+      <div class="topbar-subtitle" id="tab-subtitle">网关健康、防护状态与待处理风险</div>
+    </div>
     <div class="topbar-right">
       <span class="status-dot"></span>
       <span class="status-text">运行中</span>
@@ -551,7 +687,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
       <div class="scope-note"><strong>独立边界</strong><span id="security-scope">只分析订阅网关日志，不连接机场用户、邮箱、订单或套餐数据库。</span></div>
       <div id="security-metrics" class="security-metrics"><div class="loading">加载安全指标…</div></div>
 
-      <section class="pull-limit-panel">
+      <section class="pull-limit-panel" id="pull-limit-section">
         <div class="pull-limit-head">
           <div><div class="security-section-title">Token 拉取限制</div><div class="security-section-sub">按 Token 指纹统计独立 IP 和拉取频率，自动暂停可独立启停</div></div>
           <span id="pull-limit-mode" class="limit-mode-badge paused">读取中</span>
@@ -608,7 +744,7 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
             <div id="security-health" class="health-list"><div class="loading">加载中…</div></div>
           </section>
 
-          <section class="security-section">
+          <section class="security-section" id="guard-threshold-section">
             <div class="security-section-head">
               <div><div class="security-section-title">观察阈值</div><div class="security-section-sub">统一规则入口，保存后下次扫描生效</div></div>
             </div>
@@ -639,6 +775,29 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
           </section>
         </div>
       </div>
+    </div>
+
+    <!-- ─── 防护策略 ─────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-protection">
+      <div class="workspace-intro">
+        <div><div class="workspace-kicker">策略中心</div><h1>防护策略</h1><p>集中管理 Token 拉取限制与行为观察阈值。自动暂停和仅观察保持独立，避免误操作。</p></div>
+        <button class="mode-btn" onclick="openPanelTab('security')">查看运行状态</button>
+      </div>
+      <div id="protection-content" class="protection-stack"></div>
+    </div>
+
+    <!-- ─── 访问控制 ─────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-access">
+      <div class="workspace-intro access-intro">
+        <div><div class="workspace-kicker">规则中心</div><h1>访问控制</h1><p id="access-description">维护受信任 IP、拦截 IP、Token 与 UA 规则，所有修改沿用原有即时生效机制。</p></div>
+      </div>
+      <div class="control-tabs" role="tablist" aria-label="访问控制分类">
+        <button class="control-tab active" data-access="whitelist" onclick="showAccessSection('whitelist')">IP 白名单</button>
+        <button class="control-tab" data-access="blacklist" onclick="showAccessSection('blacklist')">IP 黑名单</button>
+        <button class="control-tab" data-access="token_blacklist" onclick="showAccessSection('token_blacklist')">Token 黑名单</button>
+        <button class="control-tab" data-access="ua_blacklist" onclick="showAccessSection('ua_blacklist')">UA 规则</button>
+      </div>
+      <div id="access-stage" class="access-stage"></div>
     </div>
 
     <!-- ─── 日志 ─────────────────────────────────────────── -->
@@ -1125,6 +1284,100 @@ let alertHistoryPage = 1;
 let alertHistoryRange = 'all';
 let lastAlertHistory = null;
 let alertHistoryQueryTimer = null;
+let activeAccessSection = 'whitelist';
+let workspaceMounted = false;
+
+const ACCESS_SECTIONS = {
+  whitelist: {
+    title: 'IP 白名单',
+    description: '受信任 IP 与 CIDR 将跳过 IP、云服务商和 Token 拉取限制。',
+    loader: loadWhitelist,
+  },
+  blacklist: {
+    title: 'IP 黑名单',
+    description: '拦截恶意 IP 与 CIDR，规则保存后立即进入网关配置。',
+    loader: loadBlacklist,
+  },
+  token_blacklist: {
+    title: 'Token 黑名单',
+    description: '精确停用指定订阅 Token，并从重复风险统计中排除。',
+    loader: loadTokenBlacklist,
+  },
+  ua_blacklist: {
+    title: 'UA 规则',
+    description: '集中维护 UA 放行和拦截关键词，降低扫描器与异常客户端干扰。',
+    loader: loadUaBlacklist,
+  },
+};
+
+function mountWorkspaceLayout() {
+  if (workspaceMounted) return;
+  workspaceMounted = true;
+
+  const protectionTarget = document.getElementById('protection-content');
+  ['pull-limit-section', 'guard-threshold-section'].forEach(id => {
+    const section = document.getElementById(id);
+    if (section && protectionTarget) protectionTarget.appendChild(section);
+  });
+
+  const accessStage = document.getElementById('access-stage');
+  Object.keys(ACCESS_SECTIONS).forEach(name => {
+    const source = document.getElementById('panel-' + name);
+    if (!source || !accessStage) return;
+    const pane = document.createElement('section');
+    pane.className = 'access-pane' + (name === activeAccessSection ? ' active' : '');
+    pane.dataset.accessPane = name;
+    while (source.firstChild) pane.appendChild(source.firstChild);
+    accessStage.appendChild(pane);
+    source.remove();
+  });
+
+  const settingsGrid = document.querySelector('#panel-settings > .stats-grid');
+  if (!settingsGrid) return;
+  const cards = Array.from(settingsGrid.children).filter(el => el.classList.contains('card'));
+  const byTitle = new Map(cards.map(card => [card.querySelector('.card-title')?.textContent.trim(), card]));
+  const groups = [
+    {key:'identity', title:'界面与账户', sub:'管理控制台名称和管理员登录凭证', cards:['界面设置','登录凭证']},
+    {key:'gateway', title:'网关与上游', sub:'管理机场反代、监听端口和 TLS 证书', cards:['机场（反代目标）','订阅网关','SSL 证书']},
+    {key:'operations', title:'运维与通知', sub:'管理统计预热、缓存状态和高危事件推送', cards:['分析统计缓存','告警推送']},
+  ];
+  settingsGrid.className = 'settings-groups';
+  settingsGrid.removeAttribute('style');
+  settingsGrid.replaceChildren();
+  groups.forEach(group => {
+    const section = document.createElement('section');
+    section.className = 'settings-cluster';
+    section.dataset.settingsGroup = group.key;
+    section.innerHTML = `<div class="settings-cluster-head"><div><div class="settings-cluster-title">${esc(group.title)}</div><div class="settings-cluster-sub">${esc(group.sub)}</div></div></div><div class="settings-cluster-grid"></div>`;
+    const grid = section.querySelector('.settings-cluster-grid');
+    group.cards.forEach(title => {
+      const card = byTitle.get(title);
+      if (card) grid.appendChild(card);
+    });
+    settingsGrid.appendChild(section);
+  });
+}
+
+async function loadProtection(opts={}) {
+  if (!securityData || opts.force) await loadSecurity({force:!!opts.force});
+  else {
+    renderPullLimits();
+    renderGuardRules();
+  }
+}
+
+async function loadAccessControl() {
+  await Promise.all(Object.values(ACCESS_SECTIONS).map(section => section.loader()));
+}
+
+function showAccessSection(name) {
+  if (!ACCESS_SECTIONS[name]) return;
+  activeAccessSection = name;
+  document.querySelectorAll('.control-tab').forEach(button => button.classList.toggle('active', button.dataset.access === name));
+  document.querySelectorAll('.access-pane').forEach(pane => pane.classList.toggle('active', pane.dataset.accessPane === name));
+  const description = document.getElementById('access-description');
+  if (description) description.textContent = ACCESS_SECTIONS[name].description;
+}
 
 // ── 主题 ──────────────────────────────────────────────────────
 const THEMES = ['dark','light','auto'];
@@ -1156,14 +1409,12 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
 });
 applyTheme();
 const TABS = {
-  security:        {title:'安全状态',    loader:loadSecurity},
-  logs:            {title:'拉取记录',    loader:loadLogs},
-  stats:           {title:'风险分析',    loader:loadStats},
-  ua_blacklist:    {title:'UA规则',      loader:loadUaBlacklist},
-  whitelist:       {title:'IP白名单',    loader:loadWhitelist},
-  blacklist:       {title:'IP黑名单',    loader:loadBlacklist},
-  token_blacklist: {title:'Token黑名单', loader:loadTokenBlacklist},
-  settings:        {title:'系统设置',    loader:loadSettings},
+  security:   {title:'运行总览', subtitle:'网关健康、防护状态与待处理风险', loader:loadSecurity},
+  logs:       {title:'拉取记录', subtitle:'检索订阅请求、状态码、Token 与客户端特征', loader:loadLogs},
+  stats:      {title:'风险分析', subtitle:'按 IP、Token、UA、扫描器与用户画像聚合', loader:loadStats},
+  protection: {title:'防护策略', subtitle:'Token 拉取限制与行为观察阈值', loader:loadProtection},
+  access:     {title:'访问控制', subtitle:'统一维护 IP、Token 与 UA 放行和拦截规则', loader:loadAccessControl},
+  settings:   {title:'系统设置', subtitle:'界面账户、网关上游、证书与告警运维', loader:loadSettings},
 };
 let currentTab = 'security';
 
@@ -1214,14 +1465,23 @@ function switchTab(name, el) {
   if (el) el.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
+  if (!panel) return;
   panel.classList.add('active');
   restartAnimation(panel);
   document.getElementById('tab-title').textContent = TABS[name].title;
+  document.getElementById('tab-subtitle').textContent = TABS[name].subtitle || '';
+  if (name === 'access') showAccessSection(activeAccessSection);
   resetCountdown();
   loadTab(name);
 }
 
 function openPanelTab(name) {
+  if (ACCESS_SECTIONS[name]) {
+    activeAccessSection = name;
+    switchTab('access', document.querySelector('.nav-item[data-tab="access"]'));
+    showAccessSection(name);
+    return;
+  }
   switchTab(name, document.querySelector(`.nav-item[data-tab="${name}"]`));
 }
 
@@ -3520,9 +3780,9 @@ function renderSecurityHealth() {
   const age = value => value === null || value === undefined ? '不存在' : formatDuration(Number(value) || 0);
   const issues = Array.isArray(h.issues) && h.issues.length ? h.issues.join('；') : '未发现异常';
   const rows = [
-    ['统计缓存', h.stats_cache_age == null ? '不存在' : `${age(h.stats_cache_age)}前更新`],
-    ['Token 限制状态', h.token_limit_state_age == null ? '等待首次巡检' : `${age(h.token_limit_state_age)}前更新`],
-    ['IDC 规则库', h.cloud_rules_age == null ? '不存在' : `${age(h.cloud_rules_age)}前更新`],
+    ['统计缓存', h.stats_cache_age == null ? '不存在' : `${age(h.stats_cache_age)}更新`],
+    ['Token 限制状态', h.token_limit_state_age == null ? '等待首次巡检' : `${age(h.token_limit_state_age)}更新`],
+    ['IDC 规则库', h.cloud_rules_age == null ? '不存在' : `${age(h.cloud_rules_age)}更新`],
     ['访问日志', `${formatFileSize(h.log_size || 0)} · ${h.log_writable ? '可读写' : '权限异常'}`],
     ['日志清理', h.retention_days > 0 ? `保留 ${h.retention_days} 天` : '已关闭'],
     ['告警巡检', h.alert_enabled ? (h.last_alert_check || '等待首次检查') : '未开启（可选）'],
@@ -3717,6 +3977,7 @@ async function importLogs(input) {
 
 // ── 初始化 ────────────────────────────────────────────────────
 async function initDashboard() {
+  mountWorkspaceLayout();
   resetCountdown();
   await loadTab('security', {force:true}).catch(() => {});
   scheduleBackgroundPreload();

@@ -11,7 +11,7 @@ function expect_limit(bool $condition, string $message): void {
     if (!$condition) $failures[] = $message;
 }
 
-$now = strtotime('2026-08-04 12:00:00');
+$now = time();
 $path = '/api/v1/client/subscribe';
 $secret = str_repeat('a', 64);
 $lines = [];
