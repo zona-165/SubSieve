@@ -67,7 +67,7 @@ function guard_finding_key(string $kind, string $subject, string $secret): strin
 }
 
 function guard_parse_log_line(string $line): ?array {
-    $pattern = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"$/';
+    $pattern = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"(?: "reason=([^"]*)" "provider=([^"]*)")?$/';
     if (!preg_match($pattern, trim($line), $match)) return null;
 
     $date = DateTime::createFromFormat('d/M/Y:H:i:s O', $match[2]);
@@ -91,6 +91,8 @@ function guard_parse_log_line(string $line): ?array {
         'bytes' => (int)$match[5],
         'ua' => $match[6],
         'token' => $token,
+        'block_reason' => (string)($match[7] ?? ''),
+        'cloud_provider' => (string)($match[8] ?? ''),
     ];
 }
 
@@ -111,6 +113,7 @@ function guard_analyze_logs(iterable $lines, array $settings, int $now, string $
     $tokenHourIps = [];
     $ipHourTokens = [];
     $ip404 = [];
+    $cloudBlocks = [];
     $lastSeen = [];
     $todayRequests = 0;
     $todayBytes = 0;
@@ -127,6 +130,28 @@ function guard_analyze_logs(iterable $lines, array $settings, int $now, string $
 
         $ip = $entry['ip'];
         $tokenRef = $entry['token'] !== '' ? guard_token_fingerprint($entry['token'], $secret) : '';
+        if ($entry['status'] === 403 && $entry['block_reason'] === 'cloud' && preg_match('/^[a-z0-9_]+$/', $entry['cloud_provider'])) {
+            $providerId = $entry['cloud_provider'];
+            $cloudKey = $providerId . '|' . $ip;
+            if (!isset($cloudBlocks[$cloudKey])) {
+                $cloudBlocks[$cloudKey] = [
+                    'provider_id' => $providerId,
+                    'ip' => $ip,
+                    'count' => 0,
+                    'last_seen_ts' => 0,
+                    'status_counts' => [],
+                    'paths' => [],
+                    'uas' => [],
+                ];
+            }
+            $cloudBlocks[$cloudKey]['count']++;
+            $cloudBlocks[$cloudKey]['last_seen_ts'] = max($cloudBlocks[$cloudKey]['last_seen_ts'], $entry['ts']);
+            $statusKey = (string)$entry['status'];
+            $cloudBlocks[$cloudKey]['status_counts'][$statusKey] = ($cloudBlocks[$cloudKey]['status_counts'][$statusKey] ?? 0) + 1;
+            if ($entry['path'] !== '') $cloudBlocks[$cloudKey]['paths'][$entry['path']] = true;
+            $ua = trim((string)$entry['ua']);
+            if ($ua !== '') $cloudBlocks[$cloudKey]['uas'][$ua] = true;
+        }
         if (date('Y-m-d', $entry['ts']) === $today) {
             $todayRequests++;
             $todayBytes += max(0, $entry['bytes']);
@@ -197,6 +222,52 @@ function guard_analyze_logs(iterable $lines, array $settings, int $now, string $
         }
     }
 
+    $providerCatalog = guard_cloud_provider_catalog();
+    foreach ($cloudBlocks as $block) {
+        $providerId = (string)$block['provider_id'];
+        $provider = is_array($providerCatalog[$providerId] ?? null) ? $providerCatalog[$providerId] : [];
+        $providerName = (string)($provider['name'] ?? $providerId);
+        $paths = array_slice(array_keys($block['paths']), 0, 5);
+        $uas = array_slice(array_keys($block['uas']), 0, 5);
+        $finding = guard_finding(
+            'idc_provider_block',
+            (string)$block['ip'],
+            '云厂商 / IDC 自动拦截',
+            (int)$block['count'],
+            1,
+            '近期日志',
+            "请求来源命中已启用的 {$providerName} CIDR 策略，网关已自动返回 403。",
+            (int)$block['last_seen_ts'],
+            $secret,
+            [
+                'score' => 95,
+                'risk' => '极高危',
+                'source' => 'Nginx 自动拦截',
+                'automatic_block' => true,
+                'provider_id' => $providerId,
+                'provider_name' => $providerName,
+                'provider_asns' => array_values(is_array($provider['asns'] ?? null) ? $provider['asns'] : []),
+                'provider_keywords' => array_values(is_array($provider['keywords'] ?? null) ? $provider['keywords'] : []),
+                'status_counts' => $block['status_counts'],
+                'sample_paths' => $paths,
+                'sample_uas' => $uas,
+                'trigger_details' => [
+                    '触发规则' => $providerName . ' CIDR 自动拦截',
+                    '网关动作' => 'HTTP 403 · Forbidden: Cloud IP',
+                    '命中厂商' => $providerName,
+                    '命中次数' => (string)$block['count'],
+                    '最后触发' => date('Y-m-d H:i:s', (int)$block['last_seen_ts']),
+                ],
+            ]
+        );
+        $finding['key'] = guard_finding_key(
+            'idc_provider_block',
+            $providerId . '|' . (string)$block['ip'],
+            $secret
+        );
+        $findings[] = $finding;
+    }
+
     usort($findings, fn(array $a, array $b) => ($b['score'] <=> $a['score']) ?: ($b['last_seen_ts'] <=> $a['last_seen_ts']));
     $blocked = ($statusCounts[403] ?? 0) + ($statusCounts[429] ?? 0) + ($statusCounts[444] ?? 0);
 
@@ -215,6 +286,20 @@ function guard_analyze_logs(iterable $lines, array $settings, int $now, string $
         ],
         'findings' => array_slice($findings, 0, 100),
     ];
+}
+
+function guard_cloud_provider_catalog(): array {
+    $file = defined('CLOUD_PROVIDER_CATALOG_JSON')
+        ? CLOUD_PROVIDER_CATALOG_JSON
+        : '/etc/nginx/subscribe/cloud_provider_catalog.json';
+    $data = guard_read_json($file);
+    $result = [];
+    foreach ($data['providers'] ?? [] as $provider) {
+        if (!is_array($provider)) continue;
+        $id = trim((string)($provider['id'] ?? ''));
+        if ($id !== '') $result[$id] = $provider;
+    }
+    return $result;
 }
 
 function guard_add_daily_ip_volume_findings(

@@ -40,32 +40,41 @@ if (str_starts_with($path, '/api/')) {
     if ($path === '/api/security.php') {
         $previewFindings = [];
         $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
-        $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner'];
+        $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner', 'idc_provider_block'];
         for ($i = 1; $i <= 13; $i++) {
             $status = $i <= 7 ? 'pending' : ($i <= 9 ? 'watch' : ($i <= 12 ? 'trusted' : 'confirmed'));
             $kind = $findingKinds[($i - 1) % count($findingKinds)];
             $isDaily = $i === 1;
             $isToken = $kind === 'token_multi_ip';
             $previewSummary[$status]++;
+            $isCloud = $kind === 'idc_provider_block';
             $previewFindings[] = [
                 'key' => $kind . ':' . substr(hash('sha256', 'preview-' . $i), 0, 24),
                 'kind' => $kind,
-                'title' => $isDaily ? '今日单 IP 高频拉取' : ($isToken ? 'Token 跨多 IP 拉取' : ($kind === 'scanner' ? '脚本/扫描器拉取订阅' : 'IP 拉取多个 Token')),
+                'title' => $isCloud ? '云厂商 / IDC 自动拦截' : ($isDaily ? '今日单 IP 高频拉取' : ($isToken ? 'Token 跨多 IP 拉取' : ($kind === 'scanner' ? '脚本/扫描器拉取订阅' : 'IP 拉取多个 Token'))),
                 'subject' => $isToken ? 'TKN-' . strtoupper(substr(hash('sha256', 'token-' . $i), 0, 16)) : '198.51.100.' . (20 + $i),
                 'count' => $isDaily ? 233 : 30 + $i,
                 'threshold' => $isDaily ? 100 : 30,
                 'window' => $isDaily ? '今日' : ($i % 2 === 0 ? '最近日志窗口' : '1 分钟'),
-                'source' => $isDaily ? '订阅路径统计' : '本地日志',
+                'source' => $isCloud ? 'Nginx 自动拦截' : ($isDaily ? '订阅路径统计' : '本地日志'),
                 'last_seen' => date('Y-m-d H:i:s', time() - $i * 90),
-                'risk' => $isDaily ? '极高危' : ($i <= 4 ? '高危' : '关注'),
-                'score' => $isDaily ? 100 : max(62, 96 - $i * 2),
-                'reason' => $isDaily ? '该 IP 今日累计拉取订阅 233 次，已超过观察阈值 100 次。' : '请求行为达到观察阈值，等待管理员复核。',
-                'status_counts' => $isDaily ? ['200' => 50, '403' => 70, '429' => 111, '444' => 2] : [],
+                'risk' => $isCloud ? '极高危' : ($isDaily ? '极高危' : ($i <= 4 ? '高危' : '关注')),
+                'score' => $isCloud ? 95 : ($isDaily ? 100 : max(62, 96 - $i * 2)),
+                'reason' => $isCloud ? '请求来源命中已启用的 Amazon Web Services CIDR 策略，网关已自动返回 403。' : ($isDaily ? '该 IP 今日累计拉取订阅 233 次，已超过观察阈值 100 次。' : '请求行为达到观察阈值，等待管理员复核。'),
+                'status_counts' => $isCloud ? ['403' => 7] : ($isDaily ? ['200' => 50, '403' => 70, '429' => 111, '444' => 2] : []),
                 'token_count' => $isDaily ? 3 : 0,
                 'location' => $isToken ? '' : 'Singapore / Central Singapore',
                 'asn' => $isToken ? '' : 'AS46997',
                 'operator' => $isToken ? '' : 'Black Mesa Corporation',
                 'network_type' => $isToken ? '' : '机房/托管',
+                'automatic_block' => $isCloud,
+                'provider_id' => $isCloud ? 'aws' : '',
+                'provider_name' => $isCloud ? 'Amazon Web Services' : '',
+                'provider_asns' => $isCloud ? ['AS16509','AS14618'] : [],
+                'provider_keywords' => $isCloud ? ['amazon web services','amazon technologies'] : [],
+                'sample_paths' => $isCloud ? ['/api/v1/client/subscribe'] : [],
+                'sample_uas' => $isCloud ? ['curl/8.0'] : [],
+                'trigger_details' => $isCloud ? ['触发规则'=>'Amazon Web Services CIDR 自动拦截','网关动作'=>'HTTP 403 · Forbidden: Cloud IP','命中厂商'=>'Amazon Web Services','命中次数'=>'7'] : [],
                 'review' => ['status' => $status, 'note' => ''],
             ];
         }
@@ -196,8 +205,18 @@ if (str_starts_with($path, '/api/')) {
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    if ($path === '/api/blacklist.php' && isset($_GET['cloud_cidrs'])) {
-        echo json_encode(['ok' => true, 'cidrs' => []]);
+    if ($path === '/api/blacklist.php') {
+        if (isset($_GET['cloud_cidrs'])) {
+            echo json_encode(['ok' => true, 'cidrs' => []]);
+            exit;
+        }
+        $providers = [
+            ['id'=>'aliyun','name'=>'阿里云','asns'=>['AS45102','AS37963','AS134963'],'keywords'=>['阿里云','alibabacloud','aliyun'],'default_enabled'=>true,'enabled'=>true,'active'=>true,'count'=>227,'active_count'=>227,'available'=>true],
+            ['id'=>'aws','name'=>'Amazon Web Services','asns'=>['AS16509','AS14618'],'keywords'=>['amazon web services','amazon technologies'],'default_enabled'=>true,'enabled'=>true,'active'=>true,'count'=>7878,'active_count'=>7878,'available'=>true],
+            ['id'=>'hetzner','name'=>'Hetzner','asns'=>['AS24940','AS213230'],'keywords'=>['hetzner online','hetzner'],'default_enabled'=>false,'enabled'=>false,'active'=>false,'count'=>420,'active_count'=>0,'available'=>true],
+            ['id'=>'inspur_cloud','name'=>'浪潮云','asns'=>[],'keywords'=>['浪潮云','inspur cloud'],'default_enabled'=>false,'enabled'=>false,'active'=>false,'count'=>0,'active_count'=>0,'available'=>false],
+        ];
+        echo json_encode(['ok'=>true,'entries'=>[],'idc_summary'=>$providers,'cloud_provider_status'=>['status'=>'ready','message'=>'云厂商规则已应用，共 8105 条 CIDR']], JSON_UNESCAPED_UNICODE);
         exit;
     }
     echo json_encode($empty, JSON_UNESCAPED_UNICODE);

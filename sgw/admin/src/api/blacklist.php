@@ -11,12 +11,21 @@ if ($method === 'GET') {
         json_out(['ok' => true, 'cidrs' => read_cloud_cidrs()]);
     }
     $idc = empty($_GET['no_idc']) ? read_idc_summary() : [];
-    json_out(['ok' => true, 'entries' => read_blacklist(), 'idc_summary' => $idc]);
+    json_out([
+        'ok' => true,
+        'entries' => read_blacklist(),
+        'idc_summary' => $idc,
+        'cloud_provider_status' => read_json_file(CLOUD_PROVIDER_STATUS_JSON),
+    ]);
 }
 
 // POST — 添加并立即生效（单个或批量导入）
 if ($method === 'POST') {
     $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    if (($body['action'] ?? '') === 'save_cloud_providers') {
+        save_cloud_provider_settings($body);
+    }
 
     // 批量导入（来自文件导入）
     if (!empty($body['import_ips']) && is_array($body['import_ips'])) {
@@ -147,7 +156,7 @@ function read_cloud_cidrs(): array {
     $cidrs = [];
     foreach (file(CLOUD_GEO_CONF, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
-        if (preg_match('/^(\d[\d\.\/]+) 1;$/', $line, $m)) {
+        if (preg_match('/^(\d[\d\.\/]+) (?:1|[a-z0-9_]+);$/', $line, $m)) {
             $cidrs[] = $m[1];
         }
     }
@@ -157,6 +166,42 @@ function read_cloud_cidrs(): array {
 // ── 读取 cloud_geo.conf 返回各IDC汇总 ──────────────────────────
 
 function read_idc_summary(): array {
+    $catalog = read_json_file(CLOUD_PROVIDER_CATALOG_JSON);
+    $providers = is_array($catalog['providers'] ?? null) ? $catalog['providers'] : [];
+    if ($providers) {
+        $settings = read_json_file(CLOUD_PROVIDER_SETTINGS_JSON);
+        $enabled = is_array($settings['enabled'] ?? null) ? $settings['enabled'] : [];
+        $state = read_json_file(CLOUD_PROVIDER_STATE_JSON);
+        $active = is_array($state['providers'] ?? null) ? $state['providers'] : [];
+        $summary = [];
+        foreach ($providers as $provider) {
+            if (!is_array($provider)) continue;
+            $id = trim((string)($provider['id'] ?? ''));
+            if ($id === '') continue;
+            $stateRow = is_array($active[$id] ?? null) ? $active[$id] : [];
+            $desired = array_key_exists($id, $enabled)
+                ? !empty($enabled[$id])
+                : !empty($provider['default_enabled']);
+            $sourceType = (string)($provider['source']['type'] ?? 'none');
+            $summary[] = [
+                'id' => $id,
+                'name' => (string)($provider['name'] ?? $id),
+                'asns' => array_values(array_filter(array_map('strval', is_array($provider['asns'] ?? null) ? $provider['asns'] : []))),
+                'keywords' => array_values(array_filter(array_map('strval', is_array($provider['keywords'] ?? null) ? $provider['keywords'] : []))),
+                'default_enabled' => !empty($provider['default_enabled']),
+                'enabled' => $desired,
+                'active' => array_key_exists('active', $stateRow)
+                    ? !empty($stateRow['active'])
+                    : ($desired && (int)($stateRow['active_count'] ?? 0) > 0),
+                'count' => (int)($stateRow['cidr_count'] ?? 0),
+                'active_count' => (int)($stateRow['active_count'] ?? 0),
+                'available' => $sourceType !== 'none',
+                'source_type' => $sourceType,
+            ];
+        }
+        return $summary;
+    }
+
     if (!file_exists(CLOUD_GEO_CONF)) return [];
 
     $summary = [];
@@ -165,13 +210,13 @@ function read_idc_summary(): array {
 
     foreach (file(CLOUD_GEO_CONF, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
-        if (preg_match('/^# === (.+) ===$/', $line, $m)) {
+        if (preg_match('/^# === (.+?)(?: \[[a-z0-9_]+\])? ===$/', $line, $m)) {
             if ($current !== null && $count > 0) {
                 $summary[] = ['name' => $current, 'count' => $count];
             }
             $current = $m[1];
             $count   = 0;
-        } elseif ($current !== null && preg_match('/^\d[\d\.\/]+ 1;$/', $line)) {
+        } elseif ($current !== null && preg_match('/^\d[\d\.\/]+ (?:1|[a-z0-9_]+);$/', $line)) {
             $count++;
         }
     }
@@ -179,4 +224,69 @@ function read_idc_summary(): array {
         $summary[] = ['name' => $current, 'count' => $count];
     }
     return $summary;
+}
+
+function read_json_file(string $file): array {
+    if (!file_exists($file)) return [];
+    $raw = @file_get_contents($file);
+    $data = $raw !== false ? json_decode($raw, true) : null;
+    return is_array($data) ? $data : [];
+}
+
+function save_cloud_provider_settings(array $body): void {
+    $requested = is_array($body['enabled'] ?? null) ? $body['enabled'] : null;
+    if ($requested === null) json_err('缺少厂商开关数据');
+
+    $catalog = read_json_file(CLOUD_PROVIDER_CATALOG_JSON);
+    $providers = is_array($catalog['providers'] ?? null) ? $catalog['providers'] : [];
+    if (!$providers) json_err('云厂商目录尚未生成，请稍后重试', 503);
+
+    $normalized = [];
+    $unavailable = [];
+    foreach ($providers as $provider) {
+        if (!is_array($provider)) continue;
+        $id = trim((string)($provider['id'] ?? ''));
+        if ($id === '' || !preg_match('/^[a-z0-9_]+$/', $id)) continue;
+        $value = array_key_exists($id, $requested)
+            ? !empty($requested[$id])
+            : !empty($provider['default_enabled']);
+        if ($value && (string)($provider['source']['type'] ?? 'none') === 'none') {
+            $unavailable[] = (string)($provider['name'] ?? $id);
+            $value = false;
+        }
+        $normalized[$id] = $value;
+    }
+    if (!$normalized) json_err('云厂商目录为空');
+
+    $payload = [
+        'version' => 1,
+        'enabled' => $normalized,
+        'updated_at' => date('Y-m-d H:i:s'),
+    ];
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) json_err('厂商策略编码失败');
+
+    $tmp = CLOUD_PROVIDER_SETTINGS_JSON . '.tmp.' . getmypid();
+    if (@file_put_contents($tmp, $json, LOCK_EX) === false) json_err('厂商策略写入失败，请检查权限');
+    @chmod($tmp, 0666);
+    if (file_exists(CLOUD_PROVIDER_SETTINGS_JSON)) {
+        @copy(CLOUD_PROVIDER_SETTINGS_JSON, CLOUD_PROVIDER_SETTINGS_JSON . '.prev');
+    }
+    if (!@rename($tmp, CLOUD_PROVIDER_SETTINGS_JSON)) {
+        @unlink($tmp);
+        json_err('厂商策略替换失败');
+    }
+    if (@file_put_contents(CLOUD_PROVIDER_REFRESH_SIGNAL, (string)time(), LOCK_EX) === false) {
+        if (file_exists(CLOUD_PROVIDER_SETTINGS_JSON . '.prev')) {
+            @rename(CLOUD_PROVIDER_SETTINGS_JSON . '.prev', CLOUD_PROVIDER_SETTINGS_JSON);
+        }
+        json_err('无法通知网关应用厂商策略');
+    }
+    invalidate_guard_cache();
+    json_out([
+        'ok' => true,
+        'applying' => true,
+        'enabled_count' => count(array_filter($normalized)),
+        'unavailable' => $unavailable,
+    ]);
 }

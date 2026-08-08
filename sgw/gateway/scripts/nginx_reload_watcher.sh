@@ -5,6 +5,8 @@
 SIGNAL_FILE="/etc/nginx/subscribe/.reload"
 WHITELIST_SIGNAL="/etc/nginx/subscribe/.reload_whitelist"
 TOKEN_LIMIT_MARKER="/etc/nginx/subscribe/.token_limit_reload"
+CLOUD_PROVIDER_SIGNAL="/etc/nginx/subscribe/.refresh_cloud_providers"
+CLOUD_PROVIDER_SETTINGS="/etc/nginx/subscribe/cloud_provider_settings.json"
 
 finish_token_limit_reload() {
     [ -f "$TOKEN_LIMIT_MARKER" ] || return 0
@@ -33,7 +35,18 @@ rollback_token_limit_reload() {
 }
 
 while true; do
-    if [ -f "$WHITELIST_SIGNAL" ]; then
+    if [ -f "$CLOUD_PROVIDER_SIGNAL" ]; then
+        rm -f "$CLOUD_PROVIDER_SIGNAL"
+        if /scripts/update_cloud_geo.sh >/dev/null 2>&1; then
+            rm -f "${CLOUD_PROVIDER_SETTINGS}.prev"
+        else
+            if [ -s "${CLOUD_PROVIDER_SETTINGS}.prev" ]; then
+                mv -f "${CLOUD_PROVIDER_SETTINGS}.prev" "$CLOUD_PROVIDER_SETTINGS"
+            fi
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 云厂商策略应用失败，已恢复上一版选择" \
+                >> /var/log/subscribe/entrypoint.log
+        fi
+    elif [ -f "$WHITELIST_SIGNAL" ]; then
         rm -f "$WHITELIST_SIGNAL"
         /scripts/reload_whitelist.sh 2>/dev/null || true
     elif [ -f "$SIGNAL_FILE" ]; then

@@ -27,6 +27,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/token_limit.conf" ] || printf 'map $arg_token $is_token_temporarily_suspended {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/token_limit.conf"
 [ -f "$SUBSCRIBE_DIR/token_limit_rate.conf" ] || printf 'map "$whitelist_ip:$arg_token" $token_pull_rate_key {\n    default "";\n}\nlimit_req_zone $token_pull_rate_key zone=token_pull_limit:10m rate=10r/m;\n' > "$SUBSCRIBE_DIR/token_limit_rate.conf"
 [ -f "$SUBSCRIBE_DIR/token_limit_apply.conf" ] || printf 'limit_req zone=token_pull_limit burst=9 nodelay;\n' > "$SUBSCRIBE_DIR/token_limit_apply.conf"
+[ -f "$SUBSCRIBE_DIR/cloud_provider_settings.json" ] || echo '{"version":1,"enabled":{}}' > "$SUBSCRIBE_DIR/cloud_provider_settings.json"
 if [ ! -s "$SUBSCRIBE_DIR/guard_secret" ]; then
     php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;' > "$SUBSCRIBE_DIR/guard_secret"
 fi
@@ -50,7 +51,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/token_limit_state.json" \
     "$SUBSCRIBE_DIR/token_limit.conf" \
     "$SUBSCRIBE_DIR/token_limit_rate.conf" \
-    "$SUBSCRIBE_DIR/token_limit_apply.conf"
+    "$SUBSCRIBE_DIR/token_limit_apply.conf" \
+    "$SUBSCRIBE_DIR/cloud_provider_settings.json"
 chown www-data:www-data "$SUBSCRIBE_DIR/guard_secret"
 chmod 600 "$SUBSCRIBE_DIR/guard_secret"
 

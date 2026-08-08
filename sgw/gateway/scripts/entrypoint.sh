@@ -246,8 +246,12 @@ chmod 666 \
     /etc/nginx/subscribe/token_limit_apply.conf \
     /etc/nginx/subscribe/token_limit_state.json
 
-# 首次拉取云IP库
-if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf ]]; then
+# 初始化云厂商策略文件。具体默认值由更新脚本根据目录生成。
+[[ ! -f /etc/nginx/subscribe/cloud_provider_settings.json ]] && echo '{"version":1,"enabled":{}}' > /etc/nginx/subscribe/cloud_provider_settings.json
+chmod 666 /etc/nginx/subscribe/cloud_provider_settings.json
+
+# 首次拉取云IP库；升级旧安装时也补齐厂商目录与状态文件。
+if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf || ! -f /etc/nginx/subscribe/cloud_provider_catalog.json || ! -f /etc/nginx/subscribe/cloud_provider_state.json ]]; then
     log "首次启动：拉取云厂商IP库..."
     SKIP_NGINX_RELOAD=1 /scripts/update_cloud_geo.sh
 else

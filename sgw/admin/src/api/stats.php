@@ -65,7 +65,7 @@ if (file_exists(LOG_FILE)) {
         $line = rtrim($line);
         if ($line === '') continue;
 
-        $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"$/';
+        $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"(?: "reason=([^"]*)" "provider=([^"]*)")?$/';
         if (!preg_match($pat, $line, $m)) continue;
 
         [, $ip, $time, $request, $status, , $ua] = $m;

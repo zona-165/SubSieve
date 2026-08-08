@@ -448,6 +448,38 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .idc-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .idc-section .card-title{margin-bottom:10px}
 .idc-note{margin:-2px 0 10px;color:var(--text3);font-size:11px;line-height:1.55}
+.idc-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.idc-section-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.idc-policy-status{padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:rgba(100,116,139,.07);color:var(--text2);font-size:11px;white-space:nowrap}
+.idc-policy-status.updating{border-color:rgba(245,158,11,.28);background:rgba(245,158,11,.09);color:#d97706}
+.idc-policy-status.error{border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.08);color:#ef4444}
+.idc-provider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.idc-provider-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(100,116,139,.045);transition:border-color .15s,background .15s,transform .15s}
+.idc-provider-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.idc-provider-card.enabled{border-color:rgba(15,118,110,.28);background:rgba(15,118,110,.055)}
+.idc-provider-card.pending{border-color:rgba(245,158,11,.34)}
+.idc-provider-card.unavailable{opacity:.62}
+.idc-provider-name{font-size:12px;font-weight:800;color:var(--text)}
+.idc-provider-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;color:var(--text3);font-size:10px}
+.idc-provider-meta span{padding:2px 5px;border-radius:5px;background:rgba(100,116,139,.08)}
+.idc-provider-keywords{margin-top:6px;color:var(--text3);font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.provider-switch{position:relative;width:38px;height:22px;flex:0 0 auto;cursor:pointer}
+.provider-switch input{position:absolute;opacity:0;pointer-events:none}
+.provider-switch-track{position:absolute;inset:0;border-radius:999px;background:#94a3b8;transition:background .18s}
+.provider-switch-track::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:transform .18s}
+.provider-switch input:checked+.provider-switch-track{background:var(--accent)}
+.provider-switch input:checked+.provider-switch-track::after{transform:translateX(16px)}
+.provider-switch input:disabled+.provider-switch-track{opacity:.42;cursor:not-allowed}
+.idc-policy-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);color:var(--text3);font-size:11px}
+.risk-trigger-detail{margin-top:9px;border:1px solid var(--border);border-radius:8px;background:rgba(100,116,139,.055);overflow:hidden}
+.risk-trigger-detail summary{cursor:pointer;padding:8px 10px;color:var(--text2);font-size:11px;font-weight:750;list-style:none}
+.risk-trigger-detail summary::-webkit-details-marker{display:none}
+.risk-trigger-detail summary::after{content:"+";float:right;color:var(--text3)}
+.risk-trigger-detail[open] summary::after{content:"−"}
+.risk-trigger-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;padding:0 10px 9px}
+.risk-trigger-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:11px}
+.risk-trigger-label{color:var(--text3)}
+.risk-trigger-value{color:var(--text2);overflow-wrap:anywhere}
 
 @keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes itemIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -518,6 +550,12 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .risk-main{grid-template-columns:1fr;gap:5px}
   .risk-meta,.risk-actions{justify-content:flex-start}
   .risk-detail{padding:0 8px}
+  .idc-section-head,.idc-policy-footer{align-items:flex-start;flex-direction:column}
+  .idc-section-actions{width:100%;justify-content:flex-start}
+  .idc-provider-grid{grid-template-columns:1fr}
+  .idc-provider-card{padding:11px}
+  .idc-policy-footer .btn-primary{width:100%}
+  .risk-trigger-grid{grid-template-columns:1fr}
   .ip-form{display:grid;grid-template-columns:1fr;gap:8px}
   .ip-input,.comment-input,.btn-primary{width:100%;min-width:0}
   .apply-row{align-items:flex-start;flex-wrap:wrap}
@@ -1390,6 +1428,8 @@ let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
 let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
 let blCommentMap = {};   // ip → 黑名单备注（供日志列显示）
+let cloudProviderDraft = {};
+let cloudProviderRows = [];
 let uaBlLimit = 50;      // UA封禁列表显示数量
 let uaWlLimit = 50;      // UA白名单显示数量
 let allUaBlEntries = []; // UA封禁列表完整数据缓存
@@ -2155,7 +2195,7 @@ function guardFindingGroup(row) {
   const kind = String(row?.kind || '');
   if (['daily_ip_volume','ip_rate','token_rate'].includes(kind)) return 'volume';
   if (['token_multi_ip','history_token_ips'].includes(kind)) return 'token';
-  if (['ip_multi_token','history_ip_tokens','ip_404_flood'].includes(kind)) return 'source';
+  if (['ip_multi_token','history_ip_tokens','ip_404_flood','idc_provider_block'].includes(kind)) return 'source';
   if (kind === 'scanner') return 'scanner';
   return 'source';
 }
@@ -2464,6 +2504,9 @@ async function loadBlacklist() {
   allBlEntries = data.entries || [];
   const entries = allBlEntries;
   const idcSummary = data.idc_summary || [];
+  const cloudStatus = data.cloud_provider_status || {};
+  cloudProviderRows = idcSummary.filter(row => row && row.id);
+  cloudProviderDraft = Object.fromEntries(cloudProviderRows.map(row => [row.id, Boolean(row.enabled)]));
 
   let html = '';
   if (entries.length) {
@@ -2488,24 +2531,119 @@ async function loadBlacklist() {
     html += '<div class="empty">手动黑名单为空</div>';
   }
 
-  if (idcSummary.length) {
+  if (cloudProviderRows.length) {
+    const activeCidrs = cloudProviderRows.reduce((sum, row) => sum + Number(row.active_count || 0), 0);
+    const enabledCount = cloudProviderRows.filter(row => row.enabled).length;
+    const statusClass = ['updating','error'].includes(cloudStatus.status) ? cloudStatus.status : '';
+    const statusText = cloudStatus.message || (cloudStatus.status === 'ready' ? '策略已生效' : '等待网关状态');
     html += `<div class="idc-section">
-      <div class="card-title">系统内置IDC封禁（自动拦截，共 ${idcSummary.reduce((s,r)=>s+r.count,0)} 条CIDR）</div>
-      <div class="idc-note">订阅请求命中后返回 403；UA 白名单不能绕过，显式 IP 白名单除外。</div>
-      <div class="table-wrap">
-      <table><thead><tr><th>云服务商 / IDC</th><th>CIDR数量</th></tr></thead>
-      <tbody>${idcSummary.map(s => `
-        <tr>
-          <td class="ip-cell">${esc(s.name)}</td>
-          <td style="color:#6366f1;font-weight:600">${s.count} 条</td>
-        </tr>`).join('')}
-      </tbody></table>
+      <div class="idc-section-head">
+        <div><div class="card-title">云服务商 / IDC 自动拦截</div><div class="idc-note">按厂商选择生效范围；命中后返回 403，并携带厂商与触发规则进入风险分析。显式 IP 白名单仍保持最高优先级。</div></div>
+        <div class="idc-section-actions">
+          <span class="idc-policy-status ${statusClass}">${esc(statusText)}</span>
+          <button class="mode-btn" onclick="setAllCloudProviders(true)">全部开启</button>
+          <button class="mode-btn" onclick="setAllCloudProviders(false)">全部关闭</button>
+          <button class="mode-btn" onclick="resetCloudProviderDefaults()">恢复默认</button>
+        </div>
       </div>
+      <div class="idc-provider-grid">
+        ${cloudProviderRows.map(row => {
+          const available = row.available !== false;
+          const hasCidrs = Number(row.count || 0) > 0;
+          const pending = hasCidrs && Boolean(row.enabled) !== Boolean(row.active);
+          const asns = Array.isArray(row.asns) && row.asns.length ? row.asns.join(' · ') : 'ASN 未配置';
+          const keywords = Array.isArray(row.keywords) ? row.keywords.join('、') : '';
+          const state = !available ? '暂无数据源' : (!hasCidrs ? '暂无可用 CIDR' : (row.enabled ? (row.active ? '拦截中' : '待应用') : '未拦截'));
+          return `<div class="idc-provider-card ${row.enabled ? 'enabled' : ''} ${pending ? 'pending' : ''} ${available ? '' : 'unavailable'}" data-provider-card="${esc(row.id)}">
+            <div>
+              <div class="idc-provider-name">${esc(row.name)}</div>
+              <div class="idc-provider-meta"><span>${Number(row.count || 0)} 条 CIDR</span><span>${esc(asns)}</span><span data-provider-state="${esc(row.id)}">${esc(state)}</span></div>
+              ${keywords ? `<div class="idc-provider-keywords">识别关键词：${esc(keywords)}</div>` : ''}
+            </div>
+            <label class="provider-switch" title="${available ? '切换该厂商的自动拦截' : 'ASN/CIDR 尚未配置'}">
+              <input type="checkbox" data-provider-toggle="${esc(row.id)}" ${row.enabled ? 'checked' : ''} ${available ? '' : 'disabled'} onchange="setCloudProviderDraft('${esc(row.id)}',this.checked)">
+              <span class="provider-switch-track"></span>
+            </label>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="idc-policy-footer"><span id="cloud-provider-selection">已选择 ${enabledCount} 家 · 当前生效 ${activeCidrs} 条 CIDR</span><button class="btn-primary" id="save-cloud-providers" onclick="saveCloudProviders()">保存并应用</button></div>
     </div>`;
+  } else if (idcSummary.length) {
+    html += `<div class="idc-section"><div class="card-title">系统内置 IDC 封禁</div><div class="table-wrap"><table><thead><tr><th>云服务商 / IDC</th><th>CIDR 数量</th></tr></thead><tbody>${idcSummary.map(row => `<tr><td>${esc(row.name)}</td><td>${Number(row.count || 0)} 条</td></tr>`).join('')}</tbody></table></div></div>`;
   }
 
   document.getElementById('bl-list').innerHTML = html;
   attachCommentCells(document.getElementById('bl-list'));
+}
+
+function updateCloudProviderSelection() {
+  const enabledCount = Object.values(cloudProviderDraft).filter(Boolean).length;
+  const label = document.getElementById('cloud-provider-selection');
+  if (label) label.textContent = `已选择 ${enabledCount} 家 · 保存后由网关校验并应用`;
+}
+
+function setCloudProviderDraft(id, enabled) {
+  if (!Object.prototype.hasOwnProperty.call(cloudProviderDraft, id)) return;
+  cloudProviderDraft[id] = Boolean(enabled);
+  const card = document.querySelector(`[data-provider-card="${id}"]`);
+  card?.classList.toggle('enabled', Boolean(enabled));
+  card?.classList.add('pending');
+  const state = document.querySelector(`[data-provider-state="${id}"]`);
+  if (state) state.textContent = enabled ? '待开启' : '待关闭';
+  updateCloudProviderSelection();
+}
+
+function setAllCloudProviders(enabled) {
+  cloudProviderRows.forEach(row => {
+    if (row.available === false) return;
+    cloudProviderDraft[row.id] = Boolean(enabled);
+    const toggle = document.querySelector(`[data-provider-toggle="${row.id}"]`);
+    if (toggle) toggle.checked = Boolean(enabled);
+    setCloudProviderDraft(row.id, enabled);
+  });
+}
+
+function resetCloudProviderDefaults() {
+  cloudProviderRows.forEach(row => {
+    const enabled = row.available !== false && Boolean(row.default_enabled);
+    cloudProviderDraft[row.id] = enabled;
+    const toggle = document.querySelector(`[data-provider-toggle="${row.id}"]`);
+    if (toggle) toggle.checked = enabled;
+    setCloudProviderDraft(row.id, enabled);
+  });
+}
+
+async function saveCloudProviders() {
+  const button = document.getElementById('save-cloud-providers');
+  if (button) { button.disabled = true; button.textContent = '正在提交…'; }
+  const result = await apiFetch('/api/blacklist.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify({action:'save_cloud_providers',enabled:cloudProviderDraft}),
+  });
+  if (!result.ok) {
+    if (button) { button.disabled = false; button.textContent = '保存并应用'; }
+    toast(result.error || '厂商策略保存失败', 'err');
+    return;
+  }
+  toast(`已提交 ${Number(result.enabled_count || 0)} 家厂商，网关正在校验应用`);
+  await waitForCloudProviderApply();
+}
+
+async function waitForCloudProviderApply() {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const data = await apiFetch('/api/blacklist.php');
+    const status = data.cloud_provider_status || {};
+    if (status.status === 'updating') continue;
+    if (status.status === 'error') toast(status.message || '网关应用失败，已保留上一版策略', 'err');
+    else toast(status.message || '云厂商拦截策略已生效');
+    await loadBlacklist();
+    return;
+  }
+  await loadBlacklist();
+  toast('规则仍在后台更新，可稍后刷新查看状态');
 }
 
 function toggleAllBl(cb) {
@@ -3797,7 +3935,7 @@ function renderGuardFindings() {
     const subject = row.subject || '-';
     const sampleIps = Array.isArray(row.sample_ips) && row.sample_ips.length ? `来源样本：${row.sample_ips.join('、')}` : '';
     const meta = [
-      `${row.count || 0} / 阈值 ${row.threshold || 0}`,
+      row.automatic_block ? `${row.count || 0} 次自动拦截` : `${row.count || 0} / 阈值 ${row.threshold || 0}`,
       row.window || '',
       row.source || '',
       row.last_seen ? `最后 ${row.last_seen}` : '',
@@ -3809,6 +3947,15 @@ function renderGuardFindings() {
       ? `<span class="risk-status-counts" title="成功 / 403 / 429 / 444"><b style="color:#22c55e">${Number(status['200'] || 0)}</b>/<b style="color:#ef4444">${Number(status['403'] || 0)}</b>/<b style="color:#eab308">${Number(status['429'] || 0)}</b>/<b style="color:#64748b">${Number(status['444'] || 0)}</b></span>`
       : '';
     const intel = [row.location, row.asn, row.operator, row.network_type].filter(value => value && !['未查询','未知地区','未知网络'].includes(value));
+    const triggerRows = Object.entries(row.trigger_details || {});
+    if (row.provider_asns?.length) triggerRows.push(['厂商 ASN', row.provider_asns.join(' · ')]);
+    if (row.provider_keywords?.length) triggerRows.push(['识别关键词', row.provider_keywords.join('、')]);
+    if (row.sample_paths?.length) triggerRows.push(['请求路径', row.sample_paths.join('、')]);
+    if (row.sample_uas?.length) triggerRows.push(['UA 样本', row.sample_uas.join('、')]);
+    const triggerDetail = triggerRows.length ? `<details class="risk-trigger-detail">
+      <summary>查看触发详情</summary>
+      <div class="risk-trigger-grid">${triggerRows.map(([label,value]) => `<div class="risk-trigger-row"><span class="risk-trigger-label">${esc(label)}</span><span class="risk-trigger-value">${esc(value)}</span></div>`).join('')}</div>
+    </details>` : '';
     return `
       <div class="risk-item">
         <div class="risk-head">
@@ -3818,13 +3965,14 @@ function renderGuardFindings() {
         <div class="risk-evidence">${meta.map(item => `<span>${esc(item)}</span>`).join('')}${statusSummary}${row.token_count ? `<span>${Number(row.token_count)} 个 Token</span>` : ''}</div>
         <div class="risk-reason">${esc(row.reason || '-')}${sampleIps ? `<br>${esc(sampleIps)}` : ''}${row.ua ? `<br>UA：${esc(row.ua)}` : ''}</div>
         ${intel.length ? `<div class="risk-intel">${intel.map(item => `<span>${esc(item)}</span>`).join('')}</div>` : ''}
+        ${triggerDetail}
         <div class="risk-actions">
           <select class="review-select" id="guard-review-${index}">${guardReviewOptions(review.status)}</select>
           <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
           <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index})">保存判断</button>
           ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
           ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
-          ${canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : ''}
+          ${row.automatic_block ? `<span class="idc-policy-status">已由厂商策略拦截</span>` : (canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : '')}
         </div>
       </div>`;
   }).join('');

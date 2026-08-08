@@ -115,7 +115,7 @@ function enrich_guard_findings(
     $liveIpTokenSubjects = [];
     $liveTokenIpSubjects = [];
     foreach ($findings as $finding) {
-        $finding['source'] = '实时日志阈值';
+        if (empty($finding['source'])) $finding['source'] = '实时日志阈值';
         $result[$finding['key']] = $finding;
         if (($finding['kind'] ?? '') === 'ip_multi_token') $liveIpTokenSubjects[(string)($finding['subject'] ?? '')] = true;
         if (($finding['kind'] ?? '') === 'token_multi_ip') $liveTokenIpSubjects[(string)($finding['subject'] ?? '')] = true;

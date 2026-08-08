@@ -176,8 +176,8 @@ json_out(['ok' => true, 'logs' => $logs, 'date' => $today, 'mode' => $mode]);
 
 // ── 解析一行内部格式日志 ──────────────────────────────────────
 function parse_line(string $line): ?array {
-    // 内部格式: IP [time] "REQUEST" STATUS BYTES "UA"
-    $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"$/';
+    // 内部格式: IP [time] "REQUEST" STATUS BYTES "UA" ["reason=..." "provider=..."]
+    $pat = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"(?: "reason=([^"]*)" "provider=([^"]*)")?$/';
     if (!preg_match($pat, $line, $m)) return null;
 
     [, $ip, $time, $request, $status, $bytes, $ua] = $m;
@@ -202,6 +202,8 @@ function parse_line(string $line): ?array {
         'bytes'   => $bytes,
         'ua'      => $ua,
         'token'   => $token,
+        'block_reason' => (string)($m[7] ?? ''),
+        'cloud_provider' => (string)($m[8] ?? ''),
     ];
 }
 
@@ -215,7 +217,7 @@ function nginx_combined_to_internal(string $line): ?string {
         return "$ip [$time] \"$request\" $status $bytes \"$ua\"";
     }
     // 如果已经是内部格式，直接返回
-    if (preg_match('/^\S+ \[[^\]]+\] "[^"]*" \d+ \S+ "[^"]*"$/', $line)) {
+    if (preg_match('/^\S+ \[[^\]]+\] "[^"]*" \d+ \S+ "[^"]*"(?: "reason=[^"]*" "provider=[^"]*")?$/', $line)) {
         return $line;
     }
     return null;

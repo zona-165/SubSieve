@@ -15,6 +15,17 @@ function log_line(string $ip, int $ts, string $token, int $status = 200, string 
     return sprintf('%s [%s] "GET %s HTTP/1.1" %d 128 "%s"', $ip, $time, $path, $status, $ua);
 }
 
+function cloud_log_line(string $ip, int $ts, string $provider, string $ua = 'curl/8.0'): string {
+    $time = date('d/M/Y:H:i:s O', $ts);
+    return sprintf(
+        '%s [%s] "GET /go/test/?token=blocked-cloud HTTP/1.1" 403 19 "%s" "reason=cloud" "provider=%s"',
+        $ip,
+        $time,
+        $ua,
+        $provider
+    );
+}
+
 $now = strtotime('2026-08-04 12:00:00 UTC');
 $lines = [];
 
@@ -30,18 +41,32 @@ for ($i = 0; $i < 20; $i++) {
 for ($i = 0; $i < 40; $i++) {
     $lines[] = log_line('198.51.100.40', $now - 120 - ($i % 120), 'not-found-token', 404, 'curl/8.0');
 }
+$lines[] = cloud_log_line('192.0.2.88', $now - 10, 'aws');
+$lines[] = cloud_log_line('192.0.2.88', $now - 5, 'aws');
 
 $result = guard_analyze_logs($lines, guard_default_settings(), $now, '/go/test/', 'unit-test-secret');
 $kinds = array_column($result['findings'], 'kind');
 foreach (['ip_rate', 'token_rate', 'token_multi_ip', 'ip_multi_token', 'ip_404_flood'] as $kind) {
     check(in_array($kind, $kinds, true), "missing finding {$kind}");
 }
+check(in_array('idc_provider_block', $kinds, true), 'missing IDC provider block finding');
+$cloudFinding = array_values(array_filter($result['findings'], fn(array $row): bool => ($row['kind'] ?? '') === 'idc_provider_block'))[0] ?? [];
+check(($cloudFinding['provider_id'] ?? '') === 'aws', 'IDC provider id missing');
+check(($cloudFinding['count'] ?? 0) === 2, 'IDC block count mismatch');
+check(($cloudFinding['status_counts']['403'] ?? 0) === 2, 'IDC status evidence missing');
+check(($cloudFinding['trigger_details']['网关动作'] ?? '') === 'HTTP 403 · Forbidden: Cloud IP', 'IDC trigger details missing');
+$overlapFindings = guard_analyze_logs([
+    cloud_log_line('192.0.2.99', $now - 2, 'aws'),
+    cloud_log_line('192.0.2.99', $now - 1, 'azure'),
+], ['guard_observe_enabled' => 0], $now, '/go/test/', 'unit-test-secret')['findings'];
+check(count($overlapFindings) === 2, 'overlapping provider events were merged');
+check(count(array_unique(array_column($overlapFindings, 'key'))) === 2, 'provider finding keys collided');
 check(($result['metrics']['today_requests'] ?? 0) === count($lines), 'today request count mismatch');
-check(($result['metrics']['today_ips'] ?? 0) === 11, 'unique IP count mismatch');
+check(($result['metrics']['today_ips'] ?? 0) === 12, 'unique IP count mismatch');
 check(!str_contains(json_encode($result), 'shared-token'), 'raw Token leaked into guard result');
 
 $disabled = guard_analyze_logs($lines, ['guard_observe_enabled' => 0], $now, '/go/test/', 'unit-test-secret');
-check(count($disabled['findings']) === 0, 'disabled observation still produced findings');
+check(count($disabled['findings']) === 1 && ($disabled['findings'][0]['kind'] ?? '') === 'idc_provider_block', 'disabled observation lost enforced IDC evidence');
 check(($disabled['metrics']['today_requests'] ?? 0) === count($lines), 'disabled observation lost metrics');
 
 $dailyRows = [[

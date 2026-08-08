@@ -106,9 +106,9 @@ foreach ($cases as $name => [$overrides, $expected]) {
 }
 
 $updater = normalizedConfig($sgwRoot . '/gateway/scripts/update_cloud_geo.sh');
-$candidateTest = strpos($updater, 'nginx -t -c "$TEST_CONF"');
+$candidateTest = strpos($updater, '"$NGINX_BIN" -t -c "$TEST_CONF"');
 $atomicMove = strpos($updater, 'mv "$OUTPUT_TMP" "$OUTPUT"');
-$fullTest = strpos($updater, 'if ! nginx -t >/dev/null');
+$fullTest = strpos($updater, 'if ! "$NGINX_BIN" -t >/dev/null');
 check($candidateTest !== false, '云 IP 更新脚本缺少候选配置校验');
 check($atomicMove !== false, '云 IP 更新脚本缺少原子替换');
 check($fullTest !== false, '云 IP 更新脚本缺少完整配置校验');
@@ -119,6 +119,9 @@ if ($candidateTest !== false && $atomicMove !== false && $fullTest !== false) {
 check(str_contains($updater, 'restore_previous'), '云 IP 更新脚本缺少上一版回滚逻辑');
 check(str_contains($updater, ".data.prefixes[]?.prefix // empty"), 'RIPE CIDR 必须使用 jq 结构化解析');
 check(str_contains($updater, ".prefixes[]?.ip_prefix // empty"), 'AWS CIDR 必须使用 jq 结构化解析');
+check(str_contains($updater, 'geo $cloud_provider_id'), '云厂商规则必须保留厂商标识');
+check(str_contains($updater, 'cloud_provider_settings.json'), '云厂商规则必须读取独立开关设置');
+check(str_contains($updater, 'cloud_provider_state.json'), '云厂商规则必须输出生效状态');
 check(!str_contains($updater, "grep -o '\"ip_prefix\":\""), 'AWS CIDR 不得依赖固定 JSON 空格格式');
 
 if ($failures !== []) {
