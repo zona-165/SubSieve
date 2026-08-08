@@ -23,6 +23,8 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/alert_history.json" ] || echo "{}" > "$SUBSCRIBE_DIR/alert_history.json"
 [ -f "$SUBSCRIBE_DIR/guard_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/guard_cache.json"
 [ -f "$SUBSCRIBE_DIR/guard_reviews.json" ] || echo '{"entries":{}}' > "$SUBSCRIBE_DIR/guard_reviews.json"
+[ -f "$SUBSCRIBE_DIR/ai_settings.json" ] || echo '{"version":1,"enabled":0,"auto_analyze":0,"api_key":""}' > "$SUBSCRIBE_DIR/ai_settings.json"
+[ -f "$SUBSCRIBE_DIR/ai_analysis.json" ] || echo '{"latest":null,"history":[],"last_attempt_ts":0,"last_error":""}' > "$SUBSCRIBE_DIR/ai_analysis.json"
 [ -f "$SUBSCRIBE_DIR/token_limit_state.json" ] || echo '{"entries":{},"history":[]}' > "$SUBSCRIBE_DIR/token_limit_state.json"
 [ -f "$SUBSCRIBE_DIR/token_limit.conf" ] || printf 'map $arg_token $is_token_temporarily_suspended {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/token_limit.conf"
 [ -f "$SUBSCRIBE_DIR/token_limit_rate.conf" ] || printf 'map "$whitelist_ip:$arg_token" $token_pull_rate_key {\n    default "";\n}\nlimit_req_zone $token_pull_rate_key zone=token_pull_limit:10m rate=10r/m;\n' > "$SUBSCRIBE_DIR/token_limit_rate.conf"
@@ -55,6 +57,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/cloud_provider_settings.json"
 chown www-data:www-data "$SUBSCRIBE_DIR/guard_secret"
 chmod 600 "$SUBSCRIBE_DIR/guard_secret"
+chown www-data:www-data "$SUBSCRIBE_DIR/ai_settings.json" "$SUBSCRIBE_DIR/ai_analysis.json"
+chmod 600 "$SUBSCRIBE_DIR/ai_settings.json" "$SUBSCRIBE_DIR/ai_analysis.json"
 
 # 兼容旧版本：根据已有 JSON 生成 Token 拦截规则，并通知 gateway reload。
 php /var/www/html/maintenance.php sync-token-blacklist >/dev/null 2>&1 || true
@@ -86,6 +90,11 @@ done) &
 
 (while true; do
     php /var/www/html/maintenance.php check-alerts >> /var/log/subscribe/maintenance.log 2>&1 || true
+    sleep 60
+done) &
+
+(while true; do
+    php /var/www/html/maintenance.php ai-analyze >> /var/log/subscribe/maintenance.log 2>&1 || true
     sleep 60
 done) &
 

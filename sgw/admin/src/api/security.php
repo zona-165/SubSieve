@@ -292,6 +292,8 @@ function guard_mechanisms(array $settings, array $counts, array $health): array 
     $uaConf = file_exists(UA_CUSTOM_CONF) ? (string)@file_get_contents(UA_CUSTOM_CONF) : '';
     $tokenConf = file_exists(TOKEN_BLACKLIST_CONF) ? (string)@file_get_contents(TOKEN_BLACKLIST_CONF) : '';
     $ipPolicyReady = file_exists(BLACKLIST_CONF) && file_exists(WHITELIST_CONF);
+    $aiSettings = guard_read_json(AI_SETTINGS_JSON);
+    $aiEnabled = !empty($aiSettings['enabled']) && trim((string)($aiSettings['api_key'] ?? '')) !== '';
     $items = [
         ['key' => 'gateway', 'title' => '订阅入口防护', 'state' => $protect !== '' ? 'active' : 'error', 'detail' => $protect !== '' ? 'Nginx 订阅路径规则已加载' : 'protect.conf 缺失'],
         ['key' => 'rate_limit', 'title' => '请求速率限制', 'state' => str_contains($protect, 'limit_req') ? 'active' : 'error', 'detail' => str_contains($protect, 'limit_req') ? '网关限速与 429 响应已启用' : '未检测到 limit_req'],
@@ -305,6 +307,7 @@ function guard_mechanisms(array $settings, array $counts, array $health): array 
         ['key' => 'intel', 'title' => '多源 IP 情报', 'state' => 'active', 'detail' => $counts['ip_intel_cache'] . ' 个缓存画像'],
         ['key' => 'retention', 'title' => '日志保留与清理', 'state' => LOG_RETENTION_DAYS > 0 ? 'active' : 'paused', 'detail' => LOG_RETENTION_DAYS > 0 ? '保留 ' . LOG_RETENTION_DAYS . ' 天' : '自动清理已关闭'],
         ['key' => 'alerts', 'title' => '高危事件推送', 'state' => !empty($settings['alert_enabled']) ? 'active' : 'optional', 'detail' => !empty($settings['alert_enabled']) ? '每分钟检查并去重' : '未启用（可选）'],
+        ['key' => 'ai_review', 'title' => 'AI 风险研判', 'state' => $aiEnabled ? 'active' : 'optional', 'detail' => $aiEnabled ? '只提供复核建议，不自动执行' : '未启用（可选）'],
     ];
     return $items;
 }

@@ -165,6 +165,26 @@ if (str_starts_with($path, '/api/')) {
         echo json_encode(['ok' => true, 'entries' => $entries, 'queued' => 0], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($path === '/api/ai.php') {
+        $providers = [
+            'openai'=>['name'=>'OpenAI','adapter'=>'openai_compatible','base_url'=>'https://api.openai.com/v1','model'=>'gpt-4.1-mini'],
+            'deepseek'=>['name'=>'DeepSeek','adapter'=>'openai_compatible','base_url'=>'https://api.deepseek.com','model'=>'deepseek-v4-flash'],
+            'qwen'=>['name'=>'通义千问','adapter'=>'openai_compatible','base_url'=>'https://dashscope.aliyuncs.com/compatible-mode/v1','model'=>'qwen-plus'],
+            'kimi'=>['name'=>'Kimi','adapter'=>'openai_compatible','base_url'=>'https://api.moonshot.cn/v1','model'=>'kimi-k3'],
+            'anthropic'=>['name'=>'Anthropic Claude','adapter'=>'anthropic','base_url'=>'https://api.anthropic.com','model'=>'claude-haiku-4-5-20251001'],
+            'gemini'=>['name'=>'Google Gemini','adapter'=>'gemini','base_url'=>'https://generativelanguage.googleapis.com','model'=>'gemini-2.5-flash'],
+            'custom'=>['name'=>'自定义兼容接口','adapter'=>'openai_compatible','base_url'=>'','model'=>''],
+        ];
+        echo json_encode([
+            'ok'=>true,
+            'settings'=>['enabled'=>1,'auto_analyze'=>1,'auto_interval_minutes'=>30,'provider'=>'deepseek','adapter'=>'openai_compatible','base_url'=>'https://api.deepseek.com','model'=>'deepseek-v4-flash','include_ip'=>0,'include_ua'=>0,'include_path'=>1,'max_findings'=>10,'has_api_key'=>true,'providers'=>$providers],
+            'analysis'=>['latest'=>[
+                'id'=>'AIR-PREVIEW','generated_at'=>date('Y-m-d H:i:s'),'provider'=>'deepseek','provider_name'=>'DeepSeek','model'=>'deepseek-v4-flash','scope'=>'queue','finding_count'=>5,'advisory_only'=>true,
+                'decision'=>['risk_level'=>'high','confidence'=>86,'verdict'=>'存在高频共享与自动化拉取风险','summary'=>'多项独立证据同时指向异常拉取，但运营商 NAT 和客户端自动更新仍可能造成误报，建议先核对时间窗口再处置。','evidence'=>['单一来源在今日窗口内累计请求 233 次','同一 Token 指纹在多个来源 IP 出现','部分请求命中脚本客户端特征'],'false_positive_factors'=>['移动网络或公司出口 NAT 会共享公网 IP','客户端故障可能造成短时重复拉取'],'recommendations'=>['核对最近 24 小时来源分布和 UA 变化','先观察或临时限速，再决定是否封禁'],'proposed_actions'=>['标记为持续观察','人工确认后临时暂停 Token'],'needs_human_review'=>true,'execution'=>'none'],
+            ],'history'=>[],'last_attempt_ts'=>time(),'last_error'=>''],
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($path === '/api/stats.php') {
         echo json_encode([
             'ok' => true, 'scan_limit' => 30000,

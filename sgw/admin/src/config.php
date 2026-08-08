@@ -29,6 +29,8 @@ define('ALERT_HISTORY_JSON', '/etc/nginx/subscribe/alert_history.json');
 define('GUARD_CACHE_JSON', '/etc/nginx/subscribe/guard_cache.json');
 define('GUARD_REVIEW_JSON', '/etc/nginx/subscribe/guard_reviews.json');
 define('GUARD_SECRET_FILE', '/etc/nginx/subscribe/guard_secret');
+define('AI_SETTINGS_JSON', '/etc/nginx/subscribe/ai_settings.json');
+define('AI_ANALYSIS_JSON', '/etc/nginx/subscribe/ai_analysis.json');
 define('TOKEN_LIMIT_STATE_JSON', '/etc/nginx/subscribe/token_limit_state.json');
 define('TOKEN_LIMIT_CONF', '/etc/nginx/subscribe/token_limit.conf');
 define('TOKEN_LIMIT_RATE_CONF', '/etc/nginx/subscribe/token_limit_rate.conf');

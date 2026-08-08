@@ -1,0 +1,8 @@
+# Local deployment secrets and generated runtime state
+sgw/.env
+sgw/.env.*
+sgw/**/ai_settings.json
+sgw/**/admin_settings.json
+sgw/**/ai_analysis.json
+sgw/ssl/*.pem
+sgw/ssl/*.key

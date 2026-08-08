@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/guard.php';
+require_once __DIR__ . '/lib/ai_guard.php';
 
 if (PHP_SAPI !== 'cli') {
     json_err('maintenance only supports CLI', 403);
@@ -28,6 +29,16 @@ if ($action === 'refresh-token-limits') {
     $result = guard_refresh_pull_limits();
     echo json_encode(['ok' => true, 'result' => $result], JSON_UNESCAPED_UNICODE) . PHP_EOL;
     exit(0);
+}
+if ($action === 'ai-analyze') {
+    $settings = ai_read_settings();
+    if (empty($settings['enabled']) || empty($settings['auto_analyze'])) {
+        echo json_encode(['ok' => true, 'skipped' => true, 'reason' => 'disabled'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+        exit(0);
+    }
+    $result = ai_run_analysis(false);
+    echo json_encode($result, JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    exit(!empty($result['ok']) ? 0 : 1);
 }
 
 echo json_encode(['ok' => false, 'error' => 'unknown action'], JSON_UNESCAPED_UNICODE) . PHP_EOL;

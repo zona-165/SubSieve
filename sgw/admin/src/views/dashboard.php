@@ -336,6 +336,22 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .risk-evidence span{padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:rgba(100,116,139,.05)}
 .risk-reason{color:var(--text3);font-size:11px;line-height:1.6}
 .risk-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+.ai-analysis-panel{display:none;margin:0 0 14px;padding:14px;border:1px solid rgba(14,165,233,.24);border-left:3px solid #0ea5e9;border-radius:9px;background:rgba(14,165,233,.06)}
+.ai-analysis-panel.visible{display:block;animation:itemIn var(--motion-med) ease both}
+.ai-analysis-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.ai-analysis-kicker{font-size:10px;font-weight:850;color:#0ea5e9;text-transform:uppercase}
+.ai-analysis-title{font-size:14px;font-weight:900;color:var(--text);margin-top:2px}
+.ai-analysis-meta{font-size:10px;color:var(--text3);text-align:right}
+.ai-analysis-summary{font-size:12px;line-height:1.7;color:var(--text2)}
+.ai-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.ai-analysis-block{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);min-width:0}
+.ai-analysis-block h4{font-size:11px;color:var(--text);margin-bottom:6px}
+.ai-analysis-block ul{padding-left:17px;color:var(--text3);font-size:11px;line-height:1.65}
+.ai-risk-badge{padding:4px 8px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap;background:rgba(245,158,11,.12);color:#f59e0b}
+.ai-risk-badge.low{background:rgba(34,197,94,.12);color:#16a34a}.ai-risk-badge.high,.ai-risk-badge.critical{background:rgba(239,68,68,.12);color:#ef4444}
+.ai-advisory{margin-top:10px;color:var(--text3);font-size:10px}
+.ai-secret-status{display:inline-flex;align-items:center;gap:6px;color:var(--text3);font-size:11px}
+.ai-secret-status::before{content:"";width:7px;height:7px;border-radius:50%;background:#94a3b8}.ai-secret-status.ready::before{background:#22c55e}
 .review-select{min-width:112px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:6px 8px;border-radius:8px;font-size:11px;outline:none}
 .rule-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
 .rule-field label{display:block;color:var(--text2);font-size:11px;margin-bottom:5px}
@@ -589,6 +605,8 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .rule-grid{grid-template-columns:1fr 1fr;gap:8px}
   .risk-head{align-items:flex-start}
   .risk-actions .mode-btn,.risk-actions .review-select{flex:1 1 calc(50% - 7px);min-height:34px}
+  .ai-analysis-grid{grid-template-columns:1fr}
+  .ai-analysis-head{flex-direction:column}.ai-analysis-meta{text-align:left}
   .health-row,.action-row{grid-template-columns:90px minmax(0,1fr);gap:8px}
   #toast{left:10px;right:10px;bottom:12px;text-align:center}
 }
@@ -1077,7 +1095,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
       <section class="security-section risk-workbench">
         <div class="security-section-head">
           <div><div class="security-section-title">风险复核</div><div class="security-section-sub">命中阈值后进入复核；人工确认后再执行封禁</div></div>
-          <span class="auto-timer" id="guard-review-summary"></span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><span class="auto-timer" id="guard-review-summary"></span><button class="mode-btn ai-run-btn" onclick="runAiAnalysis('')">AI 研判队列</button></div>
         </div>
         <div class="risk-kind-toolbar" aria-label="风险分类">
           <button class="mode-btn active" id="guard-kind-all" onclick="setGuardRiskKind('all')">全部风险</button>
@@ -1099,6 +1117,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             <button class="mode-btn" id="guard-size-20" onclick="setGuardPageSize(20)">20</button>
           </div>
         </div>
+        <div id="ai-analysis-panel" class="ai-analysis-panel"></div>
         <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
         <div id="guard-pagination" class="review-pagination"></div>
       </section>
@@ -1383,6 +1402,40 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
           </div>
         </div>
 
+        <!-- AI 风险研判 -->
+        <div class="card">
+          <div class="card-title">AI 风险研判</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:13px"><input id="cfg-ai-enabled" type="checkbox" style="width:18px;height:18px">开启 AI 研判</label>
+              <span id="cfg-ai-key-status" class="ai-secret-status">未保存 Token</span>
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:13px"><input id="cfg-ai-auto" type="checkbox" style="width:18px;height:18px">后台定时分析风险队列</label>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px">
+              <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">AI 厂商</label><select class="ip-input" id="cfg-ai-provider" onchange="aiProviderChanged()" style="width:100%"></select></div>
+              <div id="cfg-ai-adapter-wrap" style="display:none"><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">接口协议</label><select class="ip-input" id="cfg-ai-adapter" style="width:100%"><option value="openai_compatible">OpenAI 兼容</option><option value="anthropic">Anthropic Messages</option><option value="gemini">Gemini</option></select></div>
+              <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">模型</label><input class="ip-input" id="cfg-ai-model" placeholder="模型名称" style="width:100%"></div>
+            </div>
+            <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">API 地址</label><input class="ip-input" id="cfg-ai-base-url" placeholder="https://api.example.com/v1" style="width:100%"></div>
+            <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">API Token</label><input class="ip-input" id="cfg-ai-api-key" type="password" autocomplete="new-password" placeholder="留空则保留服务器中已保存的 Token" style="width:100%"></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px">
+              <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">自动分析间隔（分钟）</label><input class="ip-input" id="cfg-ai-interval" type="number" min="5" max="1440" value="30" style="width:100%"></div>
+              <div><label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">每次最多风险数</label><input class="ip-input" id="cfg-ai-max-findings" type="number" min="1" max="30" value="10" style="width:100%"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:7px;color:var(--text2);font-size:12px"><input id="cfg-ai-include-ip" type="checkbox">发送来源 IP</label>
+              <label style="display:flex;align-items:center;gap:7px;color:var(--text2);font-size:12px"><input id="cfg-ai-include-ua" type="checkbox">发送 UA</label>
+              <label style="display:flex;align-items:center;gap:7px;color:var(--text2);font-size:12px"><input id="cfg-ai-include-path" type="checkbox" checked>发送请求路径</label>
+            </div>
+            <div class="apply-hint" style="color:var(--text3)">Token 仅保存在服务器数据卷，页面和 API 不回显；原始订阅 Token 永不发送。AI 仅提供复核建议，不自动执行封禁。</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
+              <button class="btn-primary" onclick="saveAiSettings()">保存设置</button>
+              <button class="mode-btn" onclick="testAiSettings()">测试连接</button>
+              <button class="mode-btn danger" onclick="clearAiToken()">清除 Token</button>
+            </div>
+          </div>
+        </div>
+
 
       </div>
     </div>
@@ -1422,6 +1475,8 @@ let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let securityData = null;
+let aiModuleData = null;
+let aiAnalyzing = false;
 let tokenInvestigationData = null;
 let guardReviewFilter = 'active';
 let guardRiskKindFilter = 'all';
@@ -1504,7 +1559,7 @@ function mountWorkspaceLayout() {
   const groups = [
     {key:'identity', title:'界面与账户', sub:'管理控制台名称和管理员登录凭证', cards:['界面设置','登录凭证']},
     {key:'gateway', title:'网关与上游', sub:'管理机场反代、监听端口和 TLS 证书', cards:['机场（反代目标）','订阅网关','SSL 证书']},
-    {key:'operations', title:'运维与通知', sub:'管理统计预热、缓存状态和高危事件推送', cards:['分析统计缓存','告警推送']},
+    {key:'operations', title:'运维与通知', sub:'管理统计预热、告警推送和 AI 辅助研判', cards:['分析统计缓存','告警推送','AI 风险研判']},
   ];
   settingsGrid.className = 'settings-groups';
   settingsGrid.removeAttribute('style');
@@ -2184,7 +2239,7 @@ async function loadStats(opts={}) {
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
   }
   allStatsData = data;
-  await loadSecurity({force:true});
+  await Promise.all([loadSecurity({force:true}), loadAiModule()]);
   renderStats();
 }
 
@@ -2895,6 +2950,7 @@ async function loadSettings() {
   }
   renderStatsCacheInfo(data.stats_cache || {});
   renderAlertHistory(data.alert_history || {});
+  await loadAiModule();
 }
 
 function renderStatsCacheInfo(cache) {
@@ -4023,6 +4079,7 @@ function renderGuardFindings() {
           <select class="review-select" id="guard-review-${index}">${guardReviewOptions(review.status)}</select>
           <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
           <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index})">保存判断</button>
+          <button class="mode-btn ai-run-btn" onclick="runAiAnalysis(${jsArg(row.key)})">AI 研判</button>
           ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
           ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
           ${row.automatic_block ? `<span class="idc-policy-status">已由厂商策略拦截</span>` : (canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : '')}
@@ -4054,6 +4111,148 @@ async function saveGuardReview(key, index) {
   renderRiskAnalysis();
   renderSecurityMetrics();
   toast('复核状态已保存');
+}
+
+async function loadAiModule() {
+  const data = await apiFetch('/api/ai.php');
+  if (!data.ok) {
+    aiModuleData = {settings:{enabled:0,has_api_key:false,providers:{}},analysis:{latest:null,last_error:data.error || ''}};
+  } else {
+    aiModuleData = data;
+  }
+  renderAiSettings();
+  renderAiAnalysis();
+  return aiModuleData;
+}
+
+function renderAiSettings() {
+  const providerEl = document.getElementById('cfg-ai-provider');
+  if (!providerEl || !aiModuleData) return;
+  const settings = aiModuleData.settings || {};
+  const providers = settings.providers || {};
+  providerEl.innerHTML = Object.entries(providers).map(([key,row]) => `<option value="${esc(key)}">${esc(row.name || key)}</option>`).join('');
+  providerEl.value = settings.provider || 'openai';
+  document.getElementById('cfg-ai-enabled').checked = !!Number(settings.enabled || 0);
+  document.getElementById('cfg-ai-auto').checked = !!Number(settings.auto_analyze || 0);
+  document.getElementById('cfg-ai-adapter').value = settings.adapter || 'openai_compatible';
+  document.getElementById('cfg-ai-base-url').value = settings.base_url || '';
+  document.getElementById('cfg-ai-model').value = settings.model || '';
+  document.getElementById('cfg-ai-api-key').value = '';
+  document.getElementById('cfg-ai-interval').value = Number(settings.auto_interval_minutes || 30);
+  document.getElementById('cfg-ai-max-findings').value = Number(settings.max_findings || 10);
+  document.getElementById('cfg-ai-include-ip').checked = !!Number(settings.include_ip || 0);
+  document.getElementById('cfg-ai-include-ua').checked = !!Number(settings.include_ua || 0);
+  document.getElementById('cfg-ai-include-path').checked = !!Number(settings.include_path ?? 1);
+  const keyStatus = document.getElementById('cfg-ai-key-status');
+  keyStatus.classList.toggle('ready', !!settings.has_api_key);
+  keyStatus.textContent = settings.has_api_key ? 'Token 已安全保存' : '未保存 Token';
+  document.getElementById('cfg-ai-adapter-wrap').style.display = settings.provider === 'custom' ? 'block' : 'none';
+}
+
+function aiProviderChanged() {
+  const provider = document.getElementById('cfg-ai-provider').value;
+  const preset = aiModuleData?.settings?.providers?.[provider] || {};
+  document.getElementById('cfg-ai-adapter-wrap').style.display = provider === 'custom' ? 'block' : 'none';
+  if (provider !== 'custom') document.getElementById('cfg-ai-adapter').value = preset.adapter || 'openai_compatible';
+  document.getElementById('cfg-ai-base-url').value = preset.base_url || '';
+  document.getElementById('cfg-ai-model').value = preset.model || '';
+}
+
+function getAiSettingsPayload(action='save') {
+  return {
+    action,
+    enabled: document.getElementById('cfg-ai-enabled').checked ? 1 : 0,
+    auto_analyze: document.getElementById('cfg-ai-auto').checked ? 1 : 0,
+    provider: document.getElementById('cfg-ai-provider').value || 'openai',
+    adapter: document.getElementById('cfg-ai-adapter').value || 'openai_compatible',
+    base_url: document.getElementById('cfg-ai-base-url').value.trim(),
+    model: document.getElementById('cfg-ai-model').value.trim(),
+    api_key: document.getElementById('cfg-ai-api-key').value.trim(),
+    auto_interval_minutes: parseInt(document.getElementById('cfg-ai-interval').value || '30', 10),
+    max_findings: parseInt(document.getElementById('cfg-ai-max-findings').value || '10', 10),
+    include_ip: document.getElementById('cfg-ai-include-ip').checked ? 1 : 0,
+    include_ua: document.getElementById('cfg-ai-include-ua').checked ? 1 : 0,
+    include_path: document.getElementById('cfg-ai-include-path').checked ? 1 : 0,
+  };
+}
+
+function validateAiPayload(body) {
+  if (!body.base_url || !/^https:\/\//i.test(body.base_url)) { toast('AI API 地址必须使用 HTTPS', 'err'); return false; }
+  if (!body.model) { toast('请填写模型名称', 'err'); return false; }
+  if (body.auto_interval_minutes < 5 || body.auto_interval_minutes > 1440) { toast('自动分析间隔需在 5-1440 分钟之间', 'err'); return false; }
+  if (body.max_findings < 1 || body.max_findings > 30) { toast('每次风险数需在 1-30 之间', 'err'); return false; }
+  if (body.enabled && !body.api_key && !aiModuleData?.settings?.has_api_key) { toast('开启前请填写 API Token', 'err'); return false; }
+  return true;
+}
+
+async function submitAiSettings(action) {
+  const body = getAiSettingsPayload(action);
+  if (!validateAiPayload(body)) return;
+  const data = await apiFetch('/api/ai.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(body),
+  });
+  if (!data.ok) { toast(data.error || (action === 'test' ? '连接测试失败' : '保存失败'), 'err'); return; }
+  toast(action === 'test' ? 'AI 接口连接正常，点击保存后生效' : 'AI 研判设置已保存');
+  if (action === 'test') return;
+  await loadAiModule();
+  if (securityData) { await loadSecurity({force:true}); renderStats(); }
+}
+
+function saveAiSettings() { return submitAiSettings('save'); }
+function testAiSettings() { return submitAiSettings('test'); }
+
+async function clearAiToken() {
+  if (!confirm('确定清除服务器中保存的 AI Token？AI 研判会同时关闭。')) return;
+  const body = getAiSettingsPayload('save');
+  body.clear_api_key = 1;
+  body.enabled = 0;
+  body.auto_analyze = 0;
+  body.api_key = '';
+  const data = await apiFetch('/api/ai.php', {
+    method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body:JSON.stringify(body),
+  });
+  if (!data.ok) { toast(data.error || '清除失败', 'err'); return; }
+  toast('AI Token 已清除');
+  await loadAiModule();
+}
+
+async function runAiAnalysis(findingKey='') {
+  if (aiAnalyzing) return;
+  aiAnalyzing = true;
+  document.querySelectorAll('.ai-run-btn').forEach(button => { button.disabled = true; button.dataset.oldText = button.textContent; button.textContent = '研判中…'; });
+  try {
+    const data = await apiFetch('/api/ai.php', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body:JSON.stringify({action:'analyze', finding_key:findingKey}),
+    });
+    if (!data.ok) { toast(data.error || 'AI 研判失败', 'err'); return; }
+    if (data.skipped) toast('AI 研判刚执行过，请稍后再试');
+    await loadAiModule();
+    toast(data.skipped ? '已显示最近研判结果' : 'AI 研判完成');
+    document.getElementById('ai-analysis-panel')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  } finally {
+    aiAnalyzing = false;
+    document.querySelectorAll('.ai-run-btn').forEach(button => { button.disabled = false; button.textContent = button.dataset.oldText || 'AI 研判'; });
+  }
+}
+
+function renderAiAnalysis() {
+  const panel = document.getElementById('ai-analysis-panel');
+  if (!panel || !aiModuleData) return;
+  const state = aiModuleData.analysis || {};
+  const latest = state.latest;
+  if (!latest) {
+    panel.classList.remove('visible');
+    panel.innerHTML = '';
+    return;
+  }
+  const decision = latest.decision || {};
+  const level = ['low','medium','high','critical'].includes(decision.risk_level) ? decision.risk_level : 'medium';
+  const labels = {low:'低风险',medium:'中风险',high:'高风险',critical:'极高风险'};
+  const list = (title, items) => `<div class="ai-analysis-block"><h4>${esc(title)}</h4>${Array.isArray(items) && items.length ? `<ul>${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '<div style="color:var(--text3);font-size:11px">暂无</div>'}</div>`;
+  panel.classList.add('visible');
+  panel.innerHTML = `<div class="ai-analysis-head"><div><div class="ai-analysis-kicker">AI 辅助研判 · 仅供复核</div><div class="ai-analysis-title">${esc(decision.verdict || '需要人工复核')}</div></div><div><span class="ai-risk-badge ${level}">${esc(labels[level])} · 置信度 ${Number(decision.confidence || 0)}%</span><div class="ai-analysis-meta">${esc(latest.provider_name || latest.provider || '')} · ${esc(latest.model || '')}<br>${esc(latest.generated_at || '')} · ${Number(latest.finding_count || 0)} 条证据</div></div></div><div class="ai-analysis-summary">${esc(decision.summary || '未提供摘要')}</div><div class="ai-analysis-grid">${list('关键证据',decision.evidence)}${list('可能误报',decision.false_positive_factors)}${list('复核建议',decision.recommendations)}${list('拟议动作',decision.proposed_actions)}</div><div class="ai-advisory">AI 没有执行任何封禁、限速或配置变更。最终判断和处置必须由管理员确认。</div>`;
 }
 
 function openRiskLogs(ip='') {
