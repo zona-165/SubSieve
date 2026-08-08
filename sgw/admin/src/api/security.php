@@ -66,7 +66,16 @@ function build_security_snapshot(): array {
     $statsCacheFile = dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json';
     $statsCache = guard_read_json($statsCacheFile);
     $statsData = is_array($statsCache['data'] ?? null) ? $statsCache['data'] : [];
-    $findings = enrich_guard_findings($analysis['findings'] ?? [], $statsData, $secret);
+    $whitelistIps = guard_whitelist_ip_set();
+    $findings = guard_add_daily_ip_volume_findings(
+        $analysis['findings'] ?? [],
+        is_array($statsData['pull_ips'] ?? null) ? $statsData['pull_ips'] : [],
+        $rules,
+        time(),
+        $secret,
+        $whitelistIps
+    );
+    $findings = enrich_guard_findings($findings, $statsData, $secret, $rules, $whitelistIps);
     $counts = guard_policy_counts();
     $health = guard_health_snapshot($settings, $counts, $statsCacheFile);
     $actions = guard_recent_actions($secret);
@@ -94,16 +103,27 @@ function build_security_snapshot(): array {
     ];
 }
 
-function enrich_guard_findings(array $findings, array $statsData, string $secret): array {
+function enrich_guard_findings(
+    array $findings,
+    array $statsData,
+    string $secret,
+    array $settings = [],
+    array $whitelistIps = []
+): array {
+    $rules = guard_normalize_settings($settings);
     $result = [];
+    $liveIpTokenSubjects = [];
+    $liveTokenIpSubjects = [];
     foreach ($findings as $finding) {
         $finding['source'] = '实时日志阈值';
         $result[$finding['key']] = $finding;
+        if (($finding['kind'] ?? '') === 'ip_multi_token') $liveIpTokenSubjects[(string)($finding['subject'] ?? '')] = true;
+        if (($finding['kind'] ?? '') === 'token_multi_ip') $liveTokenIpSubjects[(string)($finding['subject'] ?? '')] = true;
     }
 
     foreach (array_slice($statsData['scanner_reports'] ?? [], 0, 20) as $row) {
         $ip = trim((string)($row['ip'] ?? ''));
-        if ($ip === '') continue;
+        if ($ip === '' || isset($whitelistIps[$ip])) continue;
         $token = (string)($row['token'] ?? '');
         $subject = $ip;
         $key = guard_finding_key('scanner', $ip . '|' . $token . '|' . (string)($row['ua'] ?? ''), $secret);
@@ -131,50 +151,51 @@ function enrich_guard_findings(array $findings, array $statsData, string $secret
 
     foreach (array_slice($statsData['susp_ips'] ?? [], 0, 20) as $row) {
         $ip = trim((string)($row['ip'] ?? ''));
-        if ($ip === '') continue;
-        $key = guard_finding_key('history_ip_tokens', $ip, $secret);
-        if (isset($result[$key])) continue;
+        if ($ip === '' || isset($whitelistIps[$ip])) continue;
         $count = (int)($row['token_count'] ?? 0);
-        $result[$key] = [
-            'key' => $key,
-            'kind' => 'history_ip_tokens',
-            'title' => '日志窗口内 IP 拉取多 Token',
-            'subject' => $ip,
-            'count' => $count,
-            'threshold' => 3,
-            'window' => '最近日志窗口',
-            'reason' => '成功订阅请求中的 Token 去重统计超过观察值。',
-            'score' => (int)($row['score'] ?? 75),
-            'risk' => (string)($row['risk'] ?? '关注'),
-            'last_seen_ts' => strtotime((string)($row['last_time'] ?? '')) ?: 0,
-            'last_seen' => (string)($row['last_time'] ?? ''),
-            'source' => '统计缓存',
-        ];
+        if ($count < $rules['guard_ip_hour_tokens'] || isset($liveIpTokenSubjects[$ip])) continue;
+        $finding = guard_finding(
+            'history_ip_tokens', $ip, '日志窗口 IP 拉取多个 Token', $count,
+            $rules['guard_ip_hour_tokens'], '最近日志窗口',
+            '成功订阅请求中的 Token 去重统计超过观察阈值。',
+            strtotime((string)($row['last_time'] ?? '')) ?: time(), $secret,
+            ['token_count' => $count]
+        );
+        $finding['source'] = '统计缓存';
+        $result[$finding['key']] = $finding;
     }
 
     foreach (array_slice($statsData['susp_tokens'] ?? [], 0, 20) as $row) {
         $token = trim((string)($row['token'] ?? ''));
         if ($token === '') continue;
         $tokenRef = guard_token_fingerprint($token, $secret);
-        $key = guard_finding_key('history_token_ips', $tokenRef, $secret);
-        $result[$key] = [
-            'key' => $key,
-            'kind' => 'history_token_ips',
-            'title' => '日志窗口内 Token 被多 IP 拉取',
-            'subject' => $tokenRef,
-            'count' => (int)($row['ip_count'] ?? 0),
-            'threshold' => 3,
-            'window' => '最近日志窗口',
-            'reason' => 'Token 指纹在最近日志窗口内出现多个来源 IP。',
-            'score' => 82,
-            'risk' => '关注',
-            'last_seen_ts' => 0,
-            'last_seen' => '',
-            'source' => '统计缓存',
-        ];
+        $count = (int)($row['ip_count'] ?? 0);
+        if ($count < $rules['guard_token_hour_ips'] || isset($liveTokenIpSubjects[$tokenRef])) continue;
+        $finding = guard_finding(
+            'history_token_ips', $tokenRef, '日志窗口 Token 被多 IP 拉取', $count,
+            $rules['guard_token_hour_ips'], '最近日志窗口',
+            'Token 指纹在最近日志窗口内出现多个来源 IP。',
+            strtotime((string)($row['last_time'] ?? '')) ?: time(), $secret,
+            ['sample_ips' => array_slice(is_array($row['ips'] ?? null) ? $row['ips'] : [], 0, 8)]
+        );
+        $finding['source'] = '统计缓存';
+        $result[$finding['key']] = $finding;
     }
 
     $result = array_values($result);
+    $intelCache = guard_read_json(IP_INTEL_CACHE_JSON);
+    foreach ($result as &$finding) {
+        $subject = (string)($finding['subject'] ?? '');
+        if (!filter_var($subject, FILTER_VALIDATE_IP)) continue;
+        $intelEntry = is_array($intelCache[$subject] ?? null) ? $intelCache[$subject] : [];
+        $intel = is_array($intelEntry['data'] ?? null) ? $intelEntry['data'] : [];
+        if (!$intel || !empty($intel['query_failed'])) continue;
+        $finding['location'] = (string)($intel['location'] ?? ($finding['location'] ?? '未查询'));
+        $finding['asn'] = (string)($intel['asn'] ?? ($finding['asn'] ?? '未查询'));
+        $finding['operator'] = (string)($intel['operator'] ?? '未知运营商');
+        $finding['network_type'] = (string)($intel['network_type'] ?? '未知网络');
+    }
+    unset($finding);
     usort($result, fn(array $a, array $b) => ($b['score'] <=> $a['score']) ?: (($b['last_seen_ts'] ?? 0) <=> ($a['last_seen_ts'] ?? 0)));
     return array_slice($result, 0, 100);
 }
@@ -197,6 +218,18 @@ function guard_policy_counts(): array {
         'ip_intel_cache' => count(guard_read_json(IP_INTEL_CACHE_JSON)),
         'token_suspended' => count(is_array($limitState['entries'] ?? null) ? $limitState['entries'] : []),
     ];
+}
+
+function guard_whitelist_ip_set(): array {
+    $result = [];
+    if (!file_exists(WHITELIST_IPS)) return $result;
+    foreach (file(WHITELIST_IPS, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) continue;
+        $ip = strtok($line, " \t#");
+        if ($ip !== false && filter_var($ip, FILTER_VALIDATE_IP)) $result[$ip] = true;
+    }
+    return $result;
 }
 
 function count_json_entries(string $file): int {

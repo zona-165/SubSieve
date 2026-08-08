@@ -5,13 +5,18 @@ if (PHP_SAPI === 'cli') {
     require_once __DIR__ . '/_auth.php';
 }
 require_once dirname(__DIR__) . '/lib/ip_intel_queue.php';
+require_once dirname(__DIR__) . '/lib/guard.php';
 
 if (!defined('STATS_CACHE_JSON')) {
     define('STATS_CACHE_JSON', dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
 }
 
 $cacheTtl = 120;
-$maxScanLines = 30000;
+$statsSettings = guard_read_json(SETTINGS_JSON);
+$statsRules = guard_normalize_settings($statsSettings);
+$maxScanLines = (int)$statsRules['guard_scan_lines'];
+$statsSubscribePath = trim((string)($statsSettings['subscribe_path'] ?? '/api/v1/client/subscribe'));
+if ($statsSubscribePath === '') $statsSubscribePath = '/api/v1/client/subscribe';
 $forceRefresh = PHP_SAPI === 'cli' || (isset($_GET['refresh']) && $_GET['refresh'] === '1');
 if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
     $cacheRaw = @file_get_contents(STATS_CACHE_JSON);
@@ -24,15 +29,14 @@ if (!$forceRefresh && file_exists(STATS_CACHE_JSON)) {
 }
 
 $today  = date('d/M/Y');
-$ips    = [];   // ip => [total,200,403,429,444]  (today only)
-$tokens = [];   // token => [count, last_time]     (today only)
-$badUas = [];   // ua => count (403 only, today)
+$pullIps = [];  // ip => subscription pull counts (today only)
 $scannerReports = []; // latest suspicious subscription pulls
-$profileSegments = []; // /24 segment => observed IP profile cells
 
 // 全量日志用于可疑分析
 $suspTokenIps = [];  // token => {ip => true}
 $suspIpTokens = [];  // ip    => {token => true}
+$suspTokenLast = [];
+$suspIpLast = [];
 
 // 读取Token黑名单（用于从统计中排除）
 $tokenBlacklist = [];
@@ -66,41 +70,39 @@ if (file_exists(LOG_FILE)) {
 
         [, $ip, $time, $request, $status, , $ua] = $m;
         $status = (int)$status;
-        collect_profile_segment($profileSegments, $ip, $time, $request, $status, $ua);
-
+        $requestPath = extract_request_path($request);
+        $isSubscription = guard_path_matches($requestPath, $statsSubscribePath);
         // ── 今日统计 ──────────────────────────────────────────
         if (str_contains($line, "[$today:")) {
-            if (!isset($ips[$ip])) $ips[$ip] = ['total'=>0,'s200'=>0,'s403'=>0,'s429'=>0,'s444'=>0];
-            $ips[$ip]['total']++;
-            if ($status === 200) $ips[$ip]['s200']++;
-            elseif ($status === 403) $ips[$ip]['s403']++;
-            elseif ($status === 429) $ips[$ip]['s429']++;
-            elseif ($status === 444) $ips[$ip]['s444']++;
-
-            if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) {
-                $tok = $tm[1];
-                if (!isset($tokenBlacklist[$tok])) {
-                    if (!isset($tokens[$tok])) $tokens[$tok] = ['count'=>0,'last_time'=>''];
-                    $tokens[$tok]['count']++;
-                    $tokens[$tok]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
+            if ($isSubscription) {
+                if (!isset($pullIps[$ip])) {
+                    $pullIps[$ip] = ['total'=>0,'s200'=>0,'s403'=>0,'s429'=>0,'s444'=>0,'tokens'=>[],'last_time'=>''];
                 }
-            }
-
-            if ($status === 403 && $ua !== '') {
-                if (!isset($badUas[$ua])) $badUas[$ua] = 0;
-                $badUas[$ua]++;
+                $pullIps[$ip]['total']++;
+                if ($status === 200) $pullIps[$ip]['s200']++;
+                elseif ($status === 403) $pullIps[$ip]['s403']++;
+                elseif ($status === 429) $pullIps[$ip]['s429']++;
+                elseif ($status === 444) $pullIps[$ip]['s444']++;
+                $pullIps[$ip]['last_time'] = format_log_time($time);
+                if (preg_match('/[?&]token=([^&\s]+)/i', $request, $pullTokenMatch)) {
+                    $pullIps[$ip]['tokens'][rawurldecode($pullTokenMatch[1])] = true;
+                }
             }
         }
 
         // ── 近段日志可疑分析（200 状态订阅请求，排除白名单IP和Token黑名单）──
         if ($status === 200
+            && $isSubscription
             && !isset($whitelistIps[$ip])
             && preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)
         ) {
-            $tok = $tm[1];
+            $tok = rawurldecode($tm[1]);
             if (!isset($tokenBlacklist[$tok])) {
                 $suspTokenIps[$tok][$ip] = true;
                 $suspIpTokens[$ip][$tok]  = true;
+                $formattedTime = format_log_time($time);
+                $suspTokenLast[$tok] = $formattedTime;
+                $suspIpLast[$ip] = $formattedTime;
                 $scannerReason = scanner_reason($ua);
                 if ($scannerReason !== '') {
                     $key = $ip . '|' . $tok;
@@ -126,46 +128,28 @@ if (file_exists(LOG_FILE)) {
     }
 }
 
-// Top IP（今日，最多返回500条，前端负责显示限制）
-uasort($ips, fn($a,$b) => $b['total'] - $a['total']);
-$topIps = [];
-foreach (array_slice($ips, 0, 500, true) as $ip => $v) {
-    $topIps[] = array_merge(['ip' => $ip], $v);
+uasort($pullIps, fn($a,$b) => $b['total'] - $a['total']);
+$pullIpList = [];
+foreach (array_slice($pullIps, 0, 500, true) as $ip => $v) {
+    $v['token_count'] = count($v['tokens'] ?? []);
+    unset($v['tokens']);
+    $pullIpList[] = array_merge(['ip' => $ip], $v);
 }
-if (PHP_SAPI === 'cli') warm_ip_intel_candidates(array_column($topIps, 'ip'), 5);
+if (PHP_SAPI === 'cli') warm_ip_intel_candidates(array_column($pullIpList, 'ip'), 5);
 
-// Top Token（今日，最多返回500条，前端负责显示限制）
-uasort($tokens, fn($a,$b) => $b['count'] - $a['count']);
-$topTokens = [];
-foreach (array_slice($tokens, 0, 500, true) as $tok => $v) {
-    $topTokens[] = [
-        'token'      => substr($tok, 0, 8) . '…',
-        'token_full' => $tok,
-        'count'      => $v['count'],
-        'last_time'  => $v['last_time'],
-    ];
-}
-
-// UA TOP（最多返回500条，前端负责显示限制）
-arsort($badUas);
-$badUaList = [];
-foreach (array_slice($badUas, 0, 500, true) as $ua => $cnt) {
-    $badUaList[] = ['ua' => $ua, 'count' => $cnt];
-}
-
-// 可疑 Token（日志周期内被 3+ 个不同IP拉取）
-$SUSP_TOKEN_THRESHOLD = 3;
+// 可疑 Token（日志周期内被多个不同 IP 拉取）
+$SUSP_TOKEN_THRESHOLD = (int)$statsRules['guard_token_hour_ips'];
 $suspTokenList = [];
 foreach ($suspTokenIps as $tok => $ipSet) {
     $cnt = count($ipSet);
     if ($cnt >= $SUSP_TOKEN_THRESHOLD) {
-        $suspTokenList[] = ['token' => $tok, 'ip_count' => $cnt, 'ips' => array_keys($ipSet)];
+        $suspTokenList[] = ['token' => $tok, 'ip_count' => $cnt, 'ips' => array_keys($ipSet), 'last_time' => (string)($suspTokenLast[$tok] ?? '')];
     }
 }
 usort($suspTokenList, fn($a,$b) => $b['ip_count'] - $a['ip_count']);
 
-// 可疑 IP（日志周期内拉取了 3+ 个不同Token）
-$SUSP_IP_THRESHOLD = 3;
+// 可疑 IP（日志周期内拉取多个不同 Token）
+$SUSP_IP_THRESHOLD = (int)$statsRules['guard_ip_hour_tokens'];
 $suspIpList = [];
 foreach ($suspIpTokens as $ip => $tokSet) {
     $cnt = count($tokSet);
@@ -182,7 +166,7 @@ foreach ($suspIpTokens as $ip => $tokSet) {
             'tokens' => array_slice(array_keys($tokSet), 0, 8),
             'paths' => [],
             'uas' => [],
-            'last_time' => '',
+            'last_time' => (string)($suspIpLast[$ip] ?? ''),
             'reasons' => [
                 "触发 IP {$ip} 在日志周期内拉取了 {$cnt} 个不同 Token，超过阈值 {$SUSP_IP_THRESHOLD}。",
                 '该判断来自成功订阅请求的 Token 去重统计，建议结合日志页按 IP 复核请求路径和 UA。',
@@ -196,21 +180,13 @@ $scannerList = array_values($scannerReports);
 usort($scannerList, fn($a,$b) => strcmp($b['time'], $a['time']));
 $scannerList = array_slice($scannerList, 0, 100);
 $scannerList = enrich_scanner_reports($scannerList);
-try {
-    $userProfiles = build_user_profiles($profileSegments);
-} catch (Throwable $e) {
-    $userProfiles = [];
-}
 
 $payload = [
     'ok'          => true,
-    'top_ips'     => $topIps,
-    'top_tokens'  => $topTokens,
-    'bad_uas'     => $badUaList,
+    'pull_ips'    => $pullIpList,
     'susp_tokens' => $suspTokenList,
     'susp_ips'    => $suspIpList,
     'scanner_reports' => $scannerList,
-    'user_profiles' => $userProfiles,
     'cached' => false,
     'scan_limit' => $maxScanLines,
 ];
@@ -249,107 +225,6 @@ function tail_log_lines(string $file, int $maxLines): iterable {
         fclose($handle);
         foreach ($buf as $line) yield $line;
     }
-}
-
-function collect_profile_segment(array &$segments, string $ip, string $time, string $request, int $status, string $ua): void {
-    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return;
-    $parts = explode('.', $ip);
-    if (count($parts) !== 4) return;
-    $octets = array_map('intval', $parts);
-    foreach ($octets as $octet) {
-        if ($octet < 0 || $octet > 255) return;
-    }
-    $segment = $octets[0] . '.' . $octets[1] . '.' . $octets[2] . '.0';
-    $rangeEnd = $octets[0] . '.' . $octets[1] . '.' . $octets[2] . '.255';
-    $lastOctet = $octets[3];
-    if (!isset($segments[$segment])) {
-        $segments[$segment] = [
-            'base' => $segment,
-            'range' => $segment . ' - ' . $rangeEnd,
-            'ips' => [],
-            'total' => 0,
-            'last_time' => '',
-        ];
-    }
-    if (!isset($segments[$segment]['ips'][$ip])) {
-        $segments[$segment]['ips'][$ip] = [
-            'ip' => $ip,
-            'last_octet' => $lastOctet,
-            'count' => 0,
-            'bad' => 0,
-            'ok' => 0,
-            'tokens' => [],
-            'uas' => [],
-            'scanner' => false,
-            'last_time' => '',
-        ];
-    }
-    $segments[$segment]['total']++;
-    $segments[$segment]['last_time'] = format_log_time($time);
-    $cell =& $segments[$segment]['ips'][$ip];
-    $cell['count']++;
-    $cell['last_time'] = format_log_time($time);
-    if ($status === 200) $cell['ok']++;
-    if (in_array($status, [403, 429, 444], true)) $cell['bad']++;
-    if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) $cell['tokens'][$tm[1]] = true;
-    $u = trim($ua);
-    if ($u !== '' && $u !== '-') $cell['uas'][$u] = true;
-    if (scanner_reason($ua) !== '') $cell['scanner'] = true;
-}
-
-function build_user_profiles(array $segments): array {
-    if (!$segments) return [];
-    uasort($segments, fn($a, $b) => ($b['total'] <=> $a['total']) ?: strcmp($a['base'], $b['base']));
-    $cache = read_ip_intel_cache();
-    $profiles = [];
-    foreach (array_slice($segments, 0, 8, true) as $segment) {
-        $cells = [];
-        $summary = ['V'=>0, 'O'=>0, 'T'=>0, 'P'=>0, 'B'=>0, 'N'=>0];
-        uasort($segment['ips'], fn($a, $b) => $a['last_octet'] <=> $b['last_octet']);
-        foreach ($segment['ips'] as $ip => $cell) {
-            $cached = isset($cache[$ip]) && is_ip_intel_cache_fresh($cache[$ip]);
-            $intel = $cached ? ($cache[$ip]['data'] ?? null) : null;
-            $kind = profile_cell_kind($cell, $intel);
-            $summary[$kind]++;
-            $cells[] = [
-                'ip' => $ip,
-                'octet' => $cell['last_octet'],
-                'kind' => $kind,
-                'label' => $kind === 'N' ? '·' : $kind,
-                'count' => $cell['count'],
-                'token_count' => count($cell['tokens']),
-                'ua_count' => count($cell['uas']),
-                'last_time' => $cell['last_time'],
-                'location' => $intel['location'] ?? '未查询',
-                'asn' => $intel['asn'] ?? '未查询',
-                'network_type' => $intel['network_type'] ?? '本地日志',
-            ];
-        }
-        $profiles[] = [
-            'range' => $segment['range'],
-            'total' => $segment['total'],
-            'ip_count' => count($segment['ips']),
-            'last_time' => $segment['last_time'],
-            'summary' => $summary,
-            'cells' => array_slice($cells, 0, 256),
-        ];
-    }
-    return $profiles;
-}
-
-function profile_cell_kind(array $cell, ?array $intel): string {
-    $tags = $intel['tags'] ?? [];
-    $network = $intel['network_type'] ?? '';
-    $asn = strtolower($intel['asn'] ?? '');
-    if (!empty($cell['scanner']) || (int)($cell['bad'] ?? 0) > 0) return 'B';
-    if (str_contains($network, 'Tor') || str_contains($asn, 'tor')) return 'T';
-    if (!empty($intel['is_proxy']) || str_contains($network, '代理') || str_contains($network, 'VPN')) return 'P';
-    if (!empty($intel['is_hosting']) || str_contains($network, '机房') || str_contains($network, '托管')) return 'O';
-    foreach ($tags as $tag) {
-        if (str_contains($tag, '代理') || str_contains($tag, 'VPN')) return 'P';
-        if (str_contains($tag, '机房') || str_contains($tag, '托管')) return 'O';
-    }
-    return 'N';
 }
 
 function scanner_reason(string $ua): string {

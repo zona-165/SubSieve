@@ -3,6 +3,7 @@
 function guard_default_settings(): array {
     return [
         'guard_observe_enabled' => 1,
+        'guard_ip_daily_requests' => 100,
         'guard_ip_per_minute' => 30,
         'guard_token_per_minute' => 20,
         'guard_token_hour_ips' => 8,
@@ -20,6 +21,7 @@ function guard_default_settings(): array {
 function guard_normalize_settings(array $settings): array {
     $defaults = guard_default_settings();
     $ranges = [
+        'guard_ip_daily_requests' => [20, 100000],
         'guard_ip_per_minute' => [5, 5000],
         'guard_token_per_minute' => [5, 5000],
         'guard_token_hour_ips' => [2, 500],
@@ -213,6 +215,57 @@ function guard_analyze_logs(iterable $lines, array $settings, int $now, string $
         ],
         'findings' => array_slice($findings, 0, 100),
     ];
+}
+
+function guard_add_daily_ip_volume_findings(
+    array $findings,
+    array $pullIps,
+    array $settings,
+    int $now,
+    string $secret,
+    array $whitelistIps = []
+): array {
+    $rules = guard_normalize_settings($settings);
+    if (empty($rules['guard_observe_enabled'])) return $findings;
+    $threshold = (int)$rules['guard_ip_daily_requests'];
+    $result = [];
+    foreach ($findings as $finding) {
+        if (!empty($finding['key'])) $result[(string)$finding['key']] = $finding;
+    }
+
+    foreach ($pullIps as $row) {
+        $ip = trim((string)($row['ip'] ?? ''));
+        $count = (int)($row['total'] ?? 0);
+        if (!filter_var($ip, FILTER_VALIDATE_IP) || $count < $threshold) continue;
+        if (isset($whitelistIps[$ip]) || in_array($ip, $whitelistIps, true)) continue;
+        $lastSeen = strtotime((string)($row['last_time'] ?? '')) ?: $now;
+        $statusCounts = [
+            '200' => (int)($row['s200'] ?? 0),
+            '403' => (int)($row['s403'] ?? 0),
+            '429' => (int)($row['s429'] ?? 0),
+            '444' => (int)($row['s444'] ?? 0),
+        ];
+        $finding = guard_finding(
+            'daily_ip_volume',
+            $ip,
+            '今日单 IP 高频拉取',
+            $count,
+            $threshold,
+            '今日',
+            "该 IP 今日累计拉取订阅 {$count} 次，已超过观察阈值 {$threshold} 次。",
+            $lastSeen,
+            $secret,
+            [
+                'status_counts' => $statusCounts,
+                'token_count' => (int)($row['token_count'] ?? 0),
+            ]
+        );
+        $result[$finding['key']] = $finding;
+    }
+
+    $result = array_values($result);
+    usort($result, fn(array $a, array $b): int => ($b['score'] <=> $a['score']) ?: ($b['last_seen_ts'] <=> $a['last_seen_ts']));
+    return array_slice($result, 0, 100);
 }
 
 function guard_finding(

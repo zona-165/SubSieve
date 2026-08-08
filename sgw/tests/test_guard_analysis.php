@@ -44,10 +44,42 @@ $disabled = guard_analyze_logs($lines, ['guard_observe_enabled' => 0], $now, '/g
 check(count($disabled['findings']) === 0, 'disabled observation still produced findings');
 check(($disabled['metrics']['today_requests'] ?? 0) === count($lines), 'disabled observation lost metrics');
 
+$dailyRows = [[
+    'ip' => '134.195.100.42',
+    'total' => 233,
+    's200' => 50,
+    's403' => 70,
+    's429' => 111,
+    's444' => 2,
+    'token_count' => 3,
+    'last_time' => '2026-08-04 11:59:00',
+]];
+$dailyFindings = guard_add_daily_ip_volume_findings([], $dailyRows, guard_default_settings(), $now, 'unit-test-secret');
+check(count($dailyFindings) === 1, 'daily IP volume finding was not created');
+check(($dailyFindings[0]['kind'] ?? '') === 'daily_ip_volume', 'daily IP volume kind mismatch');
+check(($dailyFindings[0]['count'] ?? 0) === 233, 'daily IP volume count mismatch');
+check(($dailyFindings[0]['token_count'] ?? 0) === 3, 'daily IP token count mismatch');
+check(($dailyFindings[0]['status_counts']['429'] ?? 0) === 111, 'daily IP status counts missing');
+check(!str_contains(json_encode($dailyFindings), 'preview-token'), 'daily IP finding leaked Token data');
+
+$whitelistedDaily = guard_add_daily_ip_volume_findings(
+    [],
+    $dailyRows,
+    guard_default_settings(),
+    $now,
+    'unit-test-secret',
+    ['134.195.100.42' => true]
+);
+check(count($whitelistedDaily) === 0, 'whitelisted daily IP produced a finding');
+$disabledDaily = guard_add_daily_ip_volume_findings([], $dailyRows, ['guard_observe_enabled' => 0], $now, 'unit-test-secret');
+check(count($disabledDaily) === 0, 'disabled observation produced a daily finding');
+
 $clamped = guard_normalize_settings([
+    'guard_ip_daily_requests' => 1,
     'guard_ip_per_minute' => 1,
     'guard_scan_lines' => 999999,
 ]);
+check($clamped['guard_ip_daily_requests'] === 20, 'daily IP minimum clamp failed');
 check($clamped['guard_ip_per_minute'] === 5, 'minimum clamp failed');
 check($clamped['guard_scan_lines'] === 100000, 'maximum clamp failed');
 check(guard_parse_log_line('invalid') === null, 'invalid log line was accepted');

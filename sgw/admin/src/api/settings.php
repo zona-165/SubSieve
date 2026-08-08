@@ -273,6 +273,7 @@ function apply_guard_settings(array $s, array $body): array {
         if (array_key_exists($key, $body)) $s[$key] = !empty($body[$key]) ? 1 : 0;
     }
     $fields = [
+        'guard_ip_daily_requests' => [20, 100000, 100],
         'guard_ip_per_minute' => [5, 5000, 30],
         'guard_token_per_minute' => [5, 5000, 20],
         'guard_token_hour_ips' => [2, 500, 8],

@@ -40,21 +40,32 @@ if (str_starts_with($path, '/api/')) {
     if ($path === '/api/security.php') {
         $previewFindings = [];
         $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
+        $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner'];
         for ($i = 1; $i <= 13; $i++) {
             $status = $i <= 7 ? 'pending' : ($i <= 9 ? 'watch' : ($i <= 12 ? 'trusted' : 'confirmed'));
+            $kind = $findingKinds[($i - 1) % count($findingKinds)];
+            $isDaily = $i === 1;
+            $isToken = $kind === 'token_multi_ip';
             $previewSummary[$status]++;
             $previewFindings[] = [
-                'key' => 'ip_minute:' . substr(hash('sha256', 'preview-' . $i), 0, 24),
-                'title' => $i % 2 === 0 ? '日志窗口内 IP 拉取多 Token' : '单 IP 高频拉取',
-                'subject' => '198.51.100.' . (20 + $i),
-                'count' => 30 + $i,
-                'threshold' => 30,
-                'window' => $i % 2 === 0 ? '最近日志窗口' : '1 分钟',
-                'source' => '本地日志',
+                'key' => $kind . ':' . substr(hash('sha256', 'preview-' . $i), 0, 24),
+                'kind' => $kind,
+                'title' => $isDaily ? '今日单 IP 高频拉取' : ($isToken ? 'Token 跨多 IP 拉取' : ($kind === 'scanner' ? '脚本/扫描器拉取订阅' : 'IP 拉取多个 Token')),
+                'subject' => $isToken ? 'TKN-' . strtoupper(substr(hash('sha256', 'token-' . $i), 0, 16)) : '198.51.100.' . (20 + $i),
+                'count' => $isDaily ? 233 : 30 + $i,
+                'threshold' => $isDaily ? 100 : 30,
+                'window' => $isDaily ? '今日' : ($i % 2 === 0 ? '最近日志窗口' : '1 分钟'),
+                'source' => $isDaily ? '订阅路径统计' : '本地日志',
                 'last_seen' => date('Y-m-d H:i:s', time() - $i * 90),
-                'risk' => $i <= 4 ? '高危' : '关注',
-                'score' => max(62, 96 - $i * 2),
-                'reason' => '请求行为达到观察阈值，等待管理员复核。',
+                'risk' => $isDaily ? '极高危' : ($i <= 4 ? '高危' : '关注'),
+                'score' => $isDaily ? 100 : max(62, 96 - $i * 2),
+                'reason' => $isDaily ? '该 IP 今日累计拉取订阅 233 次，已超过观察阈值 100 次。' : '请求行为达到观察阈值，等待管理员复核。',
+                'status_counts' => $isDaily ? ['200' => 50, '403' => 70, '429' => 111, '444' => 2] : [],
+                'token_count' => $isDaily ? 3 : 0,
+                'location' => $isToken ? '' : 'Singapore / Central Singapore',
+                'asn' => $isToken ? '' : 'AS46997',
+                'operator' => $isToken ? '' : 'Black Mesa Corporation',
+                'network_type' => $isToken ? '' : '机房/托管',
                 'review' => ['status' => $status, 'note' => ''],
             ];
         }
@@ -92,7 +103,8 @@ if (str_starts_with($path, '/api/')) {
             'review_summary' => $previewSummary,
             'findings' => $previewFindings,
             'rules' => [
-                'guard_observe_enabled' => 1, 'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 20,
+                'guard_observe_enabled' => 1, 'guard_ip_daily_requests' => 100,
+                'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 20,
                 'guard_token_hour_ips' => 8, 'guard_ip_hour_tokens' => 20, 'guard_ip_404_5m' => 40,
                 'guard_scan_lines' => 30000,
             ],
@@ -147,8 +159,10 @@ if (str_starts_with($path, '/api/')) {
     if ($path === '/api/stats.php') {
         echo json_encode([
             'ok' => true, 'scan_limit' => 30000,
-            'top_ips' => [['ip' => '198.51.100.24', 'total' => 36, 's200' => 34, 's403' => 1, 's429' => 1, 's444' => 0]],
-            'top_tokens' => [['token_full' => 'TKN-PREVIEW12345678', 'count' => 22, 'last_time' => date('H:i:s')]],
+            'pull_ips' => [[
+                'ip' => '198.51.100.21', 'total' => 233, 's200' => 50, 's403' => 70,
+                's429' => 111, 's444' => 2, 'token_count' => 3, 'last_time' => date('Y-m-d H:i:s'),
+            ]],
             'susp_tokens' => [[
                 'token' => 'preview-token-fingerprint', 'ip_count' => 7,
             ]],
@@ -165,18 +179,6 @@ if (str_starts_with($path, '/api/')) {
                 'path' => '/api/v1/client/subscribe', 'ua' => 'python-requests/2.32',
                 'reason' => 'automation_client', 'time' => date('Y-m-d H:i:s'),
             ]],
-            'user_profiles' => [[
-                'range' => '198.51.100.0 - 198.51.100.255', 'ip_count' => 4, 'total' => 80,
-                'last_time' => date('Y-m-d H:i:s'),
-                'summary' => ['V' => 0, 'O' => 1, 'T' => 0, 'P' => 2, 'B' => 1],
-                'cells' => [
-                    ['ip' => '198.51.100.21', 'kind' => 'P', 'label' => 'P', 'count' => 22, 'token_count' => 3],
-                    ['ip' => '198.51.100.24', 'kind' => 'B', 'label' => 'B', 'count' => 36, 'token_count' => 6],
-                    ['ip' => '198.51.100.30', 'kind' => 'O', 'label' => 'O', 'count' => 12, 'token_count' => 2],
-                    ['ip' => '198.51.100.42', 'kind' => 'P', 'label' => 'P', 'count' => 10, 'token_count' => 2],
-                ],
-            ]],
-            'bad_uas' => [],
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

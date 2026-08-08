@@ -203,9 +203,9 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .stats-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .stats-card{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--tone-bg),var(--bg3) 58%);border:1px solid var(--tone-border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;min-height:128px;text-align:left;color:var(--text);font:inherit;box-shadow:0 10px 28px rgba(15,23,42,.06)}
 .stats-card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--tone);opacity:.9}
-.stats-card::after{content:"";position:absolute;right:-28px;top:-28px;width:96px;height:96px;border-radius:50%;background:var(--tone);opacity:.10;pointer-events:none}
 .stats-card:hover{border-color:var(--tone);transform:translateY(-2px);box-shadow:0 14px 34px rgba(15,23,42,.14)}
 .stats-card:active{transform:translateY(0) scale(.99)}
+.stats-card.active{border-color:var(--tone);box-shadow:0 0 0 2px var(--tone-soft)}
 .stats-card-title{display:flex;align-items:center;justify-content:space-between;color:var(--text2);font-size:12px;font-weight:700;margin-bottom:10px}
 .stats-card-kicker{display:flex;align-items:center;gap:8px}
 .stats-card-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--tone-soft);color:var(--tone);font-size:15px}
@@ -628,6 +628,13 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .review-page-actions{display:flex;align-items:center;gap:6px}
 .review-page-jump{width:48px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:5px 6px;border-radius:6px;font-size:11px;outline:none;text-align:center}
 .review-page-jump:focus{border-color:var(--accent)}
+.risk-workbench{max-width:1180px;margin:14px auto 0}
+.risk-kind-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:5px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
+.risk-kind-toolbar .mode-btn{flex:0 0 auto}
+.risk-kind-toolbar .mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.risk-intel{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;color:var(--text3);font-size:10px}
+.risk-intel span{padding:3px 7px;border-radius:5px;background:rgba(100,116,139,.07)}
+.risk-status-counts{display:inline-flex;gap:3px;font-variant-numeric:tabular-nums}
 
 .workspace-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
 .workspace-intro h1{font-size:22px;line-height:1.2;font-weight:850}
@@ -825,28 +832,6 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             <div id="security-mechanisms" class="mechanism-grid"><div class="loading">加载中…</div></div>
           </section>
 
-          <section class="security-section">
-            <div class="security-section-head">
-              <div><div class="security-section-title">风险复核</div><div class="security-section-sub">阈值命中只进入复核队列，不会自动封禁</div></div>
-              <button class="mode-btn" onclick="openPanelTab('stats')">完整分析</button>
-            </div>
-            <div class="review-toolbar">
-              <div class="log-mode-btns">
-                <button class="mode-btn active" id="guard-filter-active" onclick="setGuardFilter('active')">待处理</button>
-                <button class="mode-btn" id="guard-filter-all" onclick="setGuardFilter('all')">全部</button>
-                <button class="mode-btn" id="guard-filter-trusted" onclick="setGuardFilter('trusted')">已判可信</button>
-                <span class="auto-timer" id="guard-review-summary"></span>
-              </div>
-              <div class="review-size-control" aria-label="每页显示数量">
-                <span>每页</span>
-                <button class="mode-btn active" id="guard-size-5" onclick="setGuardPageSize(5)">5</button>
-                <button class="mode-btn" id="guard-size-10" onclick="setGuardPageSize(10)">10</button>
-                <button class="mode-btn" id="guard-size-20" onclick="setGuardPageSize(20)">20</button>
-              </div>
-            </div>
-            <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
-            <div id="guard-pagination" class="review-pagination"></div>
-          </section>
         </div>
 
         <div>
@@ -866,6 +851,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             </label>
             <div class="rule-grid">
               <div class="rule-field"><label>单 IP / 分钟</label><input class="ip-input" id="guard-ip-minute" type="number" min="5" max="5000"></div>
+              <div class="rule-field"><label>单 IP / 今日拉取</label><input class="ip-input" id="guard-ip-daily" type="number" min="20" max="100000"></div>
               <div class="rule-field"><label>单 Token / 分钟</label><input class="ip-input" id="guard-token-minute" type="number" min="5" max="5000"></div>
               <div class="rule-field"><label>Token / 小时不同 IP</label><input class="ip-input" id="guard-token-hour-ips" type="number" min="2" max="500"></div>
               <div class="rule-field"><label>IP / 小时不同 Token</label><input class="ip-input" id="guard-ip-hour-tokens" type="number" min="2" max="1000"></div>
@@ -973,109 +959,39 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 
     <!-- ─── 分析 ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-stats">
-      <div id="stats-overview" class="stats-overview">
-        <div class="loading">加载中…</div>
+      <div class="workspace-intro">
+        <div><div class="workspace-kicker">处置中心</div><h1>风险工作台</h1><p>集中处理高频拉取、Token 共享、异常来源与脚本扫描事件。</p></div>
+        <button class="mode-btn" onclick="loadTab('stats',{force:true})">刷新分析</button>
       </div>
-      <div id="stats-detail-head" class="stats-detail-head">
-        <button class="mode-btn stats-back-btn" onclick="showStatsOverview()">返回分类</button>
-        <div class="stats-detail-title" id="stats-detail-title"></div>
-      </div>
-      <div id="stats-detail-grid" class="stats-grid stats-detail-grid">
-        <div class="card stats-detail-card" data-stats-detail="ips">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="card-title" style="margin-bottom:0">今日 Top IP</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-ips-10" onclick="setStatsLimit('ips',10)">10</button>
-              <button class="mode-btn" id="stats-ips-25" onclick="setStatsLimit('ips',25)">25</button>
-              <button class="mode-btn" id="stats-ips-50" onclick="setStatsLimit('ips',50)">50</button>
-              <button class="mode-btn" id="stats-ips-0" onclick="setStatsLimit('ips',0)">全部</button>
-            </div>
-          </div>
-          <div style="font-size:10px;color:var(--text3);margin-bottom:10px">
-            右侧计数：<span style="color:#22c55e">●</span>成功 / <span style="color:#ef4444">●</span>拦截403 / <span style="color:#eab308">●</span>限速429 / <span style="color:#64748b">●</span>断连444
-          </div>
-          <div id="top-ips"><div class="loading">加载中…</div></div>
-          <div id="stats-ips-pg" class="page-controls" style="display:none;margin-top:10px"></div>
+      <div id="risk-analysis-summary" class="analysis-core-grid"><div class="loading">加载风险分类…</div></div>
+      <section class="security-section risk-workbench">
+        <div class="security-section-head">
+          <div><div class="security-section-title">风险复核</div><div class="security-section-sub">命中阈值后进入复核；人工确认后再执行封禁</div></div>
+          <span class="auto-timer" id="guard-review-summary"></span>
         </div>
-        <div class="card stats-detail-card" data-stats-detail="tokens">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">今日 Top Token</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-tokens-10" onclick="setStatsLimit('tokens',10)">10</button>
-              <button class="mode-btn" id="stats-tokens-25" onclick="setStatsLimit('tokens',25)">25</button>
-              <button class="mode-btn" id="stats-tokens-50" onclick="setStatsLimit('tokens',50)">50</button>
-              <button class="mode-btn" id="stats-tokens-0" onclick="setStatsLimit('tokens',0)">全部</button>
-            </div>
-          </div>
-          <div id="top-tokens"><div class="loading">加载中…</div></div>
-          <div id="stats-tokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
+        <div class="risk-kind-toolbar" aria-label="风险分类">
+          <button class="mode-btn active" id="guard-kind-all" onclick="setGuardRiskKind('all')">全部风险</button>
+          <button class="mode-btn" id="guard-kind-volume" onclick="setGuardRiskKind('volume')">高频拉取</button>
+          <button class="mode-btn" id="guard-kind-token" onclick="setGuardRiskKind('token')">Token 异常</button>
+          <button class="mode-btn" id="guard-kind-source" onclick="setGuardRiskKind('source')">来源异常</button>
+          <button class="mode-btn" id="guard-kind-scanner" onclick="setGuardRiskKind('scanner')">脚本扫描</button>
         </div>
-        <div class="card stats-detail-card" data-stats-detail="suspTokens">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">可疑 Token（被多IP拉取）</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-suspTokens-10" onclick="setStatsLimit('suspTokens',10)">10</button>
-              <button class="mode-btn" id="stats-suspTokens-25" onclick="setStatsLimit('suspTokens',25)">25</button>
-              <button class="mode-btn" id="stats-suspTokens-50" onclick="setStatsLimit('suspTokens',50)">50</button>
-              <button class="mode-btn" id="stats-suspTokens-0" onclick="setStatsLimit('suspTokens',0)">全部</button>
-            </div>
+        <div class="review-toolbar">
+          <div class="log-mode-btns">
+            <button class="mode-btn active" id="guard-filter-active" onclick="setGuardFilter('active')">待处理</button>
+            <button class="mode-btn" id="guard-filter-all" onclick="setGuardFilter('all')">全部</button>
+            <button class="mode-btn" id="guard-filter-trusted" onclick="setGuardFilter('trusted')">已判可信</button>
           </div>
-          <div id="susp-tokens"><div class="loading">加载中…</div></div>
-          <div id="stats-suspTokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
-        </div>
-        <div class="card stats-detail-card" data-stats-detail="suspIps">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">可疑 IP（拉取多Token）</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-suspIps-10" onclick="setStatsLimit('suspIps',10)">10</button>
-              <button class="mode-btn" id="stats-suspIps-25" onclick="setStatsLimit('suspIps',25)">25</button>
-              <button class="mode-btn" id="stats-suspIps-50" onclick="setStatsLimit('suspIps',50)">50</button>
-              <button class="mode-btn" id="stats-suspIps-0" onclick="setStatsLimit('suspIps',0)">全部</button>
-            </div>
+          <div class="review-size-control" aria-label="每页显示数量">
+            <span>每页</span>
+            <button class="mode-btn active" id="guard-size-5" onclick="setGuardPageSize(5)">5</button>
+            <button class="mode-btn" id="guard-size-10" onclick="setGuardPageSize(10)">10</button>
+            <button class="mode-btn" id="guard-size-20" onclick="setGuardPageSize(20)">20</button>
           </div>
-          <div id="susp-ips"><div class="loading">加载中…</div></div>
-          <div id="stats-suspIps-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
-        <div class="card stats-detail-card" data-stats-detail="scanners">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">脚本/扫描器拉取订阅</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-scanners-10" onclick="setStatsLimit('scanners',10)">10</button>
-              <button class="mode-btn" id="stats-scanners-25" onclick="setStatsLimit('scanners',25)">25</button>
-              <button class="mode-btn" id="stats-scanners-50" onclick="setStatsLimit('scanners',50)">50</button>
-              <button class="mode-btn" id="stats-scanners-0" onclick="setStatsLimit('scanners',0)">全部</button>
-            </div>
-          </div>
-          <div id="scanner-reports"><div class="loading">加载中…</div></div>
-          <div id="stats-scanners-pg" class="page-controls" style="display:none;margin-top:10px"></div>
-        </div>
-        <div class="card stats-detail-card" data-stats-detail="profiles">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">用户画像</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-profiles-10" onclick="setStatsLimit('profiles',10)">10</button>
-              <button class="mode-btn" id="stats-profiles-25" onclick="setStatsLimit('profiles',25)">25</button>
-              <button class="mode-btn" id="stats-profiles-50" onclick="setStatsLimit('profiles',50)">50</button>
-              <button class="mode-btn" id="stats-profiles-0" onclick="setStatsLimit('profiles',0)">全部</button>
-            </div>
-          </div>
-          <div id="user-profiles"><div class="loading">加载中…</div></div>
-          <div id="stats-profiles-pg" class="page-controls" style="display:none;margin-top:10px"></div>
-        </div>
-        <div class="card stats-detail-card" data-stats-detail="uas">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div class="card-title" style="margin-bottom:0">UA TOP</div>
-            <div style="display:flex;gap:4px">
-              <button class="mode-btn active" id="stats-uas-10" onclick="setStatsLimit('uas',10)">10</button>
-              <button class="mode-btn" id="stats-uas-25" onclick="setStatsLimit('uas',25)">25</button>
-              <button class="mode-btn" id="stats-uas-50" onclick="setStatsLimit('uas',50)">50</button>
-              <button class="mode-btn" id="stats-uas-0" onclick="setStatsLimit('uas',0)">全部</button>
-            </div>
-          </div>
-          <div id="bad-uas"><div class="loading">加载中…</div></div>
-          <div id="stats-uas-pg" class="page-controls" style="display:none;margin-top:10px"></div>
-        </div>
-      </div>
+        <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
+        <div id="guard-pagination" class="review-pagination"></div>
+      </section>
     </div>
 
     <!-- ─── UA ─────────────────────────────────────────── -->
@@ -1395,11 +1311,9 @@ let allStatsData = null; // 完整统计数据缓存
 let securityData = null;
 let tokenInvestigationData = null;
 let guardReviewFilter = 'active';
+let guardRiskKindFilter = 'all';
 let guardReviewPage = 1;
 let guardReviewPageSize = 5;
-let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10, scanners: 10, profiles: 10};
-let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1, scanners: 1, profiles: 1};
-let activeStatsDetail = '';
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
 let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
@@ -1547,7 +1461,7 @@ applyTheme();
 const TABS = {
   security:   {title:'运行总览', subtitle:'网关健康、防护状态与待处理风险', loader:loadSecurity},
   logs:       {title:'拉取记录', subtitle:'检索订阅请求、状态码、Token 与客户端特征', loader:loadLogs},
-  stats:      {title:'风险分析', subtitle:'聚焦可疑 Token、可疑 IP、扫描器与来源画像', loader:loadStats},
+  stats:      {title:'风险分析', subtitle:'高频拉取、Token 异常、来源异常与脚本扫描处置', loader:loadStats},
   protection: {title:'防护策略', subtitle:'Token 拉取限制与行为观察阈值', loader:loadProtection},
   access:     {title:'访问控制', subtitle:'统一维护 IP、Token 与 UA 放行和拦截规则', loader:loadAccessControl},
   settings:   {title:'系统设置', subtitle:'界面账户、网关上游、证书与告警运维', loader:loadSettings},
@@ -1596,7 +1510,6 @@ function scheduleBackgroundPreload() {
 // ── Tab 切换 ──────────────────────────────────────────────────
 function switchTab(name, el) {
   if (!TABS[name]) return;
-  if (name === 'stats' && currentTab !== 'stats') activeStatsDetail = '';
   currentTab = name;
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -2145,427 +2058,54 @@ async function quickAddWhitelistFromLog(ip) {
 
 // ── 分析 ──────────────────────────────────────────────────────
 async function loadStats(opts={}) {
-  const data = await apiFetch('/api/stats.php' + (opts.force ? '?refresh=1' : ''));
+  let data = await apiFetch('/api/stats.php' + (opts.force ? '?refresh=1' : ''));
+  if (data.ok && !Array.isArray(data.pull_ips)) data = await apiFetch('/api/stats.php?refresh=1');
   if (!data.ok) {
-    ['stats-overview','top-ips','top-tokens','bad-uas','susp-tokens','susp-ips','scanner-reports','user-profiles'].forEach(id => {
-      document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
-    });
+    const target = document.getElementById('risk-analysis-summary');
+    if (target) target.innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
   }
   allStatsData = data;
+  await loadSecurity({force:true});
   renderStats();
-}
-
-function setStatsLimit(key, n) {
-  statsLimits[key] = n;
-  statsPages[key] = 1;  // 切换每页数量时重置到第1页
-  [10, 25, 50, 0].forEach(v => {
-    const btn = document.getElementById(`stats-${key}-${v}`);
-    if (btn) btn.classList.toggle('active', v === n);
-  });
-  renderStats();
-}
-
-function changeStatsPage(key, delta) {
-  statsPages[key] += delta;
-  renderStats();
-}
-
-function renderStatsPagination(key, total, pageSize) {
-  const el = document.getElementById(`stats-${key}-pg`);
-  if (!el) return;
-  if (pageSize === 0 || total <= pageSize) { el.style.display = 'none'; return; }
-  const totalPages = Math.ceil(total / pageSize);
-  statsPages[key] = Math.max(1, Math.min(statsPages[key], totalPages));
-  const p = statsPages[key];
-  el.style.display = 'flex';
-  el.innerHTML = `
-    <button class="mode-btn" onclick="changeStatsPage('${key}',-1)" ${p<=1?'disabled':''}>上一页</button>
-    <span style="color:var(--text2);font-size:12px;white-space:nowrap;padding:0 6px">第 ${p} / ${totalPages} 页（共 ${total} 条）</span>
-    <button class="mode-btn" onclick="changeStatsPage('${key}',1)" ${p>=totalPages?'disabled':''}>下一页</button>`;
 }
 
 function renderStats() {
-  if (!allStatsData) return;
-  const data = allStatsData;
-  renderStatsOverview(data);
-  updateStatsView();
-
-  // Top IP
-  const allIps = data.top_ips || [];
-  const ipsLimit = statsLimits.ips;
-  const ipsPage  = statsPages.ips;
-  const ips = ipsLimit > 0 ? allIps.slice((ipsPage-1)*ipsLimit, ipsPage*ipsLimit) : allIps;
-  const ipsStart = ipsLimit > 0 ? (ipsPage-1)*ipsLimit : 0;
-  renderStatsPagination('ips', allIps.length, ipsLimit);
-  document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => {
-    const ipBanned = blacklistIpSet.has(r.ip);
-    const ipWhitelisted = !ipBanned && whitelistIpSet.has(r.ip);
-    const ipBtn = ipBanned
-      ? `<button class="bl-badge-btn" onclick="quickUnblockIp(${jsArg(r.ip)})">黑名单</button>`
-      : ipWhitelisted
-        ? `<button class="wl-badge-btn" onclick="quickRemoveWhitelist(${jsArg(r.ip)})">白名单</button>`
-        : `<button class="add-btn-sm" onclick="quickBlacklist(${jsArg(r.ip)})">封</button><button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>`;
-    return `
-    <div class="top-row">
-      <span class="top-rank">${ipsStart+i+1}</span>
-      <span class="top-val">
-        ${esc(r.ip)}
-        ${ipBtn}
-      </span>
-      <span class="top-count">${r.total}次</span>
-      <span class="top-sub" style="margin-left:8px;font-size:11px" title="成功200 / 拦截403 / 限速429 / 断连444（非订阅路径或HTTP明文）">
-        <span style="color:#22c55e">${r.s200}</span>/<span style="color:#ef4444">${r.s403}</span>/<span style="color:#eab308">${r.s429}</span>/<span style="color:#64748b">${r.s444}</span>
-      </span>
-    </div>`;
-  }).join('') : '<div class="empty">暂无数据</div>';
-
-  // Top Token
-  const allToks = data.top_tokens || [];
-  const toksLimit = statsLimits.tokens;
-  const toksPage  = statsPages.tokens;
-  const toks = toksLimit > 0 ? allToks.slice((toksPage-1)*toksLimit, toksPage*toksLimit) : allToks;
-  const toksStart = toksLimit > 0 ? (toksPage-1)*toksLimit : 0;
-  renderStatsPagination('tokens', allToks.length, toksLimit);
-  document.getElementById('top-tokens').innerHTML = toks.length ? toks.map((r,i) => `
-    <div class="top-row">
-      <span class="top-rank">${toksStart+i+1}</span>
-      <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
-        <span class="token-text" title="${esc(r.token_full)}">${esc(r.token_full)}</span>
-        <button class="copy-btn" data-val="${esc(r.token_full)}" onclick="copyText(this.dataset.val)">复制</button>
-      </span>
-      <span class="top-count" style="white-space:nowrap;margin-left:6px">${r.count}次</span>
-      <span class="top-sub" style="margin-left:8px">${esc(r.last_time)}</span>
-    </div>`).join('') : '<div class="empty">暂无数据</div>';
-
-  // UA TOP
-  const allUas = data.bad_uas || [];
-  const uasLimit = statsLimits.uas;
-  const uasPage  = statsPages.uas;
-  const uas = uasLimit > 0 ? allUas.slice((uasPage-1)*uasLimit, uasPage*uasLimit) : allUas;
-  renderStatsPagination('uas', allUas.length, uasLimit);
-  document.getElementById('bad-uas').innerHTML = uas.length ? `
-    <table style="table-layout:fixed;width:100%"><thead><tr>
-      <th style="overflow:hidden">UA</th>
-      <th style="width:64px;white-space:nowrap">403次数</th>
-      <th style="width:72px;white-space:nowrap">操作</th>
-    </tr></thead>
-    <tbody>${uas.map(r => `
-      <tr>
-        <td class="ua-cell" style="padding:3px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
-        <td style="color:#ef4444;font-weight:600;padding:3px 8px">${r.count}</td>
-        <td style="padding:3px 8px;white-space:nowrap"><button class="add-btn-sm" onclick="quickBanUA(${jsArg(r.ua)})">封禁UA</button></td>
-      </tr>`).join('')}
-    </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
-
-  // 可疑 Token
-  const allSuspToks = data.susp_tokens || [];
-  const suspToksLimit = statsLimits.suspTokens;
-  const suspToksPage  = statsPages.suspTokens;
-  const suspToks = suspToksLimit > 0 ? allSuspToks.slice((suspToksPage-1)*suspToksLimit, suspToksPage*suspToksLimit) : allSuspToks;
-  renderStatsPagination('suspTokens', allSuspToks.length, suspToksLimit);
-  document.getElementById('susp-tokens').innerHTML = suspToks.length ? suspToks.map(r => `
-    <div class="top-row">
-      <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
-        <span class="token-text" title="${esc(r.token)}">${esc(r.token)}</span>
-        <button class="copy-btn" data-val="${esc(r.token)}" onclick="copyText(this.dataset.val)">复制</button>
-      </span>
-      <span class="top-count" style="white-space:nowrap">${r.ip_count} 个不同IP</span>
-      <button class="mode-btn" style="margin-left:8px" onclick="openTokenInvestigation('',${jsArg(r.token)})">调查</button>
-      <button class="add-btn-sm" style="margin-left:8px" onclick="quickBanToken(${jsArg(r.token)})">拉黑</button>
-    </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
-
-  // 可疑 IP
-  const allSuspIps = data.susp_ips || [];
-  const suspIpsLimit = statsLimits.suspIps;
-  const suspIpsPage  = statsPages.suspIps;
-  const suspIps = suspIpsLimit > 0 ? allSuspIps.slice((suspIpsPage-1)*suspIpsLimit, suspIpsPage*suspIpsLimit) : allSuspIps;
-  renderStatsPagination('suspIps', allSuspIps.length, suspIpsLimit);
-  document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => {
-    const suspBanned = blacklistIpSet.has(r.ip);
-    const suspBtn = suspBanned
-      ? `<button class="bl-badge-btn" onclick="quickUnblockIp(${jsArg(r.ip)})">黑名单</button>`
-      : `<button class="add-btn-sm" onclick="quickBlacklist(${jsArg(r.ip)})">封</button>`;
-    const riskColor = (r.score || 0) >= 90 ? '#ef4444' : ((r.score || 0) >= 75 ? '#eab308' : '#38bdf8');
-    const paths = (r.paths || []).map(p => `<code>${esc(p)}</code>`).join(' ');
-    const uas = (r.uas || []).map(ua => `<div title="${esc(ua)}">${esc(ua)}</div>`).join('');
-    const tokens = (r.tokens || []).map(t => `<code title="${esc(t)}">${esc(t)}</code>`).join(' ');
-    const reasons = (r.reasons || []).map((reason, idx) => `<div>${idx + 1}. ${esc(reason)}</div>`).join('');
-    const reqSummary = r.request_count ? `${r.token_count} 个Token / ${r.request_count} 次` : `${r.token_count} 个Token`;
-    return `
-    <div class="top-row risk-row">
-      <div class="risk-main">
-        <div class="risk-ip">${esc(r.ip)}</div>
-        <div>
-          <div class="risk-meta">
-            <span class="risk-badge" style="color:${riskColor}">${esc(r.risk || '可疑')} ${r.score || 0}</span>
-            <span class="top-count">${reqSummary}</span>
-          </div>
-          <div class="risk-actions">
-            ${suspBtn}
-            <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp(${jsArg(r.ip)})">白</button>
-          </div>
-        </div>
-      </div>
-      <details class="risk-detail">
-        <summary>高危成立依据</summary>
-        <div class="risk-evidence">${reasons || '暂无详细依据'}</div>
-        ${paths ? `<div class="risk-samples">路径：${paths}</div>` : ''}
-        ${tokens ? `<div class="risk-samples">Token样本：${tokens}</div>` : ''}
-        ${uas ? `<div style="margin-top:6px">${uas}</div>` : ''}
-      </details>
-    </div>`;
-  }).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
-
-  // 脚本/扫描器拉取订阅
-  const allScanners = data.scanner_reports || [];
-  const scannersLimit = statsLimits.scanners;
-  const scannersPage  = statsPages.scanners;
-  const scanners = scannersLimit > 0 ? allScanners.slice((scannersPage-1)*scannersLimit, scannersPage*scannersLimit) : allScanners;
-  renderStatsPagination('scanners', allScanners.length, scannersLimit);
-  document.getElementById('scanner-reports').innerHTML = scanners.length ? scanners.map(r => {
-    const report = scannerReportText(r);
-    return `
-    <div class="scanner-report">
-      <div class="scanner-actions">
-        <span class="risk-badge" style="color:#ef4444">${esc(r.risk || '高危')} ${r.score || 90}</span>
-        <span class="top-val" style="padding:0">${esc(r.ip)}</span>
-        <button class="copy-btn" data-val="${esc(report)}" onclick="copyText(this.dataset.val)">复制报告</button>
-        <button class="add-btn-sm" onclick="banScannerIp(${jsArg(r.ip)}, ${jsArg(r.token)})">封禁IP</button>
-      </div>
-      <pre>${esc(report)}</pre>
-    </div>`;
-  }).join('') : '<div class="empty">暂无脚本/扫描器拉取订阅记录</div>';
-
-  // 用户画像
-  const allProfiles = data.user_profiles || [];
-  const profilesLimit = statsLimits.profiles;
-  const profilesPage  = statsPages.profiles;
-  const profiles = profilesLimit > 0 ? allProfiles.slice((profilesPage-1)*profilesLimit, profilesPage*profilesLimit) : allProfiles;
-  renderStatsPagination('profiles', allProfiles.length, profilesLimit);
-  document.getElementById('user-profiles').innerHTML = profiles.length ? profiles.map(renderUserProfileSegment).join('') : '<div class="empty">暂无用户画像数据</div>';
+  if (!allStatsData || !securityData) return;
+  renderRiskAnalysis();
+  renderGuardFindings();
 }
 
-function renderUserProfileSegment(seg) {
-  const summary = seg.summary || {};
-  const cells = seg.cells || [];
-  const cellHtml = cells.map(c => {
-    const kind = String(c.kind || 'N').toLowerCase();
-    const title = `${c.ip || ''}｜请求 ${c.count || 0} 次｜Token ${c.token_count || 0} 个｜${c.location || '未查询'}｜${c.network_type || '本地日志'}`;
-    return `<div class="profile-cell profile-${esc(kind)}" title="${esc(title)}">${esc(c.label || c.kind || '·')}</div>`;
-  }).join('');
-  return `
-    <div class="profile-segment">
-      <div class="profile-head">
-        <div>
-          <div class="profile-range">${esc(seg.range || '')}</div>
-          <div class="profile-meta">日志画像｜${esc(seg.ip_count || 0)} 个IP｜${esc(seg.total || 0)} 次请求｜最后 ${esc(seg.last_time || '-')}</div>
-        </div>
-        <span class="top-count">${esc(seg.ip_count || 0)} IP</span>
-      </div>
-      <div class="profile-grid">${cellHtml}</div>
-      <div class="profile-legend">
-        <span><i class="profile-dot profile-v"></i>VPN(V): ${esc(summary.V || 0)}</span>
-        <span><i class="profile-dot profile-o"></i>公共代理(O): ${esc(summary.O || 0)}</span>
-        <span><i class="profile-dot profile-t"></i>Tor(T): ${esc(summary.T || 0)}</span>
-        <span><i class="profile-dot profile-p"></i>代理(P): ${esc(summary.P || 0)}</span>
-        <span><i class="profile-dot profile-b"></i>恶意/滥用IP(B): ${esc(summary.B || 0)}</span>
-      </div>
-    </div>`;
+function guardFindingGroup(row) {
+  const kind = String(row?.kind || '');
+  if (['daily_ip_volume','ip_rate','token_rate'].includes(kind)) return 'volume';
+  if (['token_multi_ip','history_token_ips'].includes(kind)) return 'token';
+  if (['ip_multi_token','history_ip_tokens','ip_404_flood'].includes(kind)) return 'source';
+  if (kind === 'scanner') return 'scanner';
+  return 'source';
 }
 
-function renderStatsOverview(data) {
-  const cards = [
-    {
-      key: 'suspTokens',
-      tone: 'amber',
-      icon: '!',
-      title: '可疑 Token',
-      value: (data.susp_tokens || []).length,
-      unit: '个 Token',
-      status: (data.susp_tokens || []).length ? '需要复核' : '暂无异常',
-      sub: (data.susp_tokens || [])[0] ? `${esc((data.susp_tokens || [])[0].ip_count)} 个不同IP拉取` : '暂无多 IP 拉取',
-    },
-    {
-      key: 'suspIps',
-      tone: 'rose',
-      icon: '!',
-      title: '可疑 IP',
-      value: (data.susp_ips || []).length,
-      unit: '个 IP',
-      status: (data.susp_ips || []).length ? '需要复核' : '暂无异常',
-      sub: (data.susp_ips || [])[0] ? `${esc((data.susp_ips || [])[0].risk || '可疑')} ${esc((data.susp_ips || [])[0].score || '')}` : '暂无多 Token 拉取',
-    },
-    {
-      key: 'scanners',
-      tone: 'cyan',
-      icon: '⌘',
-      title: '脚本/扫描器',
-      value: (data.scanner_reports || []).length,
-      unit: '条记录',
-      status: (data.scanner_reports || []).length ? '需要复核' : '暂无异常',
-      sub: (data.scanner_reports || [])[0] ? `${esc((data.scanner_reports || [])[0].ip)}｜${esc((data.scanner_reports || [])[0].ua || '空UA')}` : '暂无脚本拉取记录',
-    },
-    {
-      key: 'profiles',
-      tone: 'sky',
-      icon: '▦',
-      title: '用户画像',
-      value: (data.user_profiles || []).length,
-      unit: '个 IP 段',
-      status: (data.user_profiles || []).length ? '已生成' : '暂无数据',
-      sub: (data.user_profiles || [])[0] ? `${esc((data.user_profiles || [])[0].range)}｜最近 ${esc(data.scan_limit || 30000)} 行` : '暂无画像数据',
-    },
+function renderRiskAnalysis() {
+  const target = document.getElementById('risk-analysis-summary');
+  if (!target || !securityData) return;
+  const findings = securityData.findings || [];
+  const active = findings.filter(row => ['pending','watch'].includes(row.review?.status || 'pending'));
+  const groups = [
+    {key:'volume',tone:'amber',icon:'↻',title:'高频拉取',unit:'条待处理',kinds:'今日累计与分钟频率'},
+    {key:'token',tone:'violet',icon:'#',title:'Token 异常',unit:'条待处理',kinds:'多 IP 共享与高频调用'},
+    {key:'source',tone:'rose',icon:'!',title:'来源异常',unit:'条待处理',kinds:'多 Token、404 与异常来源'},
+    {key:'scanner',tone:'cyan',icon:'⌘',title:'脚本扫描',unit:'条待处理',kinds:'自动化客户端与扫描特征'},
   ];
-  const el = document.getElementById('stats-overview');
-  if (!el) return;
-  el.innerHTML = `
-    <div class="analysis-overview-head">
-      <div><div class="workspace-kicker">核心检测</div><div class="analysis-overview-title">核心分析</div><div class="analysis-overview-meta">风险识别、扫描检测与来源画像</div></div>
-      <div class="analysis-window"><span>统计窗口</span><strong>最近 ${esc(data.scan_limit || 30000)} 行</strong></div>
-    </div>
-    <div class="analysis-core-grid">${cards.map(c => {
-      return `
-      <button class="stats-card tone-${esc(c.tone)}" onclick="showStatsDetail('${c.key}')">
-        <div class="stats-card-title">
-          <span class="stats-card-kicker"><span class="stats-card-icon">${esc(c.icon)}</span>${esc(c.title)}</span>
-        </div>
-        <div class="stats-card-count-row">
-          <div class="stats-card-main">${esc(c.value)}<span class="stats-card-unit">${esc(c.unit)}</span></div>
-          <span class="stats-card-status">${esc(c.status)}</span>
-        </div>
-        <div class="stats-card-sub">${c.sub}</div>
-        <div class="stats-card-foot"><span>进入详情</span><strong>→</strong></div>
-      </button>`;
-    }).join('')}</div>`;
-}
-
-function showStatsDetail(key) {
-  activeStatsDetail = key;
-  updateStatsView();
-  restartAnimation(document.getElementById('stats-detail-grid'));
-}
-
-function showStatsOverview() {
-  activeStatsDetail = '';
-  updateStatsView();
-  restartAnimation(document.getElementById('stats-overview'));
-}
-
-function updateStatsView() {
-  const overview = document.getElementById('stats-overview');
-  const detailHead = document.getElementById('stats-detail-head');
-  const detailGrid = document.getElementById('stats-detail-grid');
-  if (!overview || !detailHead || !detailGrid) return;
-  const titles = {
-    ips: '今日 Top IP',
-    tokens: '今日 Top Token',
-    suspTokens: '可疑 Token',
-    suspIps: '可疑 IP',
-    scanners: '脚本/扫描器拉取订阅',
-    profiles: '用户画像',
-    uas: 'UA TOP',
-  };
-  const tones = {
-    ips: 'tone-blue',
-    tokens: 'tone-violet',
-    suspTokens: 'tone-amber',
-    suspIps: 'tone-rose',
-    scanners: 'tone-cyan',
-    profiles: 'tone-sky',
-    uas: 'tone-emerald',
-  };
-  const inDetail = !!activeStatsDetail;
-  overview.style.display = inDetail ? 'none' : 'block';
-  detailHead.style.display = inDetail ? 'flex' : 'none';
-  detailGrid.classList.toggle('active', inDetail);
-  const toneClasses = Object.values(tones);
-  detailHead.classList.remove(...toneClasses);
-  detailGrid.classList.remove(...toneClasses);
-  if (inDetail && tones[activeStatsDetail]) {
-    detailHead.classList.add(tones[activeStatsDetail]);
-    detailGrid.classList.add(tones[activeStatsDetail]);
-  }
-  document.getElementById('stats-detail-title').textContent = titles[activeStatsDetail] || '';
-  document.querySelectorAll('.stats-detail-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.statsDetail === activeStatsDetail);
-  });
-}
-
-function scannerReportText(r) {
-  const sourceCount = Number(r.intel_source_count || 0);
-  const intelSummary = sourceCount
-    ? `情报：${sourceCount} 源交叉验证｜置信度 ${r.intel_confidence || '未评估'}`
-    : '情报：暂未完成外部查询';
-  const consensus = r.intel_consensus ? `\n一致性：${r.intel_consensus}` : '';
-  const routePrefix = r.route_prefix ? `\n路由网段：${r.route_prefix}` : '';
-  return `脚本/扫描器拉取订阅
-━━━━━━━━━━━━━━
-结论：已读取到订阅Token。
-建议：必要时复制 Token 到机场后台手动核对用户。
-风险：${r.risk || '高危'}｜评分 ${r.score || 90}
-Token：${r.token || ''}
-来源：${r.ip || ''}｜${r.location || '未查询'}
-ASN：${r.asn || '未查询'}
-网络：${r.network_type || '未知网络'}
-${intelSummary}${consensus}${routePrefix}
-数据源：${r.query_source || '本地日志'}
-路径 ${r.path || ''}
-UA：${r.ua || '（空UA）'}
-证据：原因 ${r.reason || 'unknown'}
-时间：${r.time || ''}
-
-操作建议：确认后可封禁 IP ${r.ip || ''}`;
-}
-
-async function banScannerIp(ip, token) {
-  if (!confirm(`是否封禁脚本/扫描器 IP ${ip}？`)) return;
-  const d = await apiFetch('/api/blacklist.php', {
-    method:'POST',
-    body:JSON.stringify({ip, comment:`脚本/扫描器拉取订阅 token=${token || ''}`}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok || (d.error && d.error.includes('已在黑名单'))) {
-    toast(`✅ 已封禁 IP ${ip}`);
-    blacklistIpSet.add(ip);
-    loadStats();
-  } else {
-    toast(d.error || '封禁失败', 'err');
-  }
-}
-
-// ── 从分析页加入白名单（不要求先在黑名单）──────────────────────
-async function quickWhitelistIp(ip) {
-  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
-  const d = await apiFetch('/api/whitelist.php', {
-    method: 'POST', body: JSON.stringify({ip, comment: '从分析页加入白名单'}),
-    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-  });
-  if (d.ok || (d.error && d.error.includes('已在白名单'))) {
-    toast(`✅ ${ip} 已加入白名单并生效`);
-    if (allStatsData) {
-      allStatsData.susp_ips = (allStatsData.susp_ips || []).filter(r => r.ip !== ip);
-      renderStats();
-    }
-  } else {
-    toast(d.error || '加入白名单失败', 'err');
-  }
-}
-
-// ── 从分析页解封 IP（仅移除黑名单，不加白名单）────────────────────
-async function quickUnblockIp(ip) {
-  if (!confirm(`是否解封 ${ip}？`)) return;
-  const d = await apiFetch('/api/blacklist.php', {
-    method:'DELETE', body:JSON.stringify({ip}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) {
-    toast(`✅ ${ip} 已解封`);
-    blacklistIpSet.delete(ip);
-    renderStats();
-  } else {
-    toast(d.error || '解封失败', 'err');
-  }
+  target.innerHTML = groups.map(group => {
+    const rows = active.filter(row => guardFindingGroup(row) === group.key);
+    const top = rows.slice().sort((a,b) => Number(b.score || 0) - Number(a.score || 0))[0];
+    return `<button class="stats-card tone-${group.tone} ${guardRiskKindFilter === group.key ? 'active' : ''}" onclick="setGuardRiskKind('${group.key}')">
+      <div class="stats-card-title"><span class="stats-card-kicker"><span class="stats-card-icon">${esc(group.icon)}</span>${esc(group.title)}</span></div>
+      <div class="stats-card-count-row"><div class="stats-card-main">${rows.length}<span class="stats-card-unit">${esc(group.unit)}</span></div><span class="stats-card-status">${top ? esc((top.risk || '关注') + ' ' + Number(top.score || 0)) : '暂无异常'}</span></div>
+      <div class="stats-card-sub">${top ? `${esc(top.title || '')} · ${esc(top.subject || '')}` : esc(group.kinds)}</div>
+      <div class="stats-card-foot"><span>${guardRiskKindFilter === group.key ? '当前筛选' : '筛选此类'}</span><strong>→</strong></div>
+    </button>`;
+  }).join('');
 }
 
 // ── UA 管理 ─────────────────────────────────────────────────────
@@ -3883,6 +3423,7 @@ function renderSecurity() {
   renderSecurityMechanisms();
   renderSecurityHealth();
   renderGuardFindings();
+  renderRiskAnalysis();
   renderGuardRules();
   renderSecurityActions();
 }
@@ -4112,6 +3653,14 @@ function setGuardFilter(filter) {
   renderGuardFindings();
 }
 
+function setGuardRiskKind(kind) {
+  guardRiskKindFilter = ['all','volume','token','source','scanner'].includes(kind) ? kind : 'all';
+  guardReviewPage = 1;
+  ['all','volume','token','source','scanner'].forEach(name => document.getElementById('guard-kind-' + name)?.classList.toggle('active', name === guardRiskKindFilter));
+  renderRiskAnalysis();
+  renderGuardFindings();
+}
+
 function setGuardPageSize(size) {
   guardReviewPageSize = [5,10,20].includes(Number(size)) ? Number(size) : 5;
   guardReviewPage = 1;
@@ -4158,6 +3707,7 @@ function renderGuardFindings() {
   let rows = securityData.findings || [];
   if (guardReviewFilter === 'active') rows = rows.filter(row => ['pending','watch'].includes(row.review?.status || 'pending'));
   if (guardReviewFilter === 'trusted') rows = rows.filter(row => row.review?.status === 'trusted');
+  if (guardRiskKindFilter !== 'all') rows = rows.filter(row => guardFindingGroup(row) === guardRiskKindFilter);
   const target = document.getElementById('security-findings');
   if (!rows.length) {
     target.innerHTML = `<div class="security-empty">${guardReviewFilter === 'active' ? '当前没有待处理风险' : '当前筛选没有记录'}</div>`;
@@ -4178,18 +3728,27 @@ function renderGuardFindings() {
       row.last_seen ? `最后 ${row.last_seen}` : '',
     ].filter(Boolean);
     const canBlockIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(subject) && !blacklistIpSet.has(subject);
+    const tokenFingerprint = row.token_fingerprint || (/^TKN-[A-F0-9]{16}$/.test(subject) ? subject : '');
+    const status = row.status_counts || {};
+    const statusSummary = Object.values(status).some(value => Number(value || 0) > 0)
+      ? `<span class="risk-status-counts" title="成功 / 403 / 429 / 444"><b style="color:#22c55e">${Number(status['200'] || 0)}</b>/<b style="color:#ef4444">${Number(status['403'] || 0)}</b>/<b style="color:#eab308">${Number(status['429'] || 0)}</b>/<b style="color:#64748b">${Number(status['444'] || 0)}</b></span>`
+      : '';
+    const intel = [row.location, row.asn, row.operator, row.network_type].filter(value => value && !['未查询','未知地区','未知网络'].includes(value));
     return `
       <div class="risk-item">
         <div class="risk-head">
           <div><div class="risk-title">${esc(row.title || '风险事件')}</div><div class="risk-subject">${esc(subject)}</div></div>
           <span class="risk-score">${esc(row.risk || '关注')} ${Number(row.score || 0)}</span>
         </div>
-        <div class="risk-evidence">${meta.map(item => `<span>${esc(item)}</span>`).join('')}</div>
+        <div class="risk-evidence">${meta.map(item => `<span>${esc(item)}</span>`).join('')}${statusSummary}${row.token_count ? `<span>${Number(row.token_count)} 个 Token</span>` : ''}</div>
         <div class="risk-reason">${esc(row.reason || '-')}${sampleIps ? `<br>${esc(sampleIps)}` : ''}${row.ua ? `<br>UA：${esc(row.ua)}` : ''}</div>
+        ${intel.length ? `<div class="risk-intel">${intel.map(item => `<span>${esc(item)}</span>`).join('')}</div>` : ''}
         <div class="risk-actions">
           <select class="review-select" id="guard-review-${index}">${guardReviewOptions(review.status)}</select>
           <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
           <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index})">保存判断</button>
+          ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
+          ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
           ${canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : ''}
         </div>
       </div>`;
@@ -4216,14 +3775,24 @@ async function saveGuardReview(key, index) {
   (securityData.findings || []).forEach(item => summary[item.review?.status || 'pending']++);
   securityData.review_summary = summary;
   renderGuardFindings();
+  renderRiskAnalysis();
   renderSecurityMetrics();
   toast('复核状态已保存');
+}
+
+function openRiskLogs(ip='') {
+  document.getElementById('filter-ip').value = ip;
+  document.getElementById('filter-token').value = '';
+  logPage = 1;
+  openPanelTab('logs');
+  loadTab('logs', {force:true}).catch(() => {});
 }
 
 function renderGuardRules() {
   const r = securityData.rules || {};
   document.getElementById('guard-observe-enabled').checked = !!Number(r.guard_observe_enabled ?? 1);
   document.getElementById('guard-ip-minute').value = r.guard_ip_per_minute ?? 30;
+  document.getElementById('guard-ip-daily').value = r.guard_ip_daily_requests ?? 100;
   document.getElementById('guard-token-minute').value = r.guard_token_per_minute ?? 20;
   document.getElementById('guard-token-hour-ips').value = r.guard_token_hour_ips ?? 8;
   document.getElementById('guard-ip-hour-tokens').value = r.guard_ip_hour_tokens ?? 20;
@@ -4233,12 +3802,12 @@ function renderGuardRules() {
 
 function applyGuardPreset(name) {
   const presets = {
-    strict:[20,15,5,12,25,30000],
-    balanced:[30,20,8,20,40,30000],
-    quiet:[60,45,15,40,80,50000],
+    strict:[20,80,15,5,12,25,30000],
+    balanced:[30,100,20,8,20,40,30000],
+    quiet:[60,200,45,15,40,80,50000],
   };
   const values = presets[name] || presets.balanced;
-  ['guard-ip-minute','guard-token-minute','guard-token-hour-ips','guard-ip-hour-tokens','guard-ip-404','guard-scan-lines']
+  ['guard-ip-minute','guard-ip-daily','guard-token-minute','guard-token-hour-ips','guard-ip-hour-tokens','guard-ip-404','guard-scan-lines']
     .forEach((id, index) => document.getElementById(id).value = values[index]);
 }
 
@@ -4246,6 +3815,7 @@ async function saveGuardSettings() {
   const body = {
     guard_observe_enabled: document.getElementById('guard-observe-enabled').checked ? 1 : 0,
     guard_ip_per_minute: Number(document.getElementById('guard-ip-minute').value),
+    guard_ip_daily_requests: Number(document.getElementById('guard-ip-daily').value),
     guard_token_per_minute: Number(document.getElementById('guard-token-minute').value),
     guard_token_hour_ips: Number(document.getElementById('guard-token-hour-ips').value),
     guard_ip_hour_tokens: Number(document.getElementById('guard-ip-hour-tokens').value),
