@@ -283,6 +283,12 @@ function apply_guard_settings(array $s, array $body): array {
     foreach (['guard_pull_limit_enabled', 'guard_pull_limit_enforce'] as $key) {
         if (array_key_exists($key, $body)) $s[$key] = !empty($body[$key]) ? 1 : 0;
     }
+    if (array_key_exists('guard_pull_limit_enabled', $body) && empty($s['guard_pull_limit_enabled'])) {
+        $s['guard_pull_limit_enforce'] = 0;
+    }
+    if (array_key_exists('guard_pull_limit_enforce', $body) && !empty($s['guard_pull_limit_enforce'])) {
+        $s['guard_pull_limit_enabled'] = 1;
+    }
     $fields = [
         'guard_ip_daily_requests' => [20, 100000, 100],
         'guard_ip_per_minute' => [5, 5000, 30],

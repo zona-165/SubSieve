@@ -40,6 +40,9 @@ function guard_normalize_settings(array $settings): array {
     $result['guard_pull_limit_enforce'] = array_key_exists('guard_pull_limit_enforce', $settings)
         ? (!empty($settings['guard_pull_limit_enforce']) ? 1 : 0)
         : 0;
+    if (empty($result['guard_pull_limit_enabled'])) {
+        $result['guard_pull_limit_enforce'] = 0;
+    }
     foreach ($ranges as $key => [$min, $max]) {
         $value = is_numeric($settings[$key] ?? null) ? (int)$settings[$key] : $defaults[$key];
         $result[$key] = max($min, min($max, $value));
@@ -985,4 +988,14 @@ function guard_signal_token_limit_reload(array $files): void {
 function guard_runtime_secret(): string {
     $secret = file_exists(GUARD_SECRET_FILE) ? trim((string)@file_get_contents(GUARD_SECRET_FILE)) : '';
     return preg_match('/^[a-f0-9]{64}$/', $secret) ? $secret : hash('sha256', 'SubSieve-Guard');
+}
+
+function guard_count_cloud_cidr_lines(array $lines): int {
+    $count = 0;
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*(?:\d{1,3}\.){3}\d{1,3}\/\d{1,2}\s+(?:1|[a-z0-9][a-z0-9_-]*);\s*$/i', (string)$line)) {
+            $count++;
+        }
+    }
+    return $count;
 }

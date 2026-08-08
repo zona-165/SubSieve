@@ -45,6 +45,11 @@ $settings = [
 ];
 
 expect_limit(guard_threshold_relationship_error($settings) === '', '监控模式不应触发预警与执行阈值关系错误');
+$disabledSettings = guard_normalize_settings([
+    'guard_pull_limit_enabled' => 0,
+    'guard_pull_limit_enforce' => 1,
+]);
+expect_limit($disabledSettings['guard_pull_limit_enforce'] === 0, '关闭用量监控时必须同步关闭自动执行');
 $invalidRelationship = $settings;
 $invalidRelationship['guard_pull_limit_enforce'] = 1;
 $invalidRelationship['guard_token_per_minute'] = 10;

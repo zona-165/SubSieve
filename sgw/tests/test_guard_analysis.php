@@ -108,5 +108,11 @@ check($clamped['guard_ip_daily_requests'] === 20, 'daily IP minimum clamp failed
 check($clamped['guard_ip_per_minute'] === 5, 'minimum clamp failed');
 check($clamped['guard_scan_lines'] === 100000, 'maximum clamp failed');
 check(guard_parse_log_line('invalid') === null, 'invalid log line was accepted');
+check(guard_count_cloud_cidr_lines([
+    '    203.0.113.0/24 1;',
+    '    198.51.100.0/24 aws;',
+    '    192.0.2.0/24 google_cloud;',
+    '    default "";',
+]) === 3, 'provider-id CIDR lines were not counted');
 
 echo "guard analysis tests passed\n";

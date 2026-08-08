@@ -313,7 +313,9 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .security-section-title{font-size:14px;font-weight:850;color:var(--text)}
 .security-section-sub{color:var(--text3);font-size:11px;margin-top:3px}
 .mechanism-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.mechanism-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;padding:11px;border:1px solid var(--border);border-radius:9px;background:rgba(100,116,139,.045)}
+.mechanism-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;padding:11px;border:1px solid var(--border);border-radius:9px;background:rgba(100,116,139,.045)}
+.mechanism-config{align-self:center;border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:800;cursor:pointer;padding:5px 2px}
+.mechanism-config:hover{text-decoration:underline}
 .mechanism-dot{width:9px;height:9px;margin-top:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.10)}
 .mechanism-dot.warn{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.10)}
 .mechanism-dot.error{background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.10)}
@@ -390,9 +392,21 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .pull-limit-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
 .pull-limit-row-actions .mode-btn{padding:5px 9px}
 .pull-limit-controls{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
-.pull-limit-switches{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.pull-limit-switches label{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:12px}
-.pull-limit-switches input{width:18px;height:18px}
+.pull-limit-switches{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--border);border-radius:8px;background:rgba(100,116,139,.035);overflow:hidden}
+.pull-limit-switch{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:66px;padding:12px 14px;cursor:pointer}
+.pull-limit-switch+ .pull-limit-switch{border-left:1px solid var(--border)}
+.pull-limit-switch-copy{display:grid;gap:3px;min-width:0}
+.pull-limit-switch-copy strong{color:var(--text);font-size:12px}
+.pull-limit-switch-copy small{color:var(--text3);font-size:10px;line-height:1.45}
+.switch-control{position:relative;flex:0 0 auto;width:42px;height:24px}
+.switch-control input{position:absolute;inline-size:1px;block-size:1px;opacity:0}
+.switch-track{position:absolute;inset:0;border-radius:999px;background:#94a3b8;transition:background var(--motion-fast),opacity var(--motion-fast)}
+.switch-track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.25);transition:transform var(--motion-fast)}
+.switch-control input:checked+ .switch-track{background:var(--accent)}
+.switch-control input:checked+ .switch-track::after{transform:translateX(18px)}
+.switch-control input:focus-visible+ .switch-track{outline:2px solid var(--accent);outline-offset:2px}
+.pull-limit-switch.disabled{cursor:not-allowed;opacity:.55}
+.pull-limit-switch.disabled .switch-track{opacity:.65}
 .pull-limit-actions{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pull-limit-note{color:var(--text3);font-size:11px;line-height:1.65;flex:1;min-width:240px}
 .investigation-dialog{width:min(980px,calc(100vw - 28px));max-width:none;max-height:calc(100dvh - 28px);margin:auto;padding:0;border:1px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--text);box-shadow:0 28px 80px rgba(0,0,0,.42);overflow:hidden}
@@ -781,6 +795,8 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .protection-stack{display:flex}
   .protection-stack>.pull-limit-panel,.protection-stack>.security-section{padding:13px;margin-bottom:10px}
   .protection-stack>#guard-threshold-section .rule-grid{grid-template-columns:minmax(0,1fr)}
+  .pull-limit-switches{grid-template-columns:minmax(0,1fr)}
+  .pull-limit-switch+ .pull-limit-switch{border-left:0;border-top:1px solid var(--border)}
   .control-tabs{width:100%;margin-bottom:10px}
   .control-tab{padding:7px 11px}
   .settings-cluster-head{align-items:flex-start;flex-direction:column;gap:3px}
@@ -933,15 +949,21 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
         <div id="pull-limit-usage" class="pull-limit-usage"></div>
         <div class="pull-limit-controls">
           <div class="pull-limit-switches">
-            <label><input id="pull-limit-enabled" type="checkbox" onchange="updateGuardThresholdHint()"> 开启用量监控</label>
-            <label><input id="pull-limit-enforce" type="checkbox" onchange="updateGuardThresholdHint()"> 超限后自动执行</label>
+            <label class="pull-limit-switch" id="pull-limit-monitor-control">
+              <span class="pull-limit-switch-copy"><strong>用量监控</strong><small id="pull-limit-monitor-status">统计 Token 拉取用量与超限证据</small></span>
+              <span class="switch-control"><input id="pull-limit-enabled" type="checkbox" onchange="handlePullLimitSwitchChange('monitor')"><span class="switch-track"></span></span>
+            </label>
+            <label class="pull-limit-switch" id="pull-limit-enforce-control">
+              <span class="pull-limit-switch-copy"><strong>超限后自动执行</strong><small id="pull-limit-enforce-status">达到硬阈值后返回 429 并临时暂停</small></span>
+              <span class="switch-control"><input id="pull-limit-enforce" type="checkbox" onchange="handlePullLimitSwitchChange('enforce')"><span class="switch-track"></span></span>
+            </label>
           </div>
           <div class="rule-field"><label>24 小时不同 IP 上限</label><input class="ip-input" id="pull-limit-ips" type="number" min="2" max="200"></div>
           <div class="rule-field"><label>每分钟拉取硬上限</label><input class="ip-input" id="pull-limit-minute" type="number" min="3" max="300" oninput="updateGuardThresholdHint()"></div>
           <div class="rule-field"><label>超限暂停时长（小时）</label><input class="ip-input" id="pull-limit-hours" type="number" min="1" max="168"></div>
           <div class="pull-limit-actions">
             <div class="pull-limit-note">IP 白名单不受该规则影响。监控模式只记录超限证据；开启自动暂停后，频率限制即时生效，跨 IP 规则由后台巡检执行。</div>
-            <button class="btn-primary" onclick="savePullLimitSettings()">保存限制规则</button>
+            <button class="btn-primary" onclick="savePullLimitSettings()">保存并应用规则</button>
           </div>
         </div>
       </section>
@@ -3779,7 +3801,7 @@ function renderPullLimits() {
   document.getElementById('pull-limit-ips').value = rules.max_ips_24h || 10;
   document.getElementById('pull-limit-minute').value = rules.max_per_minute || 10;
   document.getElementById('pull-limit-hours').value = rules.suspend_hours || 24;
-  updateGuardThresholdHint();
+  syncPullLimitSwitches();
 }
 
 async function openTokenInvestigation(fingerprint='', token='') {
@@ -3904,15 +3926,43 @@ function updateGuardThresholdHint() {
   hint.classList.add('ok');
 }
 
+function syncPullLimitSwitches() {
+  const monitor = document.getElementById('pull-limit-enabled');
+  const enforce = document.getElementById('pull-limit-enforce');
+  if (!monitor || !enforce) return;
+  if (!monitor.checked) enforce.checked = false;
+  enforce.disabled = !monitor.checked;
+  document.getElementById('pull-limit-enforce-control')?.classList.toggle('disabled', enforce.disabled);
+  const monitorStatus = document.getElementById('pull-limit-monitor-status');
+  const enforceStatus = document.getElementById('pull-limit-enforce-status');
+  if (monitorStatus) monitorStatus.textContent = monitor.checked ? '已记录 Token 拉取用量与超限证据' : '已关闭，不统计 Token 用量';
+  if (enforceStatus) enforceStatus.textContent = !monitor.checked
+    ? '请先开启用量监控'
+    : (enforce.checked ? '已启用，超限将返回 429 并临时暂停' : '仅观察，不会自动限速或暂停');
+  updateGuardThresholdHint();
+}
+
+function handlePullLimitSwitchChange(kind) {
+  const monitor = document.getElementById('pull-limit-enabled');
+  const enforce = document.getElementById('pull-limit-enforce');
+  if (kind === 'enforce' && enforce?.checked && !monitor?.checked) monitor.checked = true;
+  syncPullLimitSwitches();
+}
+
 async function savePullLimitSettings() {
   const enforce = document.getElementById('pull-limit-enforce').checked;
+  const wasEnforced = !!securityData?.pull_limits?.settings?.enforce;
   const conflict = guardThresholdRelationshipError();
   if (conflict) {
     toast(conflict, 'err');
     document.getElementById('guard-token-minute')?.focus();
     return;
   }
-  if (enforce && !confirm('开启后，超过规则的 Token 将暂停拉取。确认启用自动暂停？')) return;
+  if (enforce && !wasEnforced && !confirm('开启后，超过硬阈值的 Token 将返回 429 并临时暂停拉取。确认启用自动执行？')) {
+    document.getElementById('pull-limit-enforce').checked = false;
+    syncPullLimitSwitches();
+    return;
+  }
   const body = {
     guard_pull_limit_enabled: document.getElementById('pull-limit-enabled').checked ? 1 : 0,
     guard_pull_limit_enforce: enforce ? 1 : 0,
@@ -3948,7 +3998,13 @@ function renderSecurityMechanisms() {
     <div class="mechanism-item">
       <span class="mechanism-dot ${esc(row.state || '')}"></span>
       <div><div class="mechanism-title">${esc(row.title || '-')}</div><div class="mechanism-detail">${esc(row.detail || '-')}</div></div>
+      ${row.key === 'pull_limit' ? '<button class="mechanism-config" onclick="openProtectionRuleSettings()">配置</button>' : ''}
     </div>`).join('') : '<div class="security-empty">暂无机制状态</div>';
+}
+
+function openProtectionRuleSettings() {
+  openPanelTab('protection');
+  requestAnimationFrame(() => document.getElementById('pull-limit-section')?.scrollIntoView({behavior:'smooth', block:'start'}));
 }
 
 function renderSecurityHealth() {

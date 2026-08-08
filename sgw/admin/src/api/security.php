@@ -248,11 +248,7 @@ function count_list_entries(string $file): int {
 
 function count_cloud_cidrs(): int {
     if (!file_exists(CLOUD_GEO_CONF)) return 0;
-    $count = 0;
-    foreach (file(CLOUD_GEO_CONF, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
-        if (preg_match('/^\s*(?:\d{1,3}\.){3}\d{1,3}\/\d+\s+1;\s*$/', $line)) $count++;
-    }
-    return $count;
+    return guard_count_cloud_cidr_lines(file(CLOUD_GEO_CONF, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []);
 }
 
 function guard_health_snapshot(array $settings, array $counts, string $statsCacheFile): array {
