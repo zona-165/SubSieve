@@ -5,6 +5,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONTAINER="${GATEWAY_CONTAINER:-subscribe-gateway}"
 TEST_PREFIX="/tmp/subsieve-idc-runtime"
 TEST_CONF="$TEST_PREFIX/nginx.conf"
+TEST_LOG="$TEST_PREFIX/access.log"
 
 cleanup() {
     if docker exec "$CONTAINER" test -s "$TEST_PREFIX/nginx.pid" 2>/dev/null; then
@@ -20,7 +21,7 @@ if [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "t
 fi
 
 TEST_IP=$(docker exec "$CONTAINER" awk '
-    /# === AWS ===/ { in_aws = 1; next }
+    /# === .* \[aws\] ===/ { in_aws = 1; next }
     in_aws && $1 ~ /^[0-9]/ { split($1, cidr, "/"); print cidr[1]; exit }
 ' /etc/nginx/subscribe/cloud_geo.conf)
 PROTECTED_PATH=$(docker exec "$CONTAINER" awk '
@@ -50,5 +51,9 @@ if [[ "$STATUS" != "403" || "$BODY" != *"Forbidden: Cloud IP"* ]]; then
     echo "IDC runtime test failed: ip=$TEST_IP status=$STATUS body=$BODY" >&2
     exit 1
 fi
+if ! docker exec "$CONTAINER" grep -Fq '403 "cloud" "aws"' "$TEST_LOG"; then
+    echo "IDC runtime log test failed: missing reason=cloud provider=aws" >&2
+    exit 1
+fi
 
-echo "IDC runtime test passed: ip=$TEST_IP status=403 reason=cloud"
+echo "IDC runtime test passed: ip=$TEST_IP status=403 reason=cloud provider=aws"
