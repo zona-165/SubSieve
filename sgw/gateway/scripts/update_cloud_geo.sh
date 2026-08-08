@@ -94,7 +94,8 @@ fi
 # 旧版本只有一个合并配置。首次升级先按旧注释拆分成厂商缓存，
 # 即使本轮外部数据源短暂失败，也不会让原有厂商规则从生效配置中消失。
 seed_legacy_cache() {
-    local id="$1" legacy_name="$2" target="$CACHE_DIR/${id}.cidrs"
+    local id="$1" legacy_name="$2"
+    local target="$CACHE_DIR/${id}.cidrs"
     [[ -s "$target" || ! -s "$OUTPUT" ]] && return 0
     awk -v id="$id" -v legacy="$legacy_name" '
         {
