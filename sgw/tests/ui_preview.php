@@ -106,14 +106,14 @@ if (str_starts_with($path, '/api/')) {
             'mechanisms' => [
                 ['state' => 'active', 'title' => '请求速率限制', 'detail' => '网关限速与 429 响应已启用'],
                 ['state' => 'active', 'title' => '云服务商 / IDC CIDR', 'detail' => '5,381 条 IPv4 CIDR'],
-                ['state' => 'active', 'title' => 'Token 拉取限制', 'detail' => '自动暂停生效 · 当前 2 个'],
+                ['state' => 'active', 'title' => '自动执行规则', 'detail' => '限速与自动暂停生效 · 当前暂停 2 个'],
                 ['state' => 'active', 'title' => '多源 IP 情报', 'detail' => '142 个缓存画像'],
             ],
             'review_summary' => $previewSummary,
             'findings' => $previewFindings,
             'rules' => [
                 'guard_observe_enabled' => 1, 'guard_ip_daily_requests' => 100,
-                'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 20,
+                'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 8,
                 'guard_token_hour_ips' => 8, 'guard_ip_hour_tokens' => 20, 'guard_ip_404_5m' => 40,
                 'guard_scan_lines' => 30000,
             ],

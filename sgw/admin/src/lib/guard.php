@@ -23,7 +23,7 @@ function guard_normalize_settings(array $settings): array {
     $ranges = [
         'guard_ip_daily_requests' => [20, 100000],
         'guard_ip_per_minute' => [5, 5000],
-        'guard_token_per_minute' => [5, 5000],
+        'guard_token_per_minute' => [2, 5000],
         'guard_token_hour_ips' => [2, 500],
         'guard_ip_hour_tokens' => [2, 1000],
         'guard_ip_404_5m' => [5, 5000],
@@ -46,7 +46,7 @@ function guard_normalize_settings(array $settings): array {
     }
     $pullRanges = [
         'guard_pull_limit_24h_ips' => [2, 200],
-        'guard_pull_limit_per_minute' => [2, 300],
+        'guard_pull_limit_per_minute' => [3, 300],
         'guard_pull_limit_suspend_hours' => [1, 168],
     ];
     foreach ($pullRanges as $key => [$min, $max]) {
@@ -54,6 +54,21 @@ function guard_normalize_settings(array $settings): array {
         $result[$key] = max($min, min($max, $value));
     }
     return $result;
+}
+
+function guard_threshold_relationship_error(array $settings): string {
+    $rules = guard_normalize_settings($settings);
+    if (empty($rules['guard_observe_enabled'])
+        || empty($rules['guard_pull_limit_enabled'])
+        || empty($rules['guard_pull_limit_enforce'])) {
+        return '';
+    }
+
+    $warning = (int)$rules['guard_token_per_minute'];
+    $limit = (int)$rules['guard_pull_limit_per_minute'];
+    if ($warning < $limit) return '';
+
+    return "单 Token 分钟预警阈值必须低于自动限速阈值；当前预警 {$warning} 次/分钟，自动限速 {$limit} 次/分钟";
 }
 
 function guard_token_fingerprint(string $token, string $secret): string {

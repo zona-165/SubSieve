@@ -35,12 +35,23 @@ for ($i = 0; $i < 11; $i++) {
 $lines[] = limit_log('30.0.0.1', $now - 10, 'normal-token', $path);
 
 $settings = [
+    'guard_observe_enabled' => 1,
+    'guard_token_per_minute' => 8,
     'guard_pull_limit_enabled' => 1,
     'guard_pull_limit_enforce' => 0,
     'guard_pull_limit_24h_ips' => 10,
     'guard_pull_limit_per_minute' => 10,
     'guard_pull_limit_suspend_hours' => 24,
 ];
+
+expect_limit(guard_threshold_relationship_error($settings) === '', '监控模式不应触发预警与执行阈值关系错误');
+$invalidRelationship = $settings;
+$invalidRelationship['guard_pull_limit_enforce'] = 1;
+$invalidRelationship['guard_token_per_minute'] = 10;
+expect_limit(guard_threshold_relationship_error($invalidRelationship) !== '', '自动执行开启时应拒绝等于硬上限的预警阈值');
+$validRelationship = $invalidRelationship;
+$validRelationship['guard_token_per_minute'] = 8;
+expect_limit(guard_threshold_relationship_error($validRelationship) === '', '低于硬上限的预警阈值应通过校验');
 
 $observe = guard_analyze_pull_limits($lines, $settings, $now, $path, $secret, [], false);
 expect_limit(($observe['summary']['active_tokens'] ?? 0) === 3, '应统计 3 个活跃 Token');

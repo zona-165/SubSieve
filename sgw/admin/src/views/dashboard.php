@@ -340,6 +340,9 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .rule-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
 .rule-field label{display:block;color:var(--text2);font-size:11px;margin-bottom:5px}
 .rule-field .ip-input{width:100%;min-width:0}
+.rule-hint{display:block;margin-top:5px;color:var(--text3);font-size:10px;line-height:1.45}
+.rule-hint.warn{color:#dc2626;font-weight:700}
+.rule-hint.ok{color:#059669}
 .rule-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .scope-note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(14,165,233,.18);border-radius:9px;background:rgba(14,165,233,.07);color:var(--text2);font-size:11px;line-height:1.55;margin-bottom:14px}
 .security-empty{padding:24px 0;color:var(--text3);font-size:12px;text-align:center}
@@ -903,7 +906,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 
       <section class="pull-limit-panel" id="pull-limit-section">
         <div class="pull-limit-head">
-          <div><div class="security-section-title">Token 拉取限制</div><div class="security-section-sub">按 Token 指纹统计独立 IP 和拉取频率，自动暂停可独立启停</div></div>
+          <div><div class="security-section-title">自动执行规则</div><div class="security-section-sub">达到硬阈值后由网关限速或临时暂停 Token</div></div>
           <span id="pull-limit-mode" class="limit-mode-badge paused">读取中</span>
         </div>
         <div id="pull-limit-rules" class="pull-limit-rule-grid"><div class="loading">加载限制规则…</div></div>
@@ -912,11 +915,11 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
         <div id="pull-limit-usage" class="pull-limit-usage"></div>
         <div class="pull-limit-controls">
           <div class="pull-limit-switches">
-            <label><input id="pull-limit-enabled" type="checkbox"> 开启用量监控</label>
-            <label><input id="pull-limit-enforce" type="checkbox"> 超限后自动暂停</label>
+            <label><input id="pull-limit-enabled" type="checkbox" onchange="updateGuardThresholdHint()"> 开启用量监控</label>
+            <label><input id="pull-limit-enforce" type="checkbox" onchange="updateGuardThresholdHint()"> 超限后自动执行</label>
           </div>
           <div class="rule-field"><label>24 小时不同 IP 上限</label><input class="ip-input" id="pull-limit-ips" type="number" min="2" max="200"></div>
-          <div class="rule-field"><label>每分钟拉取上限</label><input class="ip-input" id="pull-limit-minute" type="number" min="2" max="300"></div>
+          <div class="rule-field"><label>每分钟拉取硬上限</label><input class="ip-input" id="pull-limit-minute" type="number" min="3" max="300" oninput="updateGuardThresholdHint()"></div>
           <div class="rule-field"><label>超限暂停时长（小时）</label><input class="ip-input" id="pull-limit-hours" type="number" min="1" max="168"></div>
           <div class="pull-limit-actions">
             <div class="pull-limit-note">IP 白名单不受该规则影响。监控模式只记录超限证据；开启自动暂停后，频率限制即时生效，跨 IP 规则由后台巡检执行。</div>
@@ -947,15 +950,15 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 
           <section class="security-section" id="guard-threshold-section">
             <div class="security-section-head">
-              <div><div class="security-section-title">观察阈值</div><div class="security-section-sub">统一规则入口，保存后下次扫描生效</div></div>
+              <div><div class="security-section-title">风险预警规则</div><div class="security-section-sub">只生成风险证据，不会自动封禁；预警应早于自动执行</div></div>
             </div>
             <label style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:12px;margin-bottom:12px">
-              <input id="guard-observe-enabled" type="checkbox" style="width:18px;height:18px"> 开启行为阈值观察
+              <input id="guard-observe-enabled" type="checkbox" style="width:18px;height:18px" onchange="updateGuardThresholdHint()"> 开启风险预警
             </label>
             <div class="rule-grid">
               <div class="rule-field"><label>单 IP / 分钟</label><input class="ip-input" id="guard-ip-minute" type="number" min="5" max="5000"></div>
               <div class="rule-field"><label>单 IP / 今日拉取</label><input class="ip-input" id="guard-ip-daily" type="number" min="20" max="100000"></div>
-              <div class="rule-field"><label>单 Token / 分钟</label><input class="ip-input" id="guard-token-minute" type="number" min="5" max="5000"></div>
+              <div class="rule-field"><label>单 Token / 分钟预警</label><input class="ip-input" id="guard-token-minute" type="number" min="2" max="5000" oninput="updateGuardThresholdHint()"><span id="guard-token-minute-hint" class="rule-hint">读取自动执行阈值…</span></div>
               <div class="rule-field"><label>Token / 小时不同 IP</label><input class="ip-input" id="guard-token-hour-ips" type="number" min="2" max="500"></div>
               <div class="rule-field"><label>IP / 小时不同 Token</label><input class="ip-input" id="guard-ip-hour-tokens" type="number" min="2" max="1000"></div>
               <div class="rule-field"><label>单 IP 五分钟 404</label><input class="ip-input" id="guard-ip-404" type="number" min="5" max="5000"></div>
@@ -965,7 +968,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <button class="mode-btn" onclick="applyGuardPreset('strict')">严格</button>
               <button class="mode-btn" onclick="applyGuardPreset('balanced')">均衡</button>
               <button class="mode-btn" onclick="applyGuardPreset('quiet')">宽松</button>
-              <button class="btn-primary" onclick="saveGuardSettings()">保存阈值</button>
+              <button class="btn-primary" onclick="saveGuardSettings()">保存预警规则</button>
             </div>
           </section>
 
@@ -982,7 +985,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
     <!-- ─── 防护策略 ─────────────────────────────────────── -->
     <div class="tab-panel" id="panel-protection">
       <div class="workspace-intro">
-        <div><div class="workspace-kicker">策略中心</div><h1>防护策略</h1><p>集中管理 Token 拉取限制与行为观察阈值。自动暂停和仅观察保持独立，避免误操作。</p></div>
+        <div><div class="workspace-kicker">策略中心</div><h1>防护策略</h1><p>风险预警负责提前发现异常，自动执行负责限速和暂停，两层规则按先预警后拦截运行。</p></div>
         <button class="mode-btn" onclick="openPanelTab('security')">查看运行状态</button>
       </div>
       <div id="protection-content" class="protection-stack"></div>
@@ -1574,7 +1577,7 @@ const TABS = {
   security:   {title:'运行总览', subtitle:'网关健康、防护状态与待处理风险', loader:loadSecurity},
   logs:       {title:'拉取记录', subtitle:'检索订阅请求、状态码、Token 与客户端特征', loader:loadLogs},
   stats:      {title:'风险分析', subtitle:'高频拉取、Token 异常、来源异常与脚本扫描处置', loader:loadStats},
-  protection: {title:'防护策略', subtitle:'Token 拉取限制与行为观察阈值', loader:loadProtection},
+  protection: {title:'防护策略', subtitle:'风险预警与自动执行规则', loader:loadProtection},
   access:     {title:'访问控制', subtitle:'统一维护 IP、Token 与 UA 放行和拦截规则', loader:loadAccessControl},
   settings:   {title:'系统设置', subtitle:'界面账户、网关上游、证书与告警运维', loader:loadSettings},
 };
@@ -3667,7 +3670,7 @@ function renderPullLimits() {
   const usage = Array.isArray(data.usage) ? data.usage : [];
   const mode = document.getElementById('pull-limit-mode');
   mode.className = 'limit-mode-badge ' + (!rules.enabled ? 'paused' : (rules.enforce ? 'enforce' : ''));
-  mode.textContent = !rules.enabled ? '已关闭' : (rules.enforce ? '自动暂停已启用' : '监控模式');
+  mode.textContent = !rules.enabled ? '已关闭' : (rules.enforce ? '自动执行已启用' : '仅统计');
 
   const ruleRows = [
     {icon:'▣', label:'24 小时独立 IP 上限', value:`${rules.max_ips_24h || 10} 个不同 IP`},
@@ -3720,6 +3723,7 @@ function renderPullLimits() {
   document.getElementById('pull-limit-ips').value = rules.max_ips_24h || 10;
   document.getElementById('pull-limit-minute').value = rules.max_per_minute || 10;
   document.getElementById('pull-limit-hours').value = rules.suspend_hours || 24;
+  updateGuardThresholdHint();
 }
 
 async function openTokenInvestigation(fingerprint='', token='') {
@@ -3801,8 +3805,57 @@ async function blacklistInvestigationToken() {
   await quickBanToken(token);
 }
 
+function guardThresholdRelationshipError() {
+  const observe = document.getElementById('guard-observe-enabled')?.checked;
+  const monitor = document.getElementById('pull-limit-enabled')?.checked;
+  const enforce = document.getElementById('pull-limit-enforce')?.checked;
+  if (!observe || !monitor || !enforce) return '';
+
+  const warning = Number(document.getElementById('guard-token-minute')?.value);
+  const limit = Number(document.getElementById('pull-limit-minute')?.value);
+  if (!Number.isFinite(warning) || !Number.isFinite(limit) || warning < limit) return '';
+  return `单 Token 分钟预警必须低于自动限速：当前预警 ${warning} 次/分钟，硬上限 ${limit} 次/分钟`;
+}
+
+function updateGuardThresholdHint() {
+  const hint = document.getElementById('guard-token-minute-hint');
+  if (!hint) return;
+  const observe = document.getElementById('guard-observe-enabled')?.checked;
+  const monitor = document.getElementById('pull-limit-enabled')?.checked;
+  const enforce = document.getElementById('pull-limit-enforce')?.checked;
+  const warning = Number(document.getElementById('guard-token-minute')?.value);
+  const limit = Number(document.getElementById('pull-limit-minute')?.value);
+  hint.className = 'rule-hint';
+  if (!observe) {
+    hint.textContent = '风险预警当前已关闭。';
+    return;
+  }
+  if (!monitor || !enforce) {
+    hint.textContent = '自动执行未开启，当前阈值只用于风险分析。';
+    return;
+  }
+  if (!Number.isFinite(limit) || limit < 3) {
+    hint.textContent = '自动限速硬上限至少为 3 次/分钟。';
+    hint.classList.add('warn');
+    return;
+  }
+  if (!Number.isFinite(warning) || warning >= limit) {
+    hint.textContent = `应设置为 2–${limit - 1} 次/分钟，确保先预警、后限速。`;
+    hint.classList.add('warn');
+    return;
+  }
+  hint.textContent = `预警 ${warning} 次/分钟，自动限速 ${limit} 次/分钟，顺序正常。`;
+  hint.classList.add('ok');
+}
+
 async function savePullLimitSettings() {
   const enforce = document.getElementById('pull-limit-enforce').checked;
+  const conflict = guardThresholdRelationshipError();
+  if (conflict) {
+    toast(conflict, 'err');
+    document.getElementById('guard-token-minute')?.focus();
+    return;
+  }
   if (enforce && !confirm('开启后，超过规则的 Token 将暂停拉取。确认启用自动暂停？')) return;
   const body = {
     guard_pull_limit_enabled: document.getElementById('pull-limit-enabled').checked ? 1 : 0,
@@ -4021,6 +4074,7 @@ function renderGuardRules() {
   document.getElementById('guard-ip-hour-tokens').value = r.guard_ip_hour_tokens ?? 20;
   document.getElementById('guard-ip-404').value = r.guard_ip_404_5m ?? 40;
   document.getElementById('guard-scan-lines').value = r.guard_scan_lines ?? 30000;
+  updateGuardThresholdHint();
 }
 
 function applyGuardPreset(name) {
@@ -4030,11 +4084,23 @@ function applyGuardPreset(name) {
     quiet:[60,200,45,15,40,80,50000],
   };
   const values = presets[name] || presets.balanced;
+  if (document.getElementById('pull-limit-enabled')?.checked && document.getElementById('pull-limit-enforce')?.checked) {
+    const limit = Number(document.getElementById('pull-limit-minute')?.value || 10);
+    const warningRatio = {strict:.6, balanced:.75, quiet:.9}[name] || .75;
+    values[2] = Math.min(values[2], Math.max(2, Math.min(limit - 1, Math.floor(limit * warningRatio))));
+  }
   ['guard-ip-minute','guard-ip-daily','guard-token-minute','guard-token-hour-ips','guard-ip-hour-tokens','guard-ip-404','guard-scan-lines']
     .forEach((id, index) => document.getElementById(id).value = values[index]);
+  updateGuardThresholdHint();
 }
 
 async function saveGuardSettings() {
+  const conflict = guardThresholdRelationshipError();
+  if (conflict) {
+    toast(conflict, 'err');
+    document.getElementById('guard-token-minute')?.focus();
+    return;
+  }
   const body = {
     guard_observe_enabled: document.getElementById('guard-observe-enabled').checked ? 1 : 0,
     guard_ip_per_minute: Number(document.getElementById('guard-ip-minute').value),
@@ -4051,7 +4117,7 @@ async function saveGuardSettings() {
     body:JSON.stringify(body),
   });
   if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
-  toast('观察阈值已保存');
+  toast('风险预警规则已保存');
   await loadSecurity({force:true});
 }
 

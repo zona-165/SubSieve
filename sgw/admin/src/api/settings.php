@@ -161,6 +161,17 @@ if ($method === 'POST') {
     ];
     $pullLimitChanged = count(array_intersect($pullLimitKeys, array_keys($body))) > 0;
     $s = apply_guard_settings($s, $body);
+    $thresholdRelationshipKeys = [
+        'guard_observe_enabled',
+        'guard_token_per_minute',
+        'guard_pull_limit_enabled',
+        'guard_pull_limit_enforce',
+        'guard_pull_limit_per_minute',
+    ];
+    if (count(array_intersect($thresholdRelationshipKeys, array_keys($body))) > 0) {
+        $relationshipError = guard_threshold_relationship_error($s);
+        if ($relationshipError !== '') json_err($relationshipError);
+    }
 
     // 保存 settings.json
     if (!write_settings($s)) {
@@ -275,13 +286,13 @@ function apply_guard_settings(array $s, array $body): array {
     $fields = [
         'guard_ip_daily_requests' => [20, 100000, 100],
         'guard_ip_per_minute' => [5, 5000, 30],
-        'guard_token_per_minute' => [5, 5000, 20],
+        'guard_token_per_minute' => [2, 5000, 20],
         'guard_token_hour_ips' => [2, 500, 8],
         'guard_ip_hour_tokens' => [2, 1000, 20],
         'guard_ip_404_5m' => [5, 5000, 40],
         'guard_scan_lines' => [1000, 100000, 30000],
         'guard_pull_limit_24h_ips' => [2, 200, 10],
-        'guard_pull_limit_per_minute' => [2, 300, 10],
+        'guard_pull_limit_per_minute' => [3, 300, 10],
         'guard_pull_limit_suspend_hours' => [1, 168, 24],
     ];
     $changed = false;
