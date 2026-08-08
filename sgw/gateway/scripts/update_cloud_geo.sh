@@ -183,12 +183,14 @@ for encoded in "${PROVIDER_ROWS[@]}"; do
 
     if [[ "$source_type" == "text" && -s "$TEMP_DIR/${id}.source" ]]; then
         grep -E "$IPV4_CIDR_RE" "$TEMP_DIR/${id}.source" >> "$cidr_file" || true
-    elif [[ "$source_type" == "aws" && -s "$TEMP_DIR/${id}.source" ]]; then
+    elif [[ "$source_type" == "aws" && -s "$TEMP_DIR/${id}.source" ]] \
+        && jq -e '.prefixes | type == "array"' "$TEMP_DIR/${id}.source" >/dev/null 2>&1; then
         jq -r '.prefixes[]?.ip_prefix // empty' "$TEMP_DIR/${id}.source" \
             | grep -E "$IPV4_CIDR_RE" >> "$cidr_file" || true
     elif [[ "$source_type" == "asn" ]]; then
         while IFS= read -r asn; do
             [[ -s "$TEMP_DIR/${id}.${asn}.json" ]] || continue
+            jq -e '.data.prefixes | type == "array"' "$TEMP_DIR/${id}.${asn}.json" >/dev/null 2>&1 || continue
             jq -r '.data.prefixes[]?.prefix // empty' "$TEMP_DIR/${id}.${asn}.json" \
                 | grep -E "$IPV4_CIDR_RE" >> "$cidr_file" || true
         done < <(jq -r '.asns[]?' <<<"$row")
