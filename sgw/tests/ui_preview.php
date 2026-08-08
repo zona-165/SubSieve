@@ -6,6 +6,37 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 if (str_starts_with($path, '/api/')) {
     header('Content-Type: application/json; charset=utf-8');
     $empty = ['ok' => true, 'entries' => []];
+    if ($path === '/api/token_investigation.php') {
+        echo json_encode([
+            'ok' => true,
+            'profile' => [
+                'fingerprint' => 'TKN-7BAD134E1B23C662', 'raw_token' => 'preview-token-fingerprint',
+                'suspended' => true, 'suspended_until' => date('Y-m-d H:i:s', time() + 72000), 'blacklisted' => false,
+                'summary' => [
+                    'requests_24h' => 48, 'unique_ips' => 14, 'unique_asns' => 4, 'unique_locations' => 3,
+                    'ua_families' => 3, 'first_seen' => date('Y-m-d H:i:s', time() - 72000),
+                    'last_seen' => date('Y-m-d H:i:s'), 'score' => 88, 'risk' => '高风险',
+                    'status_counts' => ['200' => 42, '429' => 6],
+                ],
+                'evidence' => ['24 小时出现 14 个独立 IP，超过规则 10 个', '来源覆盖 4 个 ASN', '10 分钟窗口内出现多个不同地区，建议人工复核'],
+                'ips' => [
+                    ['ip' => '198.51.100.24', 'count' => 20, 'last_seen' => date('Y-m-d H:i:s'), 'location' => '中国 / 浙江 / 杭州', 'asn' => 'AS4134', 'operator' => 'CHINANET-BACKBONE', 'network_type' => '普通运营商网络', 'high_risk' => false, 'intel_pending' => false],
+                    ['ip' => '203.0.113.18', 'count' => 12, 'last_seen' => date('Y-m-d H:i:s', time() - 300), 'location' => '中国 / 广东 / 广州', 'asn' => 'AS9808', 'operator' => 'China Mobile', 'network_type' => '机房/托管', 'high_risk' => true, 'intel_pending' => false],
+                ],
+                'uas' => [
+                    ['ua' => 'Clash.Meta/1.18', 'family' => 'Clash', 'count' => 26, 'last_seen' => date('Y-m-d H:i:s')],
+                    ['ua' => 'Shadowrocket/2.2', 'family' => 'Shadowrocket', 'count' => 12, 'last_seen' => date('Y-m-d H:i:s', time() - 300)],
+                    ['ua' => 'python-requests/2.32', 'family' => 'Python', 'count' => 10, 'last_seen' => date('Y-m-d H:i:s', time() - 600)],
+                ],
+                'events' => [
+                    ['time' => date('Y-m-d H:i:s'), 'ip' => '198.51.100.24', 'status' => 200, 'ua_family' => 'Clash', 'location' => '中国 / 浙江 / 杭州'],
+                    ['time' => date('Y-m-d H:i:s', time() - 180), 'ip' => '203.0.113.18', 'status' => 429, 'ua_family' => 'Python', 'location' => '中国 / 广东 / 广州'],
+                ],
+            ],
+            'intel_queued' => 0,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($path === '/api/security.php') {
         $previewFindings = [];
         $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
@@ -46,10 +77,10 @@ if (str_starts_with($path, '/api/')) {
             'policy_counts' => ['ip_blacklist' => 24, 'token_blacklist' => 3],
             'pull_limits' => [
                 'settings' => ['enabled' => true, 'enforce' => true, 'max_ips_24h' => 10, 'max_per_minute' => 10, 'suspend_hours' => 24],
-                'summary' => ['active_tokens' => 316, 'suspended_tokens' => 2, 'pending_violations' => 0, 'max_unique_ips_24h' => 14, 'max_per_minute' => 13],
+                'summary' => ['active_tokens' => 316, 'suspended_tokens' => 2, 'pending_violations' => 0, 'max_unique_ips_24h' => 14, 'max_per_minute' => 13, 'max_rule_unique_ips' => 9, 'max_rule_per_minute' => 8],
                 'usage' => [
-                    ['fingerprint' => 'TKN-7BAD134E1B23C662', 'unique_ips_24h' => 14, 'requests_24h' => 48, 'peak_per_minute' => 13, 'last_seen' => date('Y-m-d H:i:s'), 'suspended' => true, 'would_suspend' => false, 'suspended_until' => date('Y-m-d H:i:s', time() + 72000)],
-                    ['fingerprint' => 'TKN-E9FA747D378F15A0', 'unique_ips_24h' => 7, 'requests_24h' => 18, 'peak_per_minute' => 4, 'last_seen' => date('Y-m-d H:i:s'), 'suspended' => false, 'would_suspend' => false, 'suspended_until' => ''],
+                    ['fingerprint' => 'TKN-7BAD134E1B23C662', 'unique_ips_24h' => 14, 'rule_unique_ips' => 0, 'requests_24h' => 48, 'peak_per_minute' => 13, 'rule_peak_per_minute' => 0, 'rule_since' => date('Y-m-d H:i:s', time() + 72000), 'last_seen' => date('Y-m-d H:i:s'), 'suspended' => true, 'would_suspend' => false, 'suspended_until' => date('Y-m-d H:i:s', time() + 72000)],
+                    ['fingerprint' => 'TKN-E9FA747D378F15A0', 'unique_ips_24h' => 7, 'rule_unique_ips' => 7, 'requests_24h' => 18, 'peak_per_minute' => 4, 'rule_peak_per_minute' => 4, 'rule_since' => '', 'last_seen' => date('Y-m-d H:i:s'), 'suspended' => false, 'would_suspend' => false, 'suspended_until' => ''],
                 ],
             ],
             'mechanisms' => [

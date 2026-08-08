@@ -363,12 +363,42 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .pull-limit-meter.warn span{background:linear-gradient(90deg,#f59e0b,#ef4444)}
 .pull-limit-status{font-weight:800;color:#10b981;white-space:nowrap}
 .pull-limit-status.warn{color:#f59e0b}.pull-limit-status.blocked{color:#ef4444}
+.pull-limit-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.pull-limit-row-actions .mode-btn{padding:5px 9px}
 .pull-limit-controls{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
 .pull-limit-switches{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .pull-limit-switches label{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:12px}
 .pull-limit-switches input{width:18px;height:18px}
 .pull-limit-actions{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pull-limit-note{color:var(--text3);font-size:11px;line-height:1.65;flex:1;min-width:240px}
+.investigation-dialog{width:min(980px,calc(100vw - 28px));max-width:none;max-height:calc(100dvh - 28px);margin:auto;padding:0;border:1px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--text);box-shadow:0 28px 80px rgba(0,0,0,.42);overflow:hidden}
+.investigation-dialog::backdrop{background:rgba(2,6,12,.66);backdrop-filter:blur(3px)}
+.investigation-shell{display:flex;flex-direction:column;max-height:calc(100dvh - 30px)}
+.investigation-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:17px 18px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.investigation-kicker{color:var(--accent);font-size:10px;font-weight:850}
+.investigation-title{font-size:17px;font-weight:900;margin-top:3px;overflow-wrap:anywhere}
+.investigation-close{width:34px;height:34px;display:grid;place-items:center;padding:0;border-radius:7px;font-size:20px}
+.investigation-body{flex:1;min-height:0;overflow:auto;padding:16px 18px;overscroll-behavior:contain}
+.investigation-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.investigation-metric{padding:11px;border-left:3px solid var(--metric-color,var(--accent));border-radius:6px;background:rgba(100,116,139,.07);min-width:0}
+.investigation-metric strong{display:block;font-size:18px;line-height:1.2;color:var(--text);overflow-wrap:anywhere}
+.investigation-metric span{display:block;margin-top:4px;color:var(--text3);font-size:10px}
+.investigation-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}
+.investigation-section{min-width:0;padding:13px 0;border-top:1px solid var(--border)}
+.investigation-section h3{font-size:12px;margin:0 0 9px;color:var(--text)}
+.investigation-evidence{display:grid;gap:7px}
+.investigation-evidence div{padding:8px 10px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.07);border-radius:5px;color:var(--text2);font-size:11px;line-height:1.5}
+.investigation-table-wrap{width:100%;max-width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:7px}
+.investigation-table{min-width:620px}
+.investigation-table th,.investigation-table td{padding:8px;font-size:10px}
+.investigation-risk{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:850}
+.investigation-risk.high{background:rgba(239,68,68,.13);color:#ef4444}.investigation-risk.review{background:rgba(245,158,11,.13);color:#f59e0b}.investigation-risk.low{background:rgba(34,197,94,.12);color:#22c55e}
+.investigation-ua-list{display:grid;gap:6px}
+.investigation-ua{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:10px}
+.investigation-ua-family{font-weight:850;color:var(--accent)}
+.investigation-ua-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+.investigation-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg3)}
+.investigation-actions .investigation-note{flex:1;min-width:220px;color:var(--text3);font-size:10px}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(100,116,139,.055)}
@@ -501,7 +531,14 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .pull-limit-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .pull-limit-row{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:12px 2px}
   .pull-limit-row>div:nth-child(2),.pull-limit-row>div:nth-child(3){grid-column:1/-1}
+  .pull-limit-row-actions{grid-column:1/-1;justify-content:flex-start}
   .pull-limit-controls{grid-template-columns:1fr}
+  .investigation-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+  .investigation-shell{max-height:calc(100dvh - 18px)}
+  .investigation-head,.investigation-body,.investigation-actions{padding-left:12px;padding-right:12px}
+  .investigation-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .investigation-grid{grid-template-columns:1fr;gap:0}
+  .investigation-actions .mode-btn,.investigation-actions .btn-primary,.investigation-actions .btn-danger{flex:1 1 calc(50% - 6px);min-height:36px}
   .mechanism-grid{grid-template-columns:1fr}
   .rule-grid{grid-template-columns:1fr 1fr;gap:8px}
   .risk-head{align-items:flex-start}
@@ -1326,6 +1363,22 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 
 <div id="toast"></div>
 
+<dialog id="token-investigation-dialog" class="investigation-dialog" onclick="if(event.target===this) closeTokenInvestigation()">
+  <div class="investigation-shell">
+    <header class="investigation-head">
+      <div><div class="investigation-kicker">TOKEN 调查档案</div><div class="investigation-title" id="investigation-title">正在读取证据</div></div>
+      <button class="mode-btn investigation-close" onclick="closeTokenInvestigation()" title="关闭" aria-label="关闭">×</button>
+    </header>
+    <div class="investigation-body" id="investigation-body"><div class="loading">正在聚合最近 24 小时证据…</div></div>
+    <footer class="investigation-actions">
+      <span class="investigation-note">只分析网关日志和缓存情报，不连接机场用户数据库。</span>
+      <button class="mode-btn" id="investigation-copy" onclick="copyInvestigationToken()" disabled>复制 Token</button>
+      <button class="mode-btn" id="investigation-logs" onclick="openInvestigationLogs()" disabled>查看拉取记录</button>
+      <button class="btn-danger" id="investigation-ban" onclick="blacklistInvestigationToken()" disabled>拉黑 Token</button>
+    </footer>
+  </div>
+</dialog>
+
 <script>
 // ── 状态 ─────────────────────────────────────────────────────
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
@@ -1340,6 +1393,7 @@ let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let securityData = null;
+let tokenInvestigationData = null;
 let guardReviewFilter = 'active';
 let guardReviewPage = 1;
 let guardReviewPageSize = 5;
@@ -2217,6 +2271,7 @@ function renderStats() {
         <button class="copy-btn" data-val="${esc(r.token)}" onclick="copyText(this.dataset.val)">复制</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.ip_count} 个不同IP</span>
+      <button class="mode-btn" style="margin-left:8px" onclick="openTokenInvestigation('',${jsArg(r.token)})">调查</button>
       <button class="add-btn-sm" style="margin-left:8px" onclick="quickBanToken(${jsArg(r.token)})">拉黑</button>
     </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
 
@@ -3873,8 +3928,8 @@ function renderPullLimits() {
 
   const summaryRows = [
     {value:summary.active_tokens || 0,label:'活跃 Token',color:'#0ea5e9'},
-    {value:`${summary.max_unique_ips_24h || 0}/${rules.max_ips_24h || 10}`,label:'最高独立 IP 用量',color:'#6366f1'},
-    {value:`${summary.max_per_minute || 0}/${rules.max_per_minute || 10}`,label:'最高每分钟拉取',color:'#f59e0b'},
+    {value:`${summary.max_rule_unique_ips || 0}/${rules.max_ips_24h || 10}`,label:'当前规则周期最高 IP',color:'#6366f1'},
+    {value:`${summary.max_rule_per_minute || 0}/${rules.max_per_minute || 10}`,label:'当前规则周期最高频率',color:'#f59e0b'},
     {value:summary.suspended_tokens || 0,label:rules.enforce ? '当前暂停' : '模拟超限',color:'#ef4444'},
   ];
   if (!rules.enforce) summaryRows[3].value = summary.pending_violations || 0;
@@ -3889,17 +3944,19 @@ function renderPullLimits() {
     target.innerHTML = '<div class="security-empty">24 小时内暂无可统计 Token</div>';
   } else {
     target.innerHTML = usage.slice(0, 8).map(row => {
-      const ipRatio = Math.min(100, Math.round((Number(row.unique_ips_24h || 0) / Math.max(1, Number(rules.max_ips_24h || 10))) * 100));
-      const minuteRatio = Math.min(100, Math.round((Number(row.peak_per_minute || 0) / Math.max(1, Number(rules.max_per_minute || 10))) * 100));
+      const ruleIps = Number(row.rule_unique_ips ?? row.unique_ips_24h ?? 0);
+      const ruleMinute = Number(row.rule_peak_per_minute ?? row.peak_per_minute ?? 0);
+      const ipRatio = Math.min(100, Math.round((ruleIps / Math.max(1, Number(rules.max_ips_24h || 10))) * 100));
+      const minuteRatio = Math.min(100, Math.round((ruleMinute / Math.max(1, Number(rules.max_per_minute || 10))) * 100));
       const flagged = row.suspended || row.would_suspend;
       const statusClass = row.suspended ? 'blocked' : (row.would_suspend ? 'warn' : '');
       const status = row.suspended ? `暂停至 ${row.suspended_until || '-'}` : (row.would_suspend ? (rules.enforce ? '等待巡检' : '模拟超限') : '正常');
       return `<div class="pull-limit-row">
-        <div><div class="pull-limit-token">${esc(row.fingerprint || '-')}</div><div style="color:var(--text3);margin-top:3px">${Number(row.requests_24h || 0).toLocaleString()} 次 · 最后 ${esc(row.last_seen || '-')}</div></div>
-        <div><span style="color:var(--text2)">独立 IP ${row.unique_ips_24h || 0}/${rules.max_ips_24h || 10}</span><div class="pull-limit-meter ${flagged ? 'warn' : ''}"><span style="width:${ipRatio}%"></span></div></div>
-        <div><span style="color:var(--text2)">峰值 ${row.peak_per_minute || 0}/${rules.max_per_minute || 10}</span><div class="pull-limit-meter ${minuteRatio >= 100 ? 'warn' : ''}"><span style="width:${minuteRatio}%"></span></div></div>
+        <div><button class="pull-limit-token" style="padding:0;border:0;background:none;cursor:pointer;text-align:left" onclick="openTokenInvestigation(${jsArg(row.fingerprint)})" title="打开 Token 调查档案">${esc(row.fingerprint || '-')}</button><div style="color:var(--text3);margin-top:3px">24h ${Number(row.requests_24h || 0).toLocaleString()} 次 · ${row.unique_ips_24h || 0} IP · 最后 ${esc(row.last_seen || '-')}</div></div>
+        <div title="24 小时总量 ${row.unique_ips_24h || 0}；规则周期从 ${esc(row.rule_since || '24 小时前')} 开始"><span style="color:var(--text2)">周期 IP ${ruleIps}/${rules.max_ips_24h || 10}</span><div class="pull-limit-meter ${flagged ? 'warn' : ''}"><span style="width:${ipRatio}%"></span></div></div>
+        <div title="24 小时峰值 ${row.peak_per_minute || 0}；当前规则周期峰值 ${ruleMinute}"><span style="color:var(--text2)">周期峰值 ${ruleMinute}/${rules.max_per_minute || 10}</span><div class="pull-limit-meter ${minuteRatio >= 100 ? 'warn' : ''}"><span style="width:${minuteRatio}%"></span></div></div>
         <div class="pull-limit-status ${statusClass}">${esc(status)}</div>
-        <div>${row.suspended ? `<button class="mode-btn danger" onclick="releasePullLimit(${jsArg(row.fingerprint)})">解除</button>` : ''}</div>
+        <div class="pull-limit-row-actions"><button class="mode-btn" onclick="openTokenInvestigation(${jsArg(row.fingerprint)})">调查</button>${row.suspended ? `<button class="mode-btn danger" onclick="releasePullLimit(${jsArg(row.fingerprint)})">解除</button>` : ''}</div>
       </div>`;
     }).join('');
   }
@@ -3909,6 +3966,85 @@ function renderPullLimits() {
   document.getElementById('pull-limit-ips').value = rules.max_ips_24h || 10;
   document.getElementById('pull-limit-minute').value = rules.max_per_minute || 10;
   document.getElementById('pull-limit-hours').value = rules.suspend_hours || 24;
+}
+
+async function openTokenInvestigation(fingerprint='', token='') {
+  const dialog = document.getElementById('token-investigation-dialog');
+  tokenInvestigationData = null;
+  document.getElementById('investigation-title').textContent = fingerprint || 'Token 调查档案';
+  document.getElementById('investigation-body').innerHTML = '<div class="loading">正在聚合最近 24 小时证据…</div>';
+  ['investigation-copy','investigation-logs','investigation-ban'].forEach(id => document.getElementById(id).disabled = true);
+  if (!dialog.open) dialog.showModal();
+  const d = await apiFetch('/api/token_investigation.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(token ? {token} : {fingerprint}),
+  });
+  if (!d.ok) {
+    document.getElementById('investigation-body').innerHTML = `<div class="empty">加载失败：${esc(d.error || '未知错误')}</div>`;
+    return;
+  }
+  tokenInvestigationData = d.profile || null;
+  renderTokenInvestigation();
+}
+
+function renderTokenInvestigation() {
+  const p = tokenInvestigationData;
+  if (!p) return;
+  const s = p.summary || {};
+  const level = Number(s.score || 0) >= 70 ? 'high' : (Number(s.score || 0) >= 40 ? 'review' : 'low');
+  document.getElementById('investigation-title').textContent = p.fingerprint || 'Token 调查档案';
+  const metrics = [
+    [Number(s.score || 0), s.risk || '未评估', '#ef4444'],
+    [Number(s.requests_24h || 0).toLocaleString(), '24 小时请求', '#0ea5e9'],
+    [Number(s.unique_ips || 0), '独立 IP', '#6366f1'],
+    [Number(s.unique_asns || 0), 'ASN', '#f59e0b'],
+    [Number(s.ua_families || 0), '客户端类型', '#10b981'],
+  ];
+  const evidence = (p.evidence || []).map(item => `<div>${esc(item)}</div>`).join('');
+  const ipRows = (p.ips || []).map(row => `<tr>
+    <td><strong>${esc(row.ip || '-')}</strong><div style="color:var(--text3);margin-top:2px">${Number(row.count || 0)} 次 · ${esc(row.last_seen || '-')}</div></td>
+    <td>${esc(row.location || '等待情报')}</td><td>${esc(row.asn || '未查询')}</td><td>${esc(row.operator || '未查询')}</td>
+    <td><span class="investigation-risk ${row.high_risk ? 'high' : (row.intel_pending ? 'review' : 'low')}">${row.high_risk ? '高风险' : (row.intel_pending ? '待查询' : esc(row.network_type || '低风险'))}</span></td>
+  </tr>`).join('');
+  const uaRows = (p.uas || []).map(row => `<div class="investigation-ua"><span class="investigation-ua-family">${esc(row.family || '-')}</span><span class="investigation-ua-value" title="${esc(row.ua || '')}">${esc(row.ua || '-')}</span><strong>${Number(row.count || 0)} 次</strong></div>`).join('');
+  const eventRows = (p.events || []).slice(0, 20).map(row => `<tr><td>${esc(row.time || '-')}</td><td>${esc(row.ip || '-')}</td><td>${statusBadge(row.status)}</td><td>${esc(row.ua_family || '-')}</td><td>${esc(row.location || '-')}</td></tr>`).join('');
+  document.getElementById('investigation-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap"><span class="investigation-risk ${level}">${esc(s.risk || '未评估')} ${Number(s.score || 0)}</span><span style="color:var(--text3);font-size:10px">${esc(s.first_seen || '-')} 至 ${esc(s.last_seen || '-')}</span>${p.suspended ? `<span class="investigation-risk high">暂停至 ${esc(p.suspended_until || '-')}</span>` : ''}${p.blacklisted ? '<span class="investigation-risk high">已永久拉黑</span>' : ''}</div>
+    <div class="investigation-metrics">${metrics.map(([value,label,color]) => `<div class="investigation-metric" style="--metric-color:${color}"><strong>${esc(String(value))}</strong><span>${esc(label)}</span></div>`).join('')}</div>
+    <div class="investigation-grid">
+      <div><section class="investigation-section"><h3>异常证据</h3><div class="investigation-evidence">${evidence}</div></section><section class="investigation-section"><h3>来源 IP 与外部情报</h3><div class="investigation-table-wrap"><table class="investigation-table"><thead><tr><th>IP</th><th>地区</th><th>ASN</th><th>运营商</th><th>风险</th></tr></thead><tbody>${ipRows || '<tr><td colspan="5">暂无数据</td></tr>'}</tbody></table></div></section></div>
+      <div><section class="investigation-section"><h3>客户端分布</h3><div class="investigation-ua-list">${uaRows || '<div class="empty">暂无数据</div>'}</div></section><section class="investigation-section"><h3>最近事件</h3><div class="investigation-table-wrap"><table class="investigation-table"><thead><tr><th>时间</th><th>IP</th><th>状态</th><th>客户端</th><th>地区</th></tr></thead><tbody>${eventRows || '<tr><td colspan="5">暂无数据</td></tr>'}</tbody></table></div></section></div>
+    </div>`;
+  document.getElementById('investigation-copy').disabled = !p.raw_token;
+  document.getElementById('investigation-logs').disabled = !p.raw_token;
+  document.getElementById('investigation-ban').disabled = !p.raw_token || !!p.blacklisted;
+}
+
+function closeTokenInvestigation() {
+  const dialog = document.getElementById('token-investigation-dialog');
+  if (dialog.open) dialog.close();
+}
+
+function copyInvestigationToken() {
+  if (tokenInvestigationData?.raw_token) copyText(tokenInvestigationData.raw_token);
+}
+
+function openInvestigationLogs() {
+  const token = tokenInvestigationData?.raw_token || '';
+  if (!token) return;
+  document.getElementById('filter-token').value = token;
+  logPage = 1;
+  closeTokenInvestigation();
+  openPanelTab('logs');
+  loadTab('logs', {force:true}).catch(() => {});
+}
+
+async function blacklistInvestigationToken() {
+  const token = tokenInvestigationData?.raw_token || '';
+  if (!token) return;
+  closeTokenInvestigation();
+  await quickBanToken(token);
 }
 
 async function savePullLimitSettings() {

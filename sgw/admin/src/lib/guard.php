@@ -288,6 +288,194 @@ function guard_write_json_atomic(string $file, array $data): bool {
     return $ok;
 }
 
+function guard_build_token_investigation(
+    iterable $lines,
+    string $fingerprint,
+    array $settings,
+    int $now,
+    string $subscribePath,
+    string $secret,
+    array $intelCache = []
+): ?array {
+    if (!preg_match('/^TKN-[A-F0-9]{16}$/', $fingerprint)) return null;
+    $rules = guard_normalize_settings($settings);
+    $cutoff = $now - 86400;
+    $rawToken = '';
+    $events = [];
+    $ips = [];
+    $uas = [];
+    $statusCounts = [];
+    $minuteLocations = [];
+    $firstSeen = 0;
+    $lastSeen = 0;
+
+    foreach ($lines as $line) {
+        $entry = guard_parse_log_line((string)$line);
+        if (!$entry || !guard_path_matches($entry['path'], $subscribePath)) continue;
+        if ($entry['token'] === '' || $entry['ts'] < $cutoff || $entry['ts'] > $now + 300) continue;
+        if (!hash_equals($fingerprint, guard_token_fingerprint($entry['token'], $secret))) continue;
+
+        $rawToken = $entry['token'];
+        $firstSeen = $firstSeen === 0 ? $entry['ts'] : min($firstSeen, $entry['ts']);
+        $lastSeen = max($lastSeen, $entry['ts']);
+        $status = (string)$entry['status'];
+        $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
+
+        if (!isset($ips[$entry['ip']])) {
+            $intelEntry = is_array($intelCache[$entry['ip']] ?? null) ? $intelCache[$entry['ip']] : [];
+            $intel = is_array($intelEntry['data'] ?? null) ? $intelEntry['data'] : [];
+            $failed = !$intel || !empty($intel['query_failed']);
+            $ips[$entry['ip']] = [
+                'ip' => $entry['ip'],
+                'count' => 0,
+                'first_seen_ts' => $entry['ts'],
+                'last_seen_ts' => $entry['ts'],
+                'statuses' => [],
+                'location' => $failed ? '等待情报' : (string)($intel['location'] ?? '未知地区'),
+                'asn' => $failed ? '未查询' : (string)($intel['asn'] ?? '未查询'),
+                'operator' => $failed ? '未查询' : (string)($intel['operator'] ?? '未知运营商'),
+                'network_type' => $failed ? '未查询' : (string)($intel['network_type'] ?? '未知网络'),
+                'high_risk' => !$failed && (!empty($intel['is_proxy']) || !empty($intel['is_vpn']) || !empty($intel['is_tor']) || !empty($intel['is_hosting'])),
+                'intel_pending' => $failed,
+            ];
+        }
+        $ips[$entry['ip']]['count']++;
+        $ips[$entry['ip']]['first_seen_ts'] = min($ips[$entry['ip']]['first_seen_ts'], $entry['ts']);
+        $ips[$entry['ip']]['last_seen_ts'] = max($ips[$entry['ip']]['last_seen_ts'], $entry['ts']);
+        $ips[$entry['ip']]['statuses'][$status] = ($ips[$entry['ip']]['statuses'][$status] ?? 0) + 1;
+
+        $ua = trim((string)$entry['ua']);
+        $uaKey = $ua !== '' ? $ua : '（空 UA）';
+        if (!isset($uas[$uaKey])) {
+            $uas[$uaKey] = ['ua' => $uaKey, 'family' => guard_ua_family($ua), 'count' => 0, 'last_seen_ts' => 0];
+        }
+        $uas[$uaKey]['count']++;
+        $uas[$uaKey]['last_seen_ts'] = max($uas[$uaKey]['last_seen_ts'], $entry['ts']);
+
+        $location = (string)($ips[$entry['ip']]['location'] ?? '');
+        if ($location !== '' && !in_array($location, ['等待情报', '未知地区'], true)) {
+            $bucket = (int)floor($entry['ts'] / 600);
+            $minuteLocations[$bucket][$location] = true;
+        }
+        $events[] = [
+            'time' => date('Y-m-d H:i:s', $entry['ts']),
+            'ts' => $entry['ts'],
+            'ip' => $entry['ip'],
+            'status' => $entry['status'],
+            'ua' => $uaKey,
+            'ua_family' => guard_ua_family($ua),
+            'location' => $location !== '' ? $location : '等待情报',
+        ];
+    }
+
+    if ($rawToken === '') return null;
+    uasort($ips, fn(array $a, array $b): int => ($b['count'] <=> $a['count']) ?: ($b['last_seen_ts'] <=> $a['last_seen_ts']));
+    uasort($uas, fn(array $a, array $b): int => ($b['count'] <=> $a['count']) ?: ($b['last_seen_ts'] <=> $a['last_seen_ts']));
+    usort($events, fn(array $a, array $b): int => $b['ts'] <=> $a['ts']);
+
+    $asnValues = [];
+    $locationValues = [];
+    $highRiskIps = 0;
+    $pendingIps = [];
+    foreach ($ips as &$row) {
+        $row['first_seen'] = date('Y-m-d H:i:s', $row['first_seen_ts']);
+        $row['last_seen'] = date('Y-m-d H:i:s', $row['last_seen_ts']);
+        unset($row['first_seen_ts'], $row['last_seen_ts']);
+        if ($row['asn'] !== '未查询' && $row['asn'] !== '查询失败') $asnValues[$row['asn']] = true;
+        if (!in_array($row['location'], ['等待情报', '未知地区', '查询失败'], true)) $locationValues[$row['location']] = true;
+        if (!empty($row['high_risk'])) $highRiskIps++;
+        if (!empty($row['intel_pending'])) $pendingIps[] = $row['ip'];
+    }
+    unset($row);
+    foreach ($uas as &$row) {
+        $row['last_seen'] = date('Y-m-d H:i:s', $row['last_seen_ts']);
+        unset($row['last_seen_ts']);
+    }
+    unset($row);
+    $families = [];
+    foreach ($uas as $row) $families[$row['family']] = true;
+    $shortWindowRegions = false;
+    foreach ($minuteLocations as $locations) {
+        if (count($locations) >= 2) {
+            $shortWindowRegions = true;
+            break;
+        }
+    }
+
+    $uniqueIps = count($ips);
+    $uniqueAsns = count($asnValues);
+    $uniqueFamilies = count($families);
+    $score = 0;
+    $evidence = [];
+    if ($uniqueIps > $rules['guard_pull_limit_24h_ips']) {
+        $score += 40;
+        $evidence[] = '24 小时出现 ' . $uniqueIps . ' 个独立 IP，超过规则 ' . $rules['guard_pull_limit_24h_ips'] . ' 个';
+    }
+    if ($uniqueAsns >= 3) {
+        $score += min(20, 8 + $uniqueAsns * 2);
+        $evidence[] = '来源覆盖 ' . $uniqueAsns . ' 个 ASN';
+    }
+    if ($uniqueFamilies >= 3) {
+        $score += min(15, 5 + $uniqueFamilies * 2);
+        $evidence[] = '出现 ' . $uniqueFamilies . ' 类客户端特征';
+    }
+    if ($highRiskIps > 0) {
+        $score += min(20, 10 + $highRiskIps * 3);
+        $evidence[] = $highRiskIps . ' 个来源带有代理、VPN、Tor 或机房信号';
+    }
+    if ($shortWindowRegions) {
+        $score += 20;
+        $evidence[] = '10 分钟窗口内出现多个不同地区，建议人工复核';
+    }
+    $score = min(100, $score);
+    if (!$evidence) $evidence[] = '当前 24 小时证据未发现显著共享特征';
+
+    return [
+        'fingerprint' => $fingerprint,
+        'raw_token' => $rawToken,
+        'summary' => [
+            'requests_24h' => array_sum($statusCounts),
+            'unique_ips' => $uniqueIps,
+            'unique_asns' => $uniqueAsns,
+            'unique_locations' => count($locationValues),
+            'ua_families' => $uniqueFamilies,
+            'first_seen' => $firstSeen > 0 ? date('Y-m-d H:i:s', $firstSeen) : '',
+            'last_seen' => $lastSeen > 0 ? date('Y-m-d H:i:s', $lastSeen) : '',
+            'score' => $score,
+            'risk' => $score >= 70 ? '高风险' : ($score >= 40 ? '需复核' : '低风险'),
+            'status_counts' => $statusCounts,
+        ],
+        'evidence' => $evidence,
+        'ips' => array_slice(array_values($ips), 0, 30),
+        'uas' => array_slice(array_values($uas), 0, 15),
+        'events' => array_slice($events, 0, 50),
+        'pending_intel_ips' => $pendingIps,
+    ];
+}
+
+function guard_ua_family(string $ua): string {
+    $value = strtolower(trim($ua));
+    if ($value === '') return '空 UA';
+    $families = [
+        'shadowrocket' => 'Shadowrocket',
+        'clash' => 'Clash',
+        'stash' => 'Stash',
+        'sing-box' => 'sing-box',
+        'surge' => 'Surge',
+        'quantumult' => 'Quantumult',
+        'v2ray' => 'V2Ray',
+        'curl' => 'curl',
+        'wget' => 'wget',
+        'python' => 'Python',
+        'mozilla/' => '浏览器',
+    ];
+    foreach ($families as $needle => $label) {
+        if (str_contains($value, $needle)) return $label;
+    }
+    $first = preg_split('/[\s\/]+/', trim($ua), 2)[0] ?? '其他客户端';
+    return substr($first !== '' ? $first : '其他客户端', 0, 40);
+}
+
 function guard_analyze_pull_limits(
     iterable $lines,
     array $settings,
@@ -375,6 +563,8 @@ function guard_analyze_pull_limits(
     $pending = 0;
     $maxIps = 0;
     $maxMinute = 0;
+    $maxRuleIps = 0;
+    $maxRuleMinute = 0;
     foreach ($usage as $fingerprint => $item) {
         $ipCount = count($item['ips']);
         $peakMinute = empty($item['minute_buckets']) ? 0 : max($item['minute_buckets']);
@@ -407,8 +597,11 @@ function guard_analyze_pull_limits(
         $rows[] = [
             'fingerprint' => $fingerprint,
             'unique_ips_24h' => $ipCount,
+            'rule_unique_ips' => $ruleIpCount,
             'requests_24h' => $item['requests_24h'],
             'peak_per_minute' => $peakMinute,
+            'rule_peak_per_minute' => $rulePeakMinute,
+            'rule_since' => ($resetCutoffs[$fingerprint] ?? 0) > 0 ? date('Y-m-d H:i:s', (int)$resetCutoffs[$fingerprint]) : '',
             'last_seen' => $item['last_seen_ts'] > 0 ? date('Y-m-d H:i:s', $item['last_seen_ts']) : '',
             'last_seen_ts' => $item['last_seen_ts'],
             'violations' => $violations,
@@ -419,6 +612,8 @@ function guard_analyze_pull_limits(
         ];
         $maxIps = max($maxIps, $ipCount);
         $maxMinute = max($maxMinute, $peakMinute);
+        $maxRuleIps = max($maxRuleIps, $ruleIpCount);
+        $maxRuleMinute = max($maxRuleMinute, $rulePeakMinute);
     }
 
     usort($rows, fn(array $a, array $b) => ((int)$b['suspended'] <=> (int)$a['suspended'])
@@ -447,6 +642,8 @@ function guard_analyze_pull_limits(
             'pending_violations' => $pending,
             'max_unique_ips_24h' => $maxIps,
             'max_per_minute' => $maxMinute,
+            'max_rule_unique_ips' => $maxRuleIps,
+            'max_rule_per_minute' => $maxRuleMinute,
         ],
         'usage' => array_slice($rows, 0, 20),
         'updated_at' => date('Y-m-d H:i:s', $now),
@@ -581,19 +778,44 @@ function guard_token_limit_apply_content(array $rules): string {
 }
 
 function guard_write_if_changed(string $file, string $content): bool {
-    if (file_exists($file) && hash_equals(hash('sha256', (string)file_get_contents($file)), hash('sha256', $content))) return false;
+    $current = null;
+    if (file_exists($file)) {
+        $current = @file_get_contents($file);
+        if ($current === false) throw new RuntimeException('cannot read ' . basename($file));
+        if (hash_equals(hash('sha256', $current), hash('sha256', $content))) {
+            guard_prepare_shared_config($file);
+            return false;
+        }
+    }
     $tmp = $file . '.tmp.' . getmypid();
     if (@file_put_contents($tmp, $content, LOCK_EX) === false) throw new RuntimeException('cannot write ' . basename($file));
-    @chmod($tmp, 0660);
-    if (file_exists($file) && !@copy($file, $file . '.prev')) {
-        @unlink($tmp);
-        throw new RuntimeException('cannot backup ' . basename($file));
+    guard_prepare_shared_config($tmp);
+    if ($current !== null) {
+        $backup = $file . '.prev';
+        $backupTmp = $backup . '.tmp.' . getmypid();
+        if (@file_put_contents($backupTmp, $current, LOCK_EX) === false) {
+            @unlink($tmp);
+            throw new RuntimeException('cannot backup ' . basename($file));
+        }
+        guard_prepare_shared_config($backupTmp);
+        if (!@rename($backupTmp, $backup)) {
+            @unlink($tmp);
+            @unlink($backupTmp);
+            throw new RuntimeException('cannot backup ' . basename($file));
+        }
     }
     if (!@rename($tmp, $file)) {
         @unlink($tmp);
         throw new RuntimeException('cannot replace ' . basename($file));
     }
+    guard_prepare_shared_config($file);
     return true;
+}
+
+function guard_prepare_shared_config(string $file): void {
+    @chown($file, 'www-data');
+    @chgrp($file, 'www-data');
+    @chmod($file, 0660);
 }
 
 function guard_signal_token_limit_reload(array $files): void {

@@ -11,7 +11,7 @@ function expect_limit(bool $condition, string $message): void {
     if (!$condition) $failures[] = $message;
 }
 
-$now = time();
+$now = strtotime('2026-08-08 12:00:30 Asia/Shanghai');
 $path = '/api/v1/client/subscribe';
 $secret = str_repeat('a', 64);
 $lines = [];
@@ -73,6 +73,51 @@ expect_limit(str_contains($rate, '"~^0:.+$" $arg_token;'), '启用自动暂停�
 $settings['guard_pull_limit_enforce'] = 0;
 $disabledRate = guard_token_limit_rate_content(guard_normalize_settings($settings));
 expect_limit(!str_contains($disabledRate, '"~^0:.+$" $arg_token;'), '监控模式不得执行 Nginx Token 频率限制');
+
+$multiFingerprint = guard_token_fingerprint('multi-ip-token', $secret);
+$releasedState = [
+    'entries' => [],
+    'history' => [[
+        'fingerprint' => $multiFingerprint,
+        'status' => 'released',
+        'released_at' => date('Y-m-d H:i:s', $now - 60),
+    ]],
+];
+$afterRelease = guard_analyze_pull_limits($lines, $settings, $now, $path, $secret, $releasedState, false);
+$releasedRow = null;
+foreach ($afterRelease['_all_usage'] as $row) {
+    if ($row['fingerprint'] === $multiFingerprint) $releasedRow = $row;
+}
+expect_limit(($releasedRow['unique_ips_24h'] ?? 0) === 11, '解除后仍应保留 24 小时总量作为调查证据');
+expect_limit(($releasedRow['rule_unique_ips'] ?? -1) === 0, '解除后的规则周期不得继续使用历史 IP 计数');
+
+$intelCache = [
+    '10.0.0.1' => ['data' => [
+        'location' => '中国 / 浙江 / 杭州', 'asn' => 'AS4134 CHINANET', 'operator' => 'CHINANET',
+        'network_type' => '普通运营商网络', 'query_failed' => false,
+        'is_proxy' => false, 'is_vpn' => false, 'is_tor' => false, 'is_hosting' => false,
+    ]],
+];
+$profile = guard_build_token_investigation($lines, $multiFingerprint, $settings, $now, $path, $secret, $intelCache);
+expect_limit(is_array($profile), '应能按 Token 指纹生成调查档案');
+expect_limit(($profile['summary']['unique_ips'] ?? 0) === 11, '调查档案应汇总独立 IP');
+expect_limit(($profile['summary']['risk'] ?? '') === '需复核', '仅超过独立 IP 规则应进入人工复核');
+expect_limit(($profile['raw_token'] ?? '') === 'multi-ip-token', '仅详细调查接口需要返回可复制的完整 Token');
+
+file_put_contents(TOKEN_LIMIT_CONF, "old config\n");
+file_put_contents(TOKEN_LIMIT_CONF . '.prev', "stale backup\n");
+chmod(TOKEN_LIMIT_CONF . '.prev', 0400);
+expect_limit(guard_write_if_changed(TOKEN_LIMIT_CONF, "new config\n"), '配置变化时应完成原子替换');
+expect_limit(file_get_contents(TOKEN_LIMIT_CONF) === "new config\n", '新配置内容应落盘');
+expect_limit(file_get_contents(TOKEN_LIMIT_CONF . '.prev') === "old config\n", '只读旧备份也应被原子替换');
+expect_limit((fileperms(TOKEN_LIMIT_CONF) & 0777) === 0660, '配置文件应保持 www-data 可维护的 0660 权限');
+chmod(TOKEN_LIMIT_CONF, 0644);
+expect_limit(!guard_write_if_changed(TOKEN_LIMIT_CONF, "new config\n"), '内容未变化时不应触发配置替换');
+clearstatcache(true, TOKEN_LIMIT_CONF);
+expect_limit((fileperms(TOKEN_LIMIT_CONF) & 0777) === 0660, '内容未变化时也应修复共享权限');
+
+@unlink(TOKEN_LIMIT_CONF);
+@unlink(TOKEN_LIMIT_CONF . '.prev');
 
 if ($failures !== []) {
     fwrite(STDERR, "Token 拉取限制测试失败：\n- " . implode("\n- ", $failures) . "\n");
