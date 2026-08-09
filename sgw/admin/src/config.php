@@ -37,6 +37,7 @@ define('TOKEN_LIMIT_RATE_CONF', '/etc/nginx/subscribe/token_limit_rate.conf');
 define('TOKEN_LIMIT_APPLY_CONF', '/etc/nginx/subscribe/token_limit_apply.conf');
 define('TOKEN_LIMIT_RELOAD_MARKER', '/etc/nginx/subscribe/.token_limit_reload');
 define('SETTINGS_JSON',     '/etc/nginx/subscribe/admin_settings.json');
+define('LOGIN_GUARD_JSON',  '/etc/nginx/subscribe/login_guard.json');
 define('PROTECT_CONF',      '/etc/nginx/subscribe/protect.conf');
 define('DEPLOY_INFO_FILE',  '/var/log/subscribe/DEPLOY_INFO.txt');
 
@@ -49,6 +50,13 @@ if (file_exists(SETTINGS_JSON)) {
 
 define('ADMIN_USER',        $_sg['admin_user']      ?? (getenv('ADMIN_USER')        ?: 'admin'));
 define('ADMIN_PASS',        $_sg['admin_pass']      ?? (getenv('ADMIN_PASS')        ?: ''));
+define('ADMIN_PASS_HASH',   (string)($_sg['admin_pass_hash'] ?? ''));
+define('ADMIN_TOTP_ENABLED', !empty($_sg['admin_totp_enabled']) && !empty($_sg['admin_totp_secret']));
+define('ADMIN_TOTP_SECRET', (string)($_sg['admin_totp_secret'] ?? ''));
+define('ADMIN_AUTH_VERSION', (string)($_sg['admin_auth_version'] ?? '1'));
+define('LOGIN_MAX_FAILURES', 5);
+define('LOGIN_FAILURE_WINDOW', 600);
+define('LOGIN_LOCK_SECONDS', 900);
 define('NGINX_RELOAD_SIGNAL',     '/etc/nginx/subscribe/.reload');
 define('WHITELIST_RELOAD_SIGNAL', '/etc/nginx/subscribe/.reload_whitelist');
 define('GATEWAY_PORT',      (int)(getenv('GATEWAY_PORT') ?: 443));
@@ -61,6 +69,8 @@ define('ADMIN_SECRET_PATH', trim(trim(getenv('ADMIN_SECRET_PATH') ?: ''), '/'));
 // 界面显示设置
 define('SITE_TITLE', $_sg['site_title'] ?? 'SubSieve');
 define('PAGE_TITLE', $_sg['page_title'] ?? 'SubSieve Admin');
+
+require_once __DIR__ . '/lib/admin_security.php';
 
 // ── 辅助函数 ──────────────────────────────────────────────────
 

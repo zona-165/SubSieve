@@ -46,22 +46,53 @@ if ($uri === '/logout') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($uri === '/' || $uri === '/index.php')) {
     $user = trim($_POST['username'] ?? '');
     $pass = $_POST['password'] ?? '';
+    $totp = trim($_POST['totp'] ?? '');
+    $sourceIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 
     $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
-    if ($user === ADMIN_USER && ADMIN_PASS !== '' && hash_equals(ADMIN_PASS, $pass)) {
+    $guard = admin_login_guard_status($sourceIp);
+    $csrfValid = admin_csrf_is_valid((string)($_POST['_csrf'] ?? ''));
+    if ($guard['locked']) {
+        $minutes = max(1, (int)ceil($guard['retry_after'] / 60));
+        $_SESSION['login_error'] = "登录尝试过多，请 {$minutes} 分钟后再试";
+        header('Location: ' . $base);
+        exit;
+    }
+
+    $passwordCheck = admin_password_check($pass);
+    $userValid = ADMIN_USER !== '' && hash_equals((string)ADMIN_USER, $user);
+    $totpValid = !ADMIN_TOTP_ENABLED || admin_totp_verify(ADMIN_TOTP_SECRET, $totp);
+
+    if ($csrfValid && $userValid && !empty($passwordCheck['valid']) && $totpValid) {
+        admin_login_guard_record_success($sourceIp);
+        if (!empty($passwordCheck['needs_rehash'])) {
+            admin_store_password_hash($pass);
+        }
         session_regenerate_id(true);
+        admin_csrf_rotate();
         $_SESSION['auth'] = true;
         $_SESSION['ts']   = time();
+        $_SESSION['auth_version'] = ADMIN_AUTH_VERSION;
         header('Location: ' . $base);
     } else {
-        $_SESSION['login_error'] = '用户名或密码错误';
+        $failure = admin_login_guard_record_failure($sourceIp);
+        if (!empty($failure['locked'])) {
+            $minutes = max(1, (int)ceil($failure['retry_after'] / 60));
+            $_SESSION['login_error'] = "登录尝试过多，请 {$minutes} 分钟后再试";
+        } else {
+            $_SESSION['login_error'] = ADMIN_TOTP_ENABLED ? '用户名、密码或验证码错误' : '用户名或密码错误';
+        }
         header('Location: ' . $base);
     }
     exit;
 }
 
 // Session 超时检查
-if (isset($_SESSION['auth']) && (time() - ($_SESSION['ts'] ?? 0)) > SESSION_LIFETIME) {
+if (isset($_SESSION['auth']) && (
+    (time() - ($_SESSION['ts'] ?? 0)) > SESSION_LIFETIME
+    || !isset($_SESSION['auth_version'])
+    || !hash_equals(ADMIN_AUTH_VERSION, (string)$_SESSION['auth_version'])
+)) {
     destroy_admin_session();
 }
 

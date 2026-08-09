@@ -36,10 +36,15 @@ input:focus{border-color:#14b8a6;box-shadow:0 0 0 3px rgba(20,184,166,.12)}
       <?php unset($_SESSION['login_error']); ?>
     <?php endif; ?>
     <form method="POST" action="<?= ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/' ?>">
+      <input type="hidden" name="_csrf" value="<?= htmlspecialchars(admin_csrf_token(), ENT_QUOTES) ?>">
       <label for="login-user">用户名</label>
       <input id="login-user" type="text" name="username" autocomplete="username" required autofocus>
       <label for="login-pass">密码</label>
       <input id="login-pass" type="password" name="password" autocomplete="current-password" required>
+      <?php if (ADMIN_TOTP_ENABLED): ?>
+        <label for="login-totp">两步验证码</label>
+        <input id="login-totp" type="text" name="totp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6 位验证码" required>
+      <?php endif; ?>
       <button class="btn" type="submit">登录</button>
     </form>
   </div>

@@ -212,10 +212,25 @@ if (str_starts_with($path, '/api/')) {
         exit;
     }
     if ($path === '/api/settings.php') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            $body = json_decode((string)file_get_contents('php://input'), true) ?: [];
+            if (!empty($body['_prepare_totp'])) {
+                echo json_encode(['ok'=>true,'secret'=>'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP','uri'=>'otpauth://totp/SubSieve%3Aadmin?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP','expires_in'=>600]);
+                exit;
+            }
+            if (!empty($body['_enable_totp']) || !empty($body['_disable_totp'])) {
+                echo json_encode(['ok'=>true,'reauth_required'=>true,'msg'=>'预览安全设置已更新']);
+                exit;
+            }
+            echo json_encode(['ok'=>true,'msg'=>'预览设置已保存']);
+            exit;
+        }
         echo json_encode([
             'ok' => true,
             'settings' => [
                 'site_title' => 'SubSieve', 'page_title' => 'SubSieve Admin', 'admin_user' => 'admin',
+                'admin_password_hashed' => true, 'admin_totp_enabled' => false,
+                'alert_webhook_configured' => true, 'alert_telegram_token_configured' => true,
                 'upstream_url' => 'https://panel.example.com', 'subscribe_path' => '/api/v1/client/subscribe',
                 'gateway_port' => 443,
             ],
@@ -250,4 +265,5 @@ define('SITE_TITLE', 'SubSieve');
 define('ADMIN_SECRET_PATH', '');
 define('ADMIN_USER', 'admin');
 define('GATEWAY_PORT', 443);
+function admin_csrf_token(): string { return 'preview-csrf-token'; }
 require dirname(__DIR__) . '/admin/src/views/dashboard.php';

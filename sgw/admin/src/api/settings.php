@@ -47,7 +47,7 @@ if ($method === 'GET') {
         if (empty($s['gateway_port'])) {
             $s['gateway_port'] = GATEWAY_PORT;
         }
-        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo, 'stats_cache' => $statsCache, 'alert_history' => $alertHistory]);
+        json_out(['ok' => true, 'settings' => admin_public_settings($s), 'cert' => $certInfo, 'stats_cache' => $statsCache, 'alert_history' => $alertHistory]);
     } catch (Throwable $e) {
         json_err('PHP错误: ' . $e->getMessage());
     }
@@ -75,6 +75,53 @@ if ($method === 'POST') {
 
     $s = read_settings();
 
+    if (!empty($body['_prepare_totp'])) {
+        $secret = admin_totp_generate_secret();
+        $_SESSION['_pending_totp'] = ['secret' => $secret, 'expires' => time() + 600];
+        json_out([
+            'ok' => true,
+            'secret' => $secret,
+            'uri' => admin_totp_uri($secret, (string)($s['admin_user'] ?? ADMIN_USER)),
+            'expires_in' => 600,
+        ]);
+    }
+
+    if (!empty($body['_enable_totp'])) {
+        $pending = $_SESSION['_pending_totp'] ?? [];
+        $secret = is_array($pending) ? (string)($pending['secret'] ?? '') : '';
+        $expires = is_array($pending) ? (int)($pending['expires'] ?? 0) : 0;
+        if ($secret === '' || $expires < time()) {
+            unset($_SESSION['_pending_totp']);
+            json_err('两步验证配置已过期，请重新生成密钥');
+        }
+        if (!admin_totp_verify($secret, (string)($body['code'] ?? ''))) {
+            json_err('验证码不正确，请确认设备时间后重试');
+        }
+        $s['admin_totp_secret'] = $secret;
+        $s['admin_totp_enabled'] = 1;
+        $s['admin_auth_version'] = bin2hex(random_bytes(16));
+        if (!write_settings($s)) json_err('保存两步验证失败，请检查文件权限');
+        unset($_SESSION['_pending_totp']);
+        $_SESSION['auth'] = false;
+        json_out(['ok' => true, 'reauth_required' => true, 'msg' => '两步验证已启用，请重新登录']);
+    }
+
+    if (!empty($body['_disable_totp'])) {
+        $secret = (string)($s['admin_totp_secret'] ?? '');
+        if ($secret === '' || empty($s['admin_totp_enabled'])) {
+            json_out(['ok' => true, 'msg' => '两步验证当前未启用']);
+        }
+        if (!admin_totp_verify($secret, (string)($body['code'] ?? ''))) {
+            json_err('验证码不正确，无法关闭两步验证');
+        }
+        unset($s['admin_totp_secret']);
+        $s['admin_totp_enabled'] = 0;
+        $s['admin_auth_version'] = bin2hex(random_bytes(16));
+        if (!write_settings($s)) json_err('关闭两步验证失败，请检查文件权限');
+        $_SESSION['auth'] = false;
+        json_out(['ok' => true, 'reauth_required' => true, 'msg' => '两步验证已关闭，请重新登录']);
+    }
+
     if (!empty($body['_clear_alert_history'])) {
         clear_alert_history(!empty($body['reset_state']));
         json_out(['ok' => true, 'msg' => !empty($body['reset_state']) ? '告警历史和去重状态已重置' : '告警历史已清空']);
@@ -99,19 +146,27 @@ if ($method === 'POST') {
     if (isset($body['page_title'])) $s['page_title'] = trim($body['page_title']) ?: 'SubSieve Admin';
 
     // ── 管理员凭证 ─────────────────────────────────────────────
+    $credentialsChanged = false;
     if (!empty($body['admin_user'])) {
-        $s['admin_user'] = trim($body['admin_user']);
+        $adminUser = trim((string)$body['admin_user']);
+        if (strlen($adminUser) > 64 || preg_match('/[\x00-\x1F\x7F]/', $adminUser)) {
+            json_err('用户名格式无效');
+        }
+        if ($adminUser !== (string)($s['admin_user'] ?? ADMIN_USER)) $credentialsChanged = true;
+        $s['admin_user'] = $adminUser;
     }
     if (!empty($body['new_pass'])) {
-        $newPass = $body['new_pass'];
-        $confPass = $body['confirm_pass'] ?? '';
+        $newPass = (string)$body['new_pass'];
+        $confPass = (string)($body['confirm_pass'] ?? '');
         if ($newPass !== $confPass) {
             json_err('两次输入的密码不一致');
         }
-        if (strlen($newPass) < 6) {
-            json_err('密码至少需要6位');
+        if (strlen($newPass) < 10) {
+            json_err('密码至少需要 10 位');
         }
-        $s['admin_pass'] = $newPass;
+        $s['admin_pass_hash'] = admin_password_hash_value($newPass);
+        unset($s['admin_pass']);
+        $credentialsChanged = true;
     }
 
     // ── 网关端口 ───────────────────────────────────────────────
@@ -172,6 +227,7 @@ if ($method === 'POST') {
         $relationshipError = guard_threshold_relationship_error($s);
         if ($relationshipError !== '') json_err($relationshipError);
     }
+    if ($credentialsChanged) $s['admin_auth_version'] = bin2hex(random_bytes(16));
 
     // 保存 settings.json
     if (!write_settings($s)) {
@@ -207,12 +263,14 @@ if ($method === 'POST') {
     if ($gatewayPortChanged) {
         $msg .= '。网关端口已记录，需在宿主机执行 bash update.sh 后生效';
     }
+    if ($credentialsChanged) $_SESSION['auth'] = false;
     json_out([
         'ok'                   => true,
         'nginx_reloaded'       => $nginxReloaded,
         'protect_updated'      => $protectUpdated,
         'gateway_port_changed' => $gatewayPortChanged,
         'pull_limit_refreshed' => $pullLimitChanged,
+        'reauth_required'      => $credentialsChanged,
         'msg'                  => $msg,
     ]);
     } catch (Throwable $e) {
@@ -233,7 +291,7 @@ function read_settings(): array {
 }
 
 function write_settings(array $s): bool {
-    return file_put_contents(SETTINGS_JSON, json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
+    return admin_security_write_json(SETTINGS_JSON, $s);
 }
 
 function apply_alert_settings(array $s, array $body): array {

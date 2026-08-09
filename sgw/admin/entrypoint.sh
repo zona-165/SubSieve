@@ -3,9 +3,10 @@ set -e
 
 SUBSCRIBE_DIR=/etc/nginx/subscribe
 
-# 确保目录存在且 admin 可写
+# 确保目录存在且 PHP-FPM 可写；gateway 以 root 启动，仍可读取共享配置。
 mkdir -p "$SUBSCRIBE_DIR"
-chmod 777 "$SUBSCRIBE_DIR"
+chown www-data:www-data "$SUBSCRIBE_DIR"
+chmod 770 "$SUBSCRIBE_DIR"
 
 # 确保所有可写文件存在
 [ -f "$SUBSCRIBE_DIR/blacklist.json" ]    || echo "[]" > "$SUBSCRIBE_DIR/blacklist.json"
@@ -16,6 +17,7 @@ chmod 777 "$SUBSCRIBE_DIR"
 [ -f "$SUBSCRIBE_DIR/token_blacklist.conf" ] || printf 'map $arg_token $is_token_blacklisted {\n    default 0;\n}\n' > "$SUBSCRIBE_DIR/token_blacklist.conf"
 [ -f "$SUBSCRIBE_DIR/whitelist_ips.txt" ] || touch "$SUBSCRIBE_DIR/whitelist_ips.txt"
 [ -f "$SUBSCRIBE_DIR/admin_settings.json" ] || echo "{}" > "$SUBSCRIBE_DIR/admin_settings.json"
+[ -f "$SUBSCRIBE_DIR/login_guard.json" ] || echo '{"version":1,"entries":{}}' > "$SUBSCRIBE_DIR/login_guard.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_cache.json"
 [ -f "$SUBSCRIBE_DIR/ip_intel_queue.json" ] || echo "{}" > "$SUBSCRIBE_DIR/ip_intel_queue.json"
 [ -f "$SUBSCRIBE_DIR/stats_cache.json" ] || echo "{}" > "$SUBSCRIBE_DIR/stats_cache.json"
@@ -42,7 +44,6 @@ chmod 666 \
     "$SUBSCRIBE_DIR/token_blacklist.json" \
     "$SUBSCRIBE_DIR/token_blacklist.conf" \
     "$SUBSCRIBE_DIR/whitelist_ips.txt" \
-    "$SUBSCRIBE_DIR/admin_settings.json" \
     "$SUBSCRIBE_DIR/ip_intel_cache.json" \
     "$SUBSCRIBE_DIR/ip_intel_queue.json" \
     "$SUBSCRIBE_DIR/stats_cache.json" \
@@ -57,6 +58,8 @@ chmod 666 \
     "$SUBSCRIBE_DIR/cloud_provider_settings.json"
 chown www-data:www-data "$SUBSCRIBE_DIR/guard_secret"
 chmod 600 "$SUBSCRIBE_DIR/guard_secret"
+chown www-data:www-data "$SUBSCRIBE_DIR/admin_settings.json" "$SUBSCRIBE_DIR/login_guard.json"
+chmod 600 "$SUBSCRIBE_DIR/admin_settings.json" "$SUBSCRIBE_DIR/login_guard.json"
 chown www-data:www-data "$SUBSCRIBE_DIR/ai_settings.json" "$SUBSCRIBE_DIR/ai_analysis.json"
 chmod 600 "$SUBSCRIBE_DIR/ai_settings.json" "$SUBSCRIBE_DIR/ai_analysis.json"
 

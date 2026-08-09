@@ -40,6 +40,29 @@ if ($action === 'ai-analyze') {
     echo json_encode($result, JSON_UNESCAPED_UNICODE) . PHP_EOL;
     exit(!empty($result['ok']) ? 0 : 1);
 }
+if ($action === 'reset-admin-password') {
+    $password = rtrim((string)stream_get_contents(STDIN), "\r\n");
+    if (strlen($password) < 10) {
+        echo json_encode(['ok' => false, 'error' => 'password must contain at least 10 characters'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+        exit(1);
+    }
+    $settings = admin_security_read_json(SETTINGS_JSON, []);
+    $settings['admin_pass_hash'] = admin_password_hash_value($password);
+    $settings['admin_auth_version'] = bin2hex(random_bytes(16));
+    unset($settings['admin_pass']);
+    $ok = admin_security_write_json(SETTINGS_JSON, $settings);
+    echo json_encode(['ok' => $ok, 'message' => $ok ? 'admin password reset' : 'cannot write settings'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    exit($ok ? 0 : 1);
+}
+if ($action === 'disable-admin-totp') {
+    $settings = admin_security_read_json(SETTINGS_JSON, []);
+    unset($settings['admin_totp_secret']);
+    $settings['admin_totp_enabled'] = 0;
+    $settings['admin_auth_version'] = bin2hex(random_bytes(16));
+    $ok = admin_security_write_json(SETTINGS_JSON, $settings);
+    echo json_encode(['ok' => $ok, 'message' => $ok ? 'admin TOTP disabled' : 'cannot write settings'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    exit($ok ? 0 : 1);
+}
 
 echo json_encode(['ok' => false, 'error' => 'unknown action'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
 exit(1);
