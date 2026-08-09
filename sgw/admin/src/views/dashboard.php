@@ -174,6 +174,11 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .mode-btn.import-btn:hover{background:rgba(99,102,241,.15)}
 button{touch-action:manipulation}
 button.button-responding:not(:disabled){pointer-events:none;filter:brightness(.94) saturate(.92);transform:translateY(1px) scale(.985)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+button.button-request-busy{pointer-events:none!important;cursor:progress!important;opacity:.68;filter:saturate(.78)}
+button.button-request-success{pointer-events:none!important;border-color:rgba(16,185,129,.42)!important;background:rgba(16,185,129,.12)!important;color:#10b981!important}
+button.button-request-error{pointer-events:none!important;border-color:rgba(239,68,68,.42)!important;background:rgba(239,68,68,.12)!important;color:#ef4444!important}
+button.config-dirty{position:relative;box-shadow:0 0 0 3px rgba(217,119,6,.14)!important}
+button.config-dirty::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 2px var(--surface)}
 @media(prefers-reduced-motion:reduce){button.button-responding:not(:disabled){transform:none!important}}
 .radio-group{display:flex;align-items:center;gap:14px;margin-left:auto}
 .radio-group label{display:flex;align-items:center;gap:5px;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap}
@@ -343,6 +348,7 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .risk-title{font-size:13px;font-weight:850;color:var(--text)}
 .risk-subject{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#818cf8;overflow-wrap:anywhere;margin-top:3px}
 .risk-score{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(239,68,68,.11);color:#ef4444;font-size:11px;font-weight:850}
+.risk-item.review-resolving{opacity:.48;transform:scale(.995);transition:opacity .2s ease,transform .2s ease}
 .risk-evidence{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0 6px;color:var(--text2);font-size:11px}
 .risk-evidence span{padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:rgba(100,116,139,.05)}
 .risk-reason{color:var(--text3);font-size:11px;line-height:1.6}
@@ -371,6 +377,14 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .review-choice-btn[data-status="watch"]{--choice-color:#d97706}
 .review-choice-btn[data-status="trusted"]{--choice-color:#059669}
 .review-choice-btn[data-status="confirmed"]{--choice-color:#e11d48}
+.review-choice-shell{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.review-save-state{min-width:42px;color:var(--text3);font-size:9px;font-weight:760;white-space:nowrap}
+.review-save-state[data-state="saving"]{color:#0ea5e9}
+.review-save-state[data-state="saved"]{color:#059669}
+.review-save-state[data-state="error"]{color:#e11d48}
+.risk-actions .comment-input.is-dirty{border-color:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.08)}
+.note-save-btn:disabled{cursor:default;opacity:.58}
+.note-save-btn.note-save-pending{border-color:rgba(217,119,6,.42);color:#d97706}
 .rule-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
 .rule-field label{display:block;color:var(--text2);font-size:11px;margin-bottom:5px}
 .rule-field .ip-input{width:100%;min-width:0}
@@ -728,11 +742,11 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .guard-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-bottom:9px}
 .guard-search-input,.guard-batch-note{width:100%;min-width:0;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input);color:var(--text);padding:8px 10px;font-size:11px;outline:none}
 .guard-search-input:focus,.guard-batch-note:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(13,148,136,.08)}
-.guard-batch-toolbar{display:grid;grid-template-columns:auto auto minmax(120px,.55fr) minmax(180px,1fr) auto;align-items:center;gap:7px;margin-bottom:12px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
+.guard-batch-toolbar{display:grid;grid-template-columns:auto auto minmax(280px,max-content) minmax(180px,1fr) auto;align-items:center;gap:7px;margin-bottom:12px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
 .guard-select-page{display:inline-flex;align-items:center;gap:6px;color:var(--text2);font-size:11px;font-weight:750;white-space:nowrap;cursor:pointer}
 .guard-select-page input{width:15px;height:15px;accent-color:var(--accent)}
 .guard-selected-count{color:var(--text3);font-size:10px;white-space:nowrap}
-.guard-batch-status{min-width:0;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input);color:var(--text);padding:7px 9px;font-size:11px;outline:none}
+.guard-batch-choice-group{min-width:0;justify-self:start}
 .guard-batch-apply:disabled{cursor:not-allowed;opacity:.5}
 .review-size-control{display:flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--text3);font-size:10px}
 .review-size-control .mode-btn{min-width:32px;padding:5px 8px}
@@ -868,7 +882,9 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .review-size-control{width:100%;justify-content:flex-start}
   .guard-batch-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
   .guard-select-page,.guard-selected-count{align-self:center}
-  .guard-batch-status,.guard-batch-note,.guard-batch-apply{min-height:36px}
+  .guard-batch-choice-group{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-column:1/-1;width:100%}
+  .guard-batch-choice-group .review-choice-btn{width:100%;min-height:34px;padding-inline:5px}
+  .guard-batch-note,.guard-batch-apply{min-height:36px}
   .guard-batch-note{grid-column:1/-1}
   .guard-batch-apply{grid-column:1/-1}
   .review-pagination{align-items:flex-start;flex-direction:column}
@@ -923,6 +939,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .topbar-subtitle,.auto-timer{display:none}
   .security-metrics,.pull-limit-summary,.rule-grid{grid-template-columns:minmax(0,1fr)}
   .guard-search-row,.guard-batch-toolbar{grid-template-columns:minmax(0,1fr)}
+  .guard-batch-choice-group{grid-template-columns:repeat(2,minmax(0,1fr));grid-column:auto}
   .guard-batch-note,.guard-batch-apply{grid-column:auto}
   .log-mode-btns .mode-btn,.log-controls .mode-btn{flex-basis:100%}
 }
@@ -1023,7 +1040,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
           <div class="rule-field"><label>超限暂停时长（小时）</label><input class="ip-input" id="pull-limit-hours" type="number" min="1" max="168"></div>
           <div class="pull-limit-actions">
             <div class="pull-limit-note">IP 白名单不受该规则影响。监控模式只记录超限证据；开启自动暂停后，频率限制即时生效，跨 IP 规则由后台巡检执行。</div>
-            <button class="btn-primary" onclick="savePullLimitSettings()">保存并应用规则</button>
+            <button class="btn-primary" id="save-pull-limit-settings" onclick="savePullLimitSettings()">保存并应用规则</button>
           </div>
         </div>
       </section>
@@ -1068,7 +1085,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <button class="mode-btn" onclick="applyGuardPreset('strict')">严格</button>
               <button class="mode-btn" onclick="applyGuardPreset('balanced')">均衡</button>
               <button class="mode-btn" onclick="applyGuardPreset('quiet')">宽松</button>
-              <button class="btn-primary" onclick="saveGuardSettings()">保存预警规则</button>
+              <button class="btn-primary" id="save-guard-settings" onclick="saveGuardSettings()">保存预警规则</button>
             </div>
           </section>
 
@@ -1208,12 +1225,13 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
         <div class="guard-batch-toolbar" id="guard-batch-toolbar">
           <label class="guard-select-page"><input id="guard-select-page" type="checkbox" onchange="toggleGuardPageSelection(this.checked)">选择本页</label>
           <span class="guard-selected-count" id="guard-selected-count">已选 0 条</span>
-          <select class="guard-batch-status" id="guard-batch-status" aria-label="批量复核状态">
-            <option value="watch">持续观察</option>
-            <option value="trusted">判定可信</option>
-            <option value="confirmed">确认异常</option>
-            <option value="pending">恢复待复核</option>
-          </select>
+          <div class="review-choice-group guard-batch-choice-group" role="group" aria-label="批量复核状态">
+            <input type="hidden" id="guard-batch-status" value="watch">
+            <button type="button" class="review-choice-btn" data-status="pending" aria-pressed="false" onclick="setGuardBatchStatus('pending',this)">待复核</button>
+            <button type="button" class="review-choice-btn active" data-status="watch" aria-pressed="true" onclick="setGuardBatchStatus('watch',this)">持续观察</button>
+            <button type="button" class="review-choice-btn" data-status="trusted" aria-pressed="false" onclick="setGuardBatchStatus('trusted',this)">判定可信</button>
+            <button type="button" class="review-choice-btn" data-status="confirmed" aria-pressed="false" onclick="setGuardBatchStatus('confirmed',this)">确认异常</button>
+          </div>
           <input class="guard-batch-note" id="guard-batch-note" maxlength="200" placeholder="批量备注（可选）">
           <button class="mode-btn guard-batch-apply" id="guard-batch-apply" onclick="applyGuardBatchReview()" disabled>应用到所选</button>
         </div>
@@ -1338,7 +1356,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网页标题（浏览器 Tab）</label>
               <input class="ip-input" id="cfg-page-title" placeholder="SubSieve Admin" value="<?= _val($_preSg['page_title'] ?? PAGE_TITLE) ?>" style="width:100%">
             </div>
-            <button class="btn-primary" onclick="saveTitleSettings()">保存标题设置</button>
+            <button class="btn-primary" id="save-title-settings" onclick="saveTitleSettings()">保存标题设置</button>
           </div>
         </div>
 
@@ -1360,7 +1378,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             </div>
             <div class="apply-hint" style="color:#eab308">⚠️ 修改后需重新登录，请牢记新密码</div>
             <div class="apply-hint" style="color:#64748b;font-size:11px;line-height:1.5">如忘记密码，请在宿主机 SSH 执行：<br><code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;font-size:11px;user-select:all">docker exec subscribe-admin cat /etc/nginx/subscribe/admin_settings.json</code></div>
-            <button class="btn-primary" onclick="saveCredSettings()">保存凭证设置</button>
+            <button class="btn-primary" id="save-credential-settings" onclick="saveCredSettings()">保存凭证设置</button>
           </div>
         </div>
 
@@ -1383,7 +1401,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <input class="ip-input" id="cfg-subscribe-path" placeholder="/api/v1/client/subscribe" value="<?= _val($_preSg['subscribe_path'] ?? '') ?>" style="width:100%">
             </div>
             <div class="apply-hint" style="color:#eab308">⚡ 保存后立即更新 nginx 配置并 reload</div>
-            <button class="btn-primary" onclick="saveUpstreamSettings()">保存并立即生效</button>
+            <button class="btn-primary" id="save-upstream-settings" onclick="saveUpstreamSettings()">保存并立即生效</button>
           </div>
         </div>
 
@@ -1398,7 +1416,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
                 style="width:100%;box-sizing:border-box">
             </div>
             <div class="apply-hint" style="color:#eab308">⚠️ 修改后需在宿主机执行 <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">bash update.sh</code> 重启容器方可生效</div>
-            <button class="btn-primary" onclick="saveGatewayPort()">保存网关端口</button>
+            <button class="btn-primary" id="save-gateway-settings" onclick="saveGatewayPort()">保存网关端口</button>
           </div>
         </div>
 
@@ -1491,7 +1509,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             </div>
             <div class="apply-hint" style="color:var(--text3)">每分钟检查统计缓存；阈值越低越敏感。</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-              <button class="btn-primary" onclick="saveAlertSettings()">保存告警设置</button>
+              <button class="btn-primary" id="save-alert-settings" onclick="saveAlertSettings()">保存告警设置</button>
               <button class="mode-btn" onclick="testAlertSettings()">测试推送</button>
               <button class="mode-btn" onclick="runAlertCheckNow()">立即检查</button>
             </div>
@@ -1529,7 +1547,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             </div>
             <div class="apply-hint" style="color:var(--text3)">Token 仅保存在服务器数据卷，页面和 API 不回显；原始订阅 Token 永不发送。AI 仅提供复核建议，不自动执行封禁。</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
-              <button class="btn-primary" onclick="saveAiSettings()">保存设置</button>
+              <button class="btn-primary" id="save-ai-settings" onclick="saveAiSettings()">保存设置</button>
               <button class="mode-btn" onclick="testAiSettings()">测试连接</button>
               <button class="mode-btn danger" onclick="clearAiToken()">清除 Token</button>
             </div>
@@ -1564,6 +1582,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 <script>
 // ── 状态 ─────────────────────────────────────────────────────
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
+const CSRF_TOKEN = <?= json_encode(admin_csrf_token()) ?>;
 let activeSubscribePath = <?= json_encode($_preSg['subscribe_path'] ?? '/api/v1/client/subscribe') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
@@ -1609,6 +1628,16 @@ let lastAlertHistory = null;
 let alertHistoryQueryTimer = null;
 let activeAccessSection = 'whitelist';
 let workspaceMounted = false;
+let actionButtonCandidate = null;
+let actionButtonCandidateAt = 0;
+const buttonRequestStates = new WeakMap();
+const pendingMutationRequests = new Map();
+const dirtyConfigScopes = new Set();
+const configScopeButtons = {
+  title:'save-title-settings', credentials:'save-credential-settings', upstream:'save-upstream-settings',
+  gateway:'save-gateway-settings', alert:'save-alert-settings', ai:'save-ai-settings',
+  pull_limit:'save-pull-limit-settings', guard:'save-guard-settings', cloud:'save-cloud-providers',
+};
 
 const ACCESS_SECTIONS = {
   whitelist: {
@@ -1818,6 +1847,92 @@ function restartAnimation(el) {
   el.style.animation = '';
 }
 
+function configScopeFromElement(element) {
+  if (!(element instanceof HTMLElement)) return '';
+  const id = element.id || '';
+  if (['cfg-site-title','cfg-page-title'].includes(id)) return 'title';
+  if (['cfg-admin-user','cfg-new-pass','cfg-confirm-pass'].includes(id)) return 'credentials';
+  if (['cfg-upstream-url','cfg-upstream-port','cfg-subscribe-path'].includes(id)) return 'upstream';
+  if (id === 'cfg-gateway-port') return 'gateway';
+  if (id.startsWith('cfg-alert-')) return 'alert';
+  if (id.startsWith('cfg-ai-')) return 'ai';
+  if (element.matches('[data-provider-toggle]')) return 'cloud';
+  if (element.closest('#pull-limit-section')) return 'pull_limit';
+  if (element.closest('#guard-threshold-section')) return 'guard';
+  return '';
+}
+
+function updateConfigDirtyButton(scope) {
+  const button = document.getElementById(configScopeButtons[scope] || '');
+  if (!button) return;
+  const dirty = dirtyConfigScopes.has(scope);
+  button.classList.toggle('config-dirty', dirty);
+  if (dirty) button.setAttribute('title', '有尚未保存的修改');
+  else if (button.getAttribute('title') === '有尚未保存的修改') button.removeAttribute('title');
+}
+
+function markConfigDirty(scope) {
+  if (!scope) return;
+  dirtyConfigScopes.add(scope);
+  updateConfigDirtyButton(scope);
+  updateTimerLabel();
+}
+
+function markConfigSaved(scope) {
+  if (!scope) return;
+  dirtyConfigScopes.delete(scope);
+  updateConfigDirtyButton(scope);
+  updateTimerLabel();
+}
+
+function clearAllConfigDirty() {
+  const scopes = Array.from(dirtyConfigScopes);
+  dirtyConfigScopes.clear();
+  scopes.forEach(updateConfigDirtyButton);
+  updateTimerLabel();
+}
+
+function captureDirtyConfigValues() {
+  const snapshot = {};
+  document.querySelectorAll('input[id],select[id],textarea[id]').forEach(element => {
+    const scope = configScopeFromElement(element);
+    if (!scope || !dirtyConfigScopes.has(scope)) return;
+    snapshot[element.id] = element.type === 'checkbox' || element.type === 'radio'
+      ? {checked:element.checked}
+      : {value:element.value};
+  });
+  return snapshot;
+}
+
+function restoreDirtyConfigValues(snapshot) {
+  Object.entries(snapshot || {}).forEach(([id, state]) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (Object.prototype.hasOwnProperty.call(state, 'checked')) element.checked = state.checked;
+    else element.value = state.value;
+  });
+  dirtyConfigScopes.forEach(updateConfigDirtyButton);
+  if (dirtyConfigScopes.has('pull_limit')) syncPullLimitSwitches();
+  if (dirtyConfigScopes.has('guard')) updateGuardThresholdHint();
+}
+
+function installUnsavedChangeTracking() {
+  if (document.documentElement.dataset.unsavedTrackingReady === '1') return;
+  document.documentElement.dataset.unsavedTrackingReady = '1';
+  const track = event => {
+    const target = event.target;
+    if (!target?.matches?.('input,select,textarea')) return;
+    markConfigDirty(configScopeFromElement(target));
+  };
+  document.addEventListener('input', track);
+  document.addEventListener('change', track);
+  window.addEventListener('beforeunload', event => {
+    if (!dirtyConfigScopes.size) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+}
+
 // ── 自动刷新倒计时 ─────────────────────────────────────────────
 function resetCountdown() {
   clearInterval(autoTimer);
@@ -1827,6 +1942,11 @@ function resetCountdown() {
     countdown--;
     updateTimerLabel();
     if (countdown <= 0) {
+      if (dirtyConfigScopes.size) {
+        countdown = 60;
+        updateTimerLabel();
+        return;
+      }
       resetCountdown();
       loadTab(currentTab, {force:true});
     }
@@ -1834,31 +1954,124 @@ function resetCountdown() {
 }
 
 function updateTimerLabel() {
+  if (dirtyConfigScopes.size) {
+    document.getElementById('auto-timer').textContent = `自动刷新已暂停 · ${dirtyConfigScopes.size} 项未保存`;
+    return;
+  }
   const m = String(Math.floor(countdown/60)).padStart(2,'0');
   const s = String(countdown % 60).padStart(2,'0');
   document.getElementById('auto-timer').textContent = `自动刷新 ${m}:${s}`;
 }
 
 function manualRefresh() {
+  if (dirtyConfigScopes.size && !confirm(`当前有 ${dirtyConfigScopes.size} 项设置尚未保存，刷新会放弃这些修改。是否继续？`)) return;
+  clearAllConfigDirty();
   resetCountdown();
   loadTab(currentTab, {force:true});
 }
 
 // ── 工具 ──────────────────────────────────────────────────────
-async function apiFetch(url, opts={}) {
-  try {
-    const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
-    const ct = r.headers.get('Content-Type') || '';
-    if (!ct.includes('application/json')) {
-      return {ok: false, error: `HTTP ${r.status}：服务器未返回 JSON`};
+function buttonPendingLabel(button) {
+  const configured = button?.dataset.busyLabel?.trim();
+  if (configured) return configured;
+  const label = button?.textContent?.trim() || '处理中';
+  const rules = [
+    ['保存','保存中…'],['删除','删除中…'],['清空','清理中…'],['封禁','封禁中…'],
+    ['解除','解除中…'],['添加','添加中…'],['加入','处理中…'],['移出','处理中…'],
+    ['导入','导入中…'],['应用','应用中…'],['检查','检查中…'],['测试','测试中…'],
+    ['研判','研判中…'],['更新','更新中…'],['执行','执行中…'],
+  ];
+  return rules.find(([keyword]) => label.includes(keyword))?.[1] || '处理中…';
+}
+
+function beginButtonRequest(button) {
+  if (!(button instanceof HTMLButtonElement)) return () => {};
+  const existing = buttonRequestStates.get(button);
+  const state = existing || {
+    count:0,
+    ok:true,
+    initiallyDisabled:button.disabled,
+    managesLabel:!button.disabled,
+    originalHtml:button.innerHTML,
+  };
+  state.count++;
+  buttonRequestStates.set(button, state);
+  button.disabled = true;
+  button.classList.add('button-request-busy');
+  button.setAttribute('aria-busy', 'true');
+  if (state.managesLabel) button.textContent = buttonPendingLabel(button);
+  return success => {
+    const current = buttonRequestStates.get(button);
+    if (!current) return;
+    current.ok = current.ok && success !== false;
+    current.count--;
+    if (current.count > 0) return;
+    buttonRequestStates.delete(button);
+    button.classList.remove('button-request-busy');
+    button.removeAttribute('aria-busy');
+    if (!button.isConnected || !current.managesLabel) {
+      button.disabled = current.initiallyDisabled;
+      return;
     }
+    const resultClass = current.ok ? 'button-request-success' : 'button-request-error';
+    button.classList.add(resultClass);
+    button.textContent = current.ok ? (button.dataset.successLabel || '已完成') : (button.dataset.errorLabel || '操作失败');
+    window.setTimeout(() => {
+      if (!button.isConnected) return;
+      button.classList.remove(resultClass);
+      button.innerHTML = current.originalHtml;
+      button.disabled = current.initiallyDisabled;
+    }, current.ok ? 650 : 900);
+  };
+}
+
+function mutationRequestKey(url, opts, method) {
+  const body = typeof opts.body === 'string' ? opts.body : '';
+  return `${method}\n${url}\n${body}`;
+}
+
+async function performApiFetch(url, opts={}) {
+  try {
+    const method = String(opts.method || 'GET').toUpperCase();
+    const headers = {'X-Requested-With':'XMLHttpRequest', ...(opts.headers || {})};
+    if (!['GET','HEAD','OPTIONS'].includes(method)) headers['X-CSRF-Token'] = CSRF_TOKEN;
+    const r = await fetch(BASE + url, {...opts, headers, credentials:'same-origin'});
+    const ct = r.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) return {ok:false,error:`HTTP ${r.status}：服务器未返回 JSON`};
     try {
       return await r.json();
     } catch(e) {
-      return {ok: false, error: `HTTP ${r.status}：JSON 解析失败`};
+      return {ok:false,error:`HTTP ${r.status}：JSON 解析失败`};
     }
   } catch(e) {
-    return {ok: false, error: `请求失败：${e.message || '网络连接被中断'}`};
+    return {ok:false,error:`请求失败：${e.message || '网络连接被中断'}`};
+  }
+}
+
+async function apiFetch(url, opts={}) {
+  const method = String(opts.method || 'GET').toUpperCase();
+  const isMutation = !['GET','HEAD'].includes(method);
+  const focusedButton = Date.now() - actionButtonCandidateAt < 1000 && document.activeElement instanceof HTMLButtonElement
+    ? document.activeElement
+    : null;
+  const button = isMutation ? (actionButtonCandidate || focusedButton) : null;
+  if (button) {
+    actionButtonCandidate = null;
+    actionButtonCandidateAt = 0;
+  }
+  const releaseButton = beginButtonRequest(button);
+  let result = null;
+  try {
+    if (!isMutation) return await performApiFetch(url, opts);
+    const requestKey = mutationRequestKey(url, opts, method);
+    if (!pendingMutationRequests.has(requestKey)) {
+      const request = performApiFetch(url, opts).finally(() => pendingMutationRequests.delete(requestKey));
+      pendingMutationRequests.set(requestKey, request);
+    }
+    result = await pendingMutationRequests.get(requestKey);
+    return result;
+  } finally {
+    releaseButton(result?.ok === true);
   }
 }
 
@@ -2657,6 +2870,7 @@ async function wlBatchDel() {
 
 // ── 黑名单 ────────────────────────────────────────────────────
 async function loadBlacklist() {
+  const pendingCloudDraft = dirtyConfigScopes.has('cloud') ? {...cloudProviderDraft} : null;
   const data = await apiFetch('/api/blacklist.php');
   if (!data.ok) {
     document.getElementById('bl-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
@@ -2668,6 +2882,11 @@ async function loadBlacklist() {
   const cloudStatus = data.cloud_provider_status || {};
   cloudProviderRows = idcSummary.filter(row => row && row.id);
   cloudProviderDraft = Object.fromEntries(cloudProviderRows.map(row => [row.id, Boolean(row.enabled)]));
+  if (pendingCloudDraft) {
+    Object.keys(cloudProviderDraft).forEach(id => {
+      if (Object.prototype.hasOwnProperty.call(pendingCloudDraft, id)) cloudProviderDraft[id] = pendingCloudDraft[id];
+    });
+  }
 
   let html = '';
   if (entries.length) {
@@ -2736,6 +2955,16 @@ async function loadBlacklist() {
 
   document.getElementById('bl-list').innerHTML = html;
   attachCommentCells(document.getElementById('bl-list'));
+  if (pendingCloudDraft) {
+    cloudProviderRows.forEach(row => {
+      const enabled = Boolean(cloudProviderDraft[row.id]);
+      const toggle = document.querySelector(`[data-provider-toggle="${row.id}"]`);
+      if (toggle) toggle.checked = enabled;
+      document.querySelector(`[data-provider-card="${row.id}"]`)?.classList.toggle('enabled', enabled);
+    });
+    updateCloudProviderSelection();
+    updateConfigDirtyButton('cloud');
+  }
 }
 
 function updateCloudProviderSelection() {
@@ -2753,6 +2982,7 @@ function setCloudProviderDraft(id, enabled) {
   const state = document.querySelector(`[data-provider-state="${id}"]`);
   if (state) state.textContent = enabled ? '待开启' : '待关闭';
   updateCloudProviderSelection();
+  markConfigDirty('cloud');
 }
 
 function setAllCloudProviders(enabled) {
@@ -2788,6 +3018,7 @@ async function saveCloudProviders() {
     toast(result.error || '厂商策略保存失败', 'err');
     return;
   }
+  markConfigSaved('cloud');
   toast(`已提交 ${Number(result.enabled_count || 0)} 家厂商，网关正在校验应用`);
   await waitForCloudProviderApply();
 }
@@ -2971,6 +3202,7 @@ async function tbDel(token) {
 let currentSettings = {};
 
 async function loadSettings() {
+  const dirtySnapshot = captureDirtyConfigValues();
   const params = new URLSearchParams({
     alert_history_limit: alertHistoryLimit,
     alert_history_page: alertHistoryPage,
@@ -3054,6 +3286,7 @@ async function loadSettings() {
   renderStatsCacheInfo(data.stats_cache || {});
   renderAlertHistory(data.alert_history || {});
   await loadAiModule();
+  restoreDirtyConfigValues(dirtySnapshot);
 }
 
 function renderStatsCacheInfo(cache) {
@@ -3465,7 +3698,7 @@ async function saveTitleSettings() {
     }),
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
-  if (d.ok) { toast('✅ 标题设置已保存，刷新页面生效'); }
+  if (d.ok) { markConfigSaved('title'); toast('✅ 标题设置已保存，刷新页面生效'); }
   else toast(d.error || '保存失败', 'err');
 }
 
@@ -3481,6 +3714,7 @@ async function saveCredSettings() {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok) {
+    markConfigSaved('credentials');
     toast('✅ 凭证已更新，请重新登录');
     document.getElementById('cfg-new-pass').value = '';
     document.getElementById('cfg-confirm-pass').value = '';
@@ -3499,6 +3733,7 @@ async function saveGatewayPort() {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok) {
+    markConfigSaved('gateway');
     toast('✅ ' + (d.msg || '网关端口已保存'));
     loadSettings();
   } else {
@@ -3533,6 +3768,7 @@ async function saveUpstreamSettings() {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok) {
+    markConfigSaved('upstream');
     toast('✅ ' + (d.msg || '上游配置已更新'));
     if (path) activeSubscribePath = path;
     await loadSettings();
@@ -3571,6 +3807,7 @@ function applyAlertPreset(name) {
   document.getElementById('cfg-alert-susp-ip-score').value = p.ip;
   document.getElementById('cfg-alert-susp-token-ips').value = p.tokenIps;
   document.getElementById('cfg-alert-dedupe-minutes').value = p.dedupe;
+  markConfigDirty('alert');
   toast(`已套用${p.label}预设，保存后生效`);
 }
 
@@ -3616,6 +3853,7 @@ async function saveAlertSettings() {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok) {
+    markConfigSaved('alert');
     toast('✅ 告警设置已保存');
     await loadSettings();
   } else {
@@ -3713,7 +3951,7 @@ async function importAlertHistory(input) {
     const previewRes = await fetch(BASE + '/api/settings.php?preview_alert_history=1', {
       method: 'POST',
       body: previewFd,
-      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
       credentials: 'same-origin',
     });
     const previewData = await previewRes.json();
@@ -3747,7 +3985,7 @@ async function importAlertHistory(input) {
     const r = await fetch(BASE + '/api/settings.php?import_alert_history=1', {
       method: 'POST',
       body: fd,
-      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
       credentials: 'same-origin',
     });
     const d = await r.json();
@@ -3770,6 +4008,7 @@ async function importAlertHistory(input) {
 
 // ── 安全状态 ──────────────────────────────────────────────────
 async function loadSecurity(opts={}) {
+  const dirtySnapshot = captureDirtyConfigValues();
   const query = opts.force ? '?refresh=1' : '';
   const d = await apiFetch('/api/security.php' + query);
   if (!d.ok) {
@@ -3779,6 +4018,7 @@ async function loadSecurity(opts={}) {
   }
   securityData = d;
   renderSecurity();
+  restoreDirtyConfigValues(dirtySnapshot);
 }
 
 function renderSecurity() {
@@ -4057,6 +4297,7 @@ async function savePullLimitSettings() {
     body:JSON.stringify(body),
   });
   if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+  markConfigSaved('pull_limit');
   toast(enforce ? '限制规则已保存，自动暂停已启用' : '限制规则已保存，当前为监控模式');
   await loadSecurity({force:true});
 }
@@ -4243,6 +4484,13 @@ function toggleGuardPageSelection(checked) {
   renderGuardBatchToolbar();
 }
 
+function setGuardBatchStatus(status, button) {
+  if (!['pending','watch','trusted','confirmed'].includes(status)) return;
+  const input = document.getElementById('guard-batch-status');
+  if (input) input.value = status;
+  updateReviewChoice(button.closest('.guard-batch-choice-group'), status);
+}
+
 function renderGuardPagination(total) {
   const target = document.getElementById('guard-pagination');
   if (!target || total <= 0) {
@@ -4323,9 +4571,9 @@ function renderGuardFindings() {
         ${intel.length ? `<div class="risk-intel">${intel.map(item => `<span>${esc(item)}</span>`).join('')}</div>` : ''}
         ${triggerDetail}
         <div class="risk-actions">
-          ${guardReviewChoices(review.status, index)}
-          <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
-          <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index},this)">保存判断</button>
+          ${guardReviewChoices(review.status, index, row.key)}
+          <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px" oninput="markGuardNoteDirty(${index},this)">
+          <button class="mode-btn note-save-btn" id="guard-note-save-${index}" onclick="saveGuardReview(${jsArg(row.key)},${index},this)" disabled>备注已保存</button>
           <button class="mode-btn ai-run-btn" onclick="runAiAnalysis(${jsArg(row.key)})">AI 研判</button>
           ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
           ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
@@ -4336,25 +4584,84 @@ function renderGuardFindings() {
   renderGuardBatchToolbar();
 }
 
-function guardReviewChoices(selected, index) {
+function guardReviewChoices(selected, index, key) {
   const options = {pending:'待复核', watch:'持续观察', trusted:'判定可信', confirmed:'确认异常'};
   const current = Object.hasOwn(options, selected) ? selected : 'pending';
-  return `<div class="review-choice-group" role="group" aria-label="复核状态">
-    <input type="hidden" id="guard-review-${index}" value="${current}">
-    ${Object.entries(options).map(([value,label]) => `<button type="button" class="review-choice-btn ${current === value ? 'active' : ''}" data-status="${value}" aria-pressed="${current === value ? 'true' : 'false'}" onclick="setGuardReviewStatus(${index},'${value}',this)">${label}</button>`).join('')}
+  return `<div class="review-choice-shell">
+    <div class="review-choice-group" role="group" aria-label="复核状态" data-saved-status="${current}">
+      <input type="hidden" id="guard-review-${index}" value="${current}">
+      ${Object.entries(options).map(([value,label]) => `<button type="button" class="review-choice-btn ${current === value ? 'active' : ''}" data-status="${value}" aria-pressed="${current === value ? 'true' : 'false'}" onclick="setGuardReviewStatus(${index},'${value}',this,${jsArg(key)})">${label}</button>`).join('')}
+    </div>
+    <span class="review-save-state" id="guard-review-state-${index}" data-state="saved" aria-live="polite">已保存</span>
   </div>`;
 }
 
-function setGuardReviewStatus(index, status, button) {
-  const input = document.getElementById('guard-review-' + index);
-  if (!input || !['pending','watch','trusted','confirmed'].includes(status)) return;
-  input.value = status;
-  const group = button.closest('.review-choice-group');
+function updateReviewChoice(group, status) {
   group?.querySelectorAll('.review-choice-btn').forEach(item => {
     const active = item.dataset.status === status;
     item.classList.toggle('active', active);
     item.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
+}
+
+function setReviewSaveState(index, state, text) {
+  const target = document.getElementById('guard-review-state-' + index);
+  if (!target) return;
+  target.dataset.state = state;
+  target.textContent = text;
+}
+
+function markGuardNoteDirty(index, input) {
+  input?.classList.add('is-dirty');
+  const button = document.getElementById('guard-note-save-' + index);
+  if (!button) return;
+  button.disabled = false;
+  button.textContent = '保存备注';
+  button.classList.add('note-save-pending');
+}
+
+function applyGuardReviewResult(key, review) {
+  const row = (securityData?.findings || []).find(item => item.key === key);
+  if (row) row.review = review;
+  refreshGuardReviewSummary();
+  renderRiskAnalysis();
+  renderSecurityMetrics();
+}
+
+async function setGuardReviewStatus(index, status, button, key) {
+  const input = document.getElementById('guard-review-' + index);
+  if (!input || !['pending','watch','trusted','confirmed'].includes(status)) return;
+  const group = button.closest('.review-choice-group');
+  const previous = group?.dataset.savedStatus || input.value || 'pending';
+  if (status === previous) return;
+  input.value = status;
+  updateReviewChoice(group, status);
+  setReviewSaveState(index, 'saving', '保存中…');
+  const choices = Array.from(group?.querySelectorAll('.review-choice-btn') || []);
+  choices.forEach(item => { item.disabled = true; });
+  const note = document.getElementById('guard-note-' + index)?.value.trim() || '';
+  try {
+    const d = await apiFetch('/api/security.php', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+      body:JSON.stringify({action:'review', key, status, note}),
+    });
+    if (!d.ok) {
+      input.value = previous;
+      updateReviewChoice(group, previous);
+      setReviewSaveState(index, 'error', '保存失败');
+      toast(d.error || '保存失败', 'err');
+      return;
+    }
+    if (group) group.dataset.savedStatus = status;
+    applyGuardReviewResult(key, d.review || {status, note});
+    setReviewSaveState(index, 'saved', '已保存');
+    const item = group?.closest('.risk-item');
+    if (item) item.classList.add('review-resolving');
+    window.setTimeout(() => renderGuardFindings(), 420);
+  } finally {
+    choices.forEach(item => { if (item.isConnected) item.disabled = false; });
+  }
 }
 
 function refreshGuardReviewSummary() {
@@ -4369,7 +4676,7 @@ function refreshGuardReviewSummary() {
 async function saveGuardReview(key, index, button=null) {
   const status = document.getElementById('guard-review-' + index)?.value || 'pending';
   const note = document.getElementById('guard-note-' + index)?.value.trim() || '';
-  const oldText = button?.textContent || '保存判断';
+  const oldText = button?.textContent || '保存备注';
   if (button) { button.disabled = true; button.textContent = '保存中…'; }
   try {
     const d = await apiFetch('/api/security.php', {
@@ -4378,13 +4685,9 @@ async function saveGuardReview(key, index, button=null) {
       body:JSON.stringify({action:'review', key, status, note}),
     });
     if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
-    const row = (securityData.findings || []).find(item => item.key === key);
-    if (row) row.review = d.review;
-    refreshGuardReviewSummary();
+    applyGuardReviewResult(key, d.review || {status, note});
     renderGuardFindings();
-    renderRiskAnalysis();
-    renderSecurityMetrics();
-    toast('复核状态已保存');
+    toast('复核备注已保存');
   } finally {
     if (button?.isConnected) { button.disabled = false; button.textContent = oldText; }
   }
@@ -4506,6 +4809,7 @@ async function submitAiSettings(action) {
   if (!data.ok) { toast(data.error || (action === 'test' ? '连接测试失败' : '保存失败'), 'err'); return; }
   toast(action === 'test' ? 'AI 接口连接正常，点击保存后生效' : 'AI 研判设置已保存');
   if (action === 'test') return;
+  markConfigSaved('ai');
   await loadAiModule();
   if (securityData) { await loadSecurity({force:true}); renderStats(); }
 }
@@ -4524,6 +4828,7 @@ async function clearAiToken() {
     method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body:JSON.stringify(body),
   });
   if (!data.ok) { toast(data.error || '清除失败', 'err'); return; }
+  markConfigSaved('ai');
   toast('AI Token 已清除');
   await loadAiModule();
 }
@@ -4600,6 +4905,7 @@ function applyGuardPreset(name) {
   }
   ['guard-ip-minute','guard-ip-daily','guard-token-minute','guard-token-hour-ips','guard-ip-hour-tokens','guard-ip-404','guard-scan-lines']
     .forEach((id, index) => document.getElementById(id).value = values[index]);
+  markConfigDirty('guard');
   updateGuardThresholdHint();
 }
 
@@ -4626,6 +4932,7 @@ async function saveGuardSettings() {
     body:JSON.stringify(body),
   });
   if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+  markConfigSaved('guard');
   toast('风险预警规则已保存');
   await loadSecurity({force:true});
 }
@@ -4674,7 +4981,7 @@ async function importLogs(input) {
     fd.append('log', file);
     const r = await fetch(BASE + '/api/logs.php', {
       method: 'POST',
-      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
       body: fd,
     });
     if (r.status === 413) {
@@ -4706,6 +5013,14 @@ function installButtonClickFeedback() {
   document.addEventListener('click', event => {
     const button = event.target.closest?.('button');
     if (!button || button.disabled) return;
+    actionButtonCandidate = button;
+    actionButtonCandidateAt = Date.now();
+    window.setTimeout(() => {
+      if (actionButtonCandidate === button) {
+        actionButtonCandidate = null;
+        actionButtonCandidateAt = 0;
+      }
+    }, 800);
     const now = Date.now();
     const unlockAt = Number(button.dataset.clickUnlockAt || 0);
     if (now < unlockAt) {
@@ -4722,6 +5037,7 @@ function installButtonClickFeedback() {
 
 async function initDashboard() {
   installButtonClickFeedback();
+  installUnsavedChangeTracking();
   mountWorkspaceLayout();
   resetCountdown();
   await loadTab('security', {force:true}).catch(() => {});

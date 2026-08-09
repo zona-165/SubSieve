@@ -48,7 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($uri === '/' || $uri === '/index.p
     $pass = $_POST['password'] ?? '';
 
     $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
-    if ($user === ADMIN_USER && ADMIN_PASS !== '' && hash_equals(ADMIN_PASS, $pass)) {
+    if (!admin_csrf_request_is_valid('POST', $_POST['csrf_token'] ?? '')) {
+        $_SESSION['login_error'] = '登录页面已过期，请重新提交';
+        header('Location: ' . $base);
+    } elseif ($user === ADMIN_USER && ADMIN_PASS !== '' && hash_equals(ADMIN_PASS, $pass)) {
         session_regenerate_id(true);
         $_SESSION['auth'] = true;
         $_SESSION['ts']   = time();

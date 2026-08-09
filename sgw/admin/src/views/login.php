@@ -36,6 +36,7 @@ input:focus{border-color:#14b8a6;box-shadow:0 0 0 3px rgba(20,184,166,.12)}
       <?php unset($_SESSION['login_error']); ?>
     <?php endif; ?>
     <form method="POST" action="<?= ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/' ?>">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(admin_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
       <label for="login-user">用户名</label>
       <input id="login-user" type="text" name="username" autocomplete="username" required autofocus>
       <label for="login-pass">密码</label>

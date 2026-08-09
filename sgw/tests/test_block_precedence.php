@@ -124,6 +124,18 @@ check(str_contains($updater, 'cloud_provider_settings.json'), '云厂商规则�
 check(str_contains($updater, 'cloud_provider_state.json'), '云厂商规则必须输出生效状态');
 check(!str_contains($updater, "grep -o '\"ip_prefix\":\""), 'AWS CIDR 不得依赖固定 JSON 空格格式');
 
+$watcher = normalizedConfig($sgwRoot . '/gateway/scripts/nginx_reload_watcher.sh');
+check(str_contains($watcher, 'rollback_runtime_reload'), '通用 Nginx 重载缺少规则文件回滚');
+check(str_contains($watcher, 'rollback_whitelist_reload'), '白名单重载缺少输入文件回滚');
+check(str_contains($watcher, 'blacklist.conf|blacklist.json|ua_custom.conf'), '运行时回滚必须限制在明确的规则文件白名单中');
+check(str_contains($watcher, '"$NGINX_BIN" -t 2>/dev/null && "$NGINX_BIN" -s reload 2>/dev/null'), '只有校验和 reload 均成功后才能确认规则生效');
+check(str_contains($watcher, 'RUN_ONCE="${RUN_ONCE:-0}"'), 'Nginx watcher 应支持单次隔离验收');
+
+$whitelistReloader = normalizedConfig($sgwRoot . '/gateway/scripts/reload_whitelist.sh');
+check(str_contains($whitelistReloader, 'OUTPUT_PREV="${OUTPUT}.prev"'), '白名单生成器缺少上一版配置备份');
+check(str_contains($whitelistReloader, 'mv "$OUTPUT_PREV" "$OUTPUT"'), '白名单 Nginx 应用失败时必须恢复上一版配置');
+check(str_contains($whitelistReloader, 'NGINX_BIN="${NGINX_BIN:-nginx}"'), '白名单应用脚本应支持隔离 Nginx 测试');
+
 if ($failures !== []) {
     fwrite(STDERR, "封禁规则测试失败：\n- " . implode("\n- ", $failures) . "\n");
     exit(1);

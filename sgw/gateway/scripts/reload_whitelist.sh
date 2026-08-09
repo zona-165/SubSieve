@@ -4,9 +4,12 @@
 
 set -euo pipefail
 
-WHITELIST_FILE="/etc/nginx/subscribe/whitelist_ips.txt"
-OUTPUT="/etc/nginx/subscribe/whitelist.conf"
+SUBSCRIBE_DIR="${SUBSCRIBE_DIR:-/etc/nginx/subscribe}"
+NGINX_BIN="${NGINX_BIN:-nginx}"
+WHITELIST_FILE="$SUBSCRIBE_DIR/whitelist_ips.txt"
+OUTPUT="$SUBSCRIBE_DIR/whitelist.conf"
 OUTPUT_TMP="${OUTPUT}.tmp.$$"
+OUTPUT_PREV="${OUTPUT}.prev"
 TEST_CONF="/tmp/subsieve-whitelist-test.$$.conf"
 SKIP_NGINX_RELOAD="${SKIP_NGINX_RELOAD:-0}"
 
@@ -39,13 +42,22 @@ http {
 }
 EOF
 
-if ! nginx -t -c "$TEST_CONF" -p /tmp >/dev/null 2>&1; then
+if ! "$NGINX_BIN" -t -c "$TEST_CONF" -p /tmp >/dev/null 2>&1; then
     echo "白名单包含无效 IP/CIDR，已保留上一版 nginx 配置" >&2
     exit 1
 fi
 
+if [[ -f "$OUTPUT" ]]; then
+    cp "$OUTPUT" "$OUTPUT_PREV"
+fi
 mv "$OUTPUT_TMP" "$OUTPUT"
 
 if [[ "$SKIP_NGINX_RELOAD" != "1" ]]; then
-    nginx -t 2>/dev/null && nginx -s reload
+    if ! "$NGINX_BIN" -t 2>/dev/null || ! "$NGINX_BIN" -s reload 2>/dev/null; then
+        if [[ -f "$OUTPUT_PREV" ]]; then
+            mv "$OUTPUT_PREV" "$OUTPUT"
+        fi
+        exit 1
+    fi
 fi
+rm -f "$OUTPUT_PREV"

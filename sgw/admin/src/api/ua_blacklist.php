@@ -28,8 +28,8 @@ if ($method === 'POST') {
         'added_at' => date('Y-m-d H:i'),
     ];
 
-    if (!write_ua_blacklist($entries)) json_err('写入UA封禁文件失败，请检查文件权限');
-    $reload = nginx_reload();
+    if (!write_ua_blacklist($entries)) json_err('UA封禁保存或重载提交失败，旧规则已保留');
+    $reload = true;
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
 
@@ -49,7 +49,9 @@ if ($method === 'PATCH') {
     unset($e);
 
     if (!$found) json_err('未找到该UA');
-    file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    if (!subsieve_atomic_write_json(UA_BLACKLIST_JSON, $entries)) {
+        json_err('更新UA封禁备注失败，请检查文件权限');
+    }
     json_out(['ok' => true]);
 }
 
@@ -61,8 +63,8 @@ if ($method === 'DELETE') {
     if (!$ua) json_err('缺少 ua 参数');
 
     $entries = array_filter(read_ua_blacklist(), fn($e) => $e['ua'] !== $ua);
-    if (!write_ua_blacklist(array_values($entries))) json_err('写入UA封禁文件失败，请检查文件权限');
-    $reload = nginx_reload();
+    if (!write_ua_blacklist(array_values($entries))) json_err('UA封禁保存或重载提交失败，旧规则已保留');
+    $reload = true;
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
 
@@ -77,9 +79,6 @@ function read_ua_blacklist(): array {
 }
 
 function write_ua_blacklist(array $entries): bool {
-    // 写 JSON（含元数据）
-    $r1 = file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-
     // 读取UA白名单，生成conf时跳过白名单中的UA
     $whitelist = [];
     if (file_exists(UA_WHITELIST_JSON)) {
@@ -105,7 +104,10 @@ function write_ua_blacklist(array $entries): bool {
     }
     $lines[] = '}';
 
-    $r2 = file_put_contents(UA_CUSTOM_CONF, implode("\n", $lines) . "\n", LOCK_EX);
-
-    return $r1 !== false && $r2 !== false;
+    $json = json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) return false;
+    return subsieve_atomic_write_nginx_files([
+        UA_CUSTOM_CONF => implode("\n", $lines) . "\n",
+        UA_BLACKLIST_JSON => $json . "\n",
+    ]);
 }

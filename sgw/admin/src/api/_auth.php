@@ -10,3 +10,9 @@ start_admin_session();
 if (empty($_SESSION['auth'])) {
     json_out(['ok' => false, 'error' => 'Unauthorized'], 401);
 }
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!admin_csrf_request_is_valid($method, $csrfToken)) {
+    json_out(['ok' => false, 'error' => '安全令牌已失效，请刷新页面后重试'], 403);
+}

@@ -241,6 +241,9 @@ if (str_starts_with($path, '/api/')) {
         exit;
     }
     if ($path === '/api/settings.php') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+            usleep(700000);
+        }
         echo json_encode([
             'ok' => true,
             'settings' => [
@@ -279,4 +282,5 @@ define('SITE_TITLE', 'SubSieve');
 define('ADMIN_SECRET_PATH', '');
 define('ADMIN_USER', 'admin');
 define('GATEWAY_PORT', 443);
+function admin_csrf_token(): string { return str_repeat('a', 64); }
 require dirname(__DIR__) . '/admin/src/views/dashboard.php';

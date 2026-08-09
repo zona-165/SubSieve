@@ -17,19 +17,18 @@ if ($method === 'POST') {
         $entries = read_whitelist();
         $existingSet = [];
         foreach ($entries as $e) $existingSet[$e['ip']] = true;
-        $newLines = []; $added = 0; $skipped = 0; $invalid = 0;
+        $added = 0; $skipped = 0; $invalid = 0;
         foreach ($body['import_ips'] as $rawIp) {
             $ip = trim($rawIp);
             if (!$ip) continue;
             if (!is_valid_ip_or_cidr($ip, true)) { $invalid++; continue; }
             if (isset($existingSet[$ip])) { $skipped++; continue; }
-            $newLines[] = $ip . '  # 从文件导入';
+            $entries[] = ['ip' => $ip, 'comment' => '从文件导入'];
             $existingSet[$ip] = true;
             $added++;
         }
         if ($added > 0) {
-            file_put_contents(WHITELIST_IPS, implode("\n", $newLines) . "\n", FILE_APPEND | LOCK_EX);
-            whitelist_reload();
+            if (!write_whitelist($entries)) json_err('白名单保存或重载提交失败，旧规则已保留');
         }
         json_out(['ok' => true, 'added' => $added, 'skipped' => $skipped, 'invalid' => $invalid]);
     }
@@ -47,9 +46,8 @@ if ($method === 'POST') {
         if ($e['ip'] === $ip) json_err('该IP已在白名单中');
     }
 
-    $line = $ip . ($comment ? "  # $comment" : '');
-    file_put_contents(WHITELIST_IPS, $line . "\n", FILE_APPEND | LOCK_EX);
-    whitelist_reload();
+    $entries[] = ['ip' => $ip, 'comment' => $comment];
+    if (!write_whitelist($entries)) json_err('白名单保存或重载提交失败，旧规则已保留');
 
     json_out(['ok' => true]);
 }
@@ -81,8 +79,9 @@ if ($method === 'PATCH') {
     }
 
     if (!$found) json_err('未找到该IP');
-    file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);
-    whitelist_reload();
+    if (!subsieve_atomic_write_nginx_files([WHITELIST_IPS => implode("\n", $new) . "\n"], true)) {
+        json_err('白名单备注保存或重载提交失败，旧规则已保留');
+    }
     json_out(['ok' => true]);
 }
 
@@ -108,8 +107,9 @@ if ($method === 'DELETE') {
         return !in_array($entry, $toRemove);
     });
 
-    file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);
-    whitelist_reload();
+    if (!subsieve_atomic_write_nginx_files([WHITELIST_IPS => implode("\n", $new) . "\n"], true)) {
+        json_err('白名单删除或重载提交失败，旧规则已保留');
+    }
     json_out(['ok' => true]);
 }
 
@@ -136,4 +136,17 @@ function read_whitelist(): array {
         $entries[] = ['ip' => $ip, 'comment' => $comment];
     }
     return $entries;
+}
+
+function write_whitelist(array $entries): bool {
+    $lines = ['# IP 白名单 - 由 admin 自动生成 | ' . date('Y-m-d H:i:s')];
+    foreach ($entries as $entry) {
+        $ip = trim((string)($entry['ip'] ?? ''));
+        if (!is_valid_ip_or_cidr($ip, true)) continue;
+        $comment = safe_comment((string)($entry['comment'] ?? ''));
+        $lines[] = $ip . ($comment !== '' ? '  # ' . $comment : '');
+    }
+    return subsieve_atomic_write_nginx_files([
+        WHITELIST_IPS => implode("\n", $lines) . "\n",
+    ], true);
 }

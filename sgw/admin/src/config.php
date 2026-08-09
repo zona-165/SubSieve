@@ -79,6 +79,22 @@ function start_admin_session(): void {
         'samesite' => 'Strict',
     ]);
     session_start();
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || strlen($_SESSION['csrf_token']) !== 64) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+}
+
+function admin_csrf_token(): string {
+    start_admin_session();
+    return (string)($_SESSION['csrf_token'] ?? '');
+}
+
+function admin_csrf_request_is_valid(string $method, ?string $providedToken): bool {
+    $method = strtoupper($method);
+    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) return true;
+    $expected = (string)($_SESSION['csrf_token'] ?? '');
+    $provided = (string)$providedToken;
+    return strlen($expected) === 64 && strlen($provided) === 64 && hash_equals($expected, $provided);
 }
 
 function destroy_admin_session(): void {
@@ -127,6 +143,150 @@ function whitelist_reload(): bool {
 
 function invalidate_guard_cache(): void {
     @unlink(GUARD_CACHE_JSON);
+}
+
+/**
+ * 原子替换一个或多个文件。所有候选内容会先写入目标目录中的临时文件，
+ * 再逐个替换；任一替换失败时，已经替换的文件会从备份恢复。
+ *
+ * $replaceFile 仅用于测试故障回滚，生产调用保持为空。
+ */
+function subsieve_atomic_write_files(array $files, int $mode = 0666, ?callable $replaceFile = null): bool {
+    if ($files === []) return true;
+
+    $normalized = [];
+    foreach ($files as $path => $content) {
+        $path = (string)$path;
+        if ($path === '' || !is_string($content) || isset($normalized[$path])) return false;
+        $normalized[$path] = $content;
+    }
+
+    $directories = array_values(array_unique(array_map('dirname', array_keys($normalized))));
+    sort($directories, SORT_STRING);
+    $locks = [];
+    $staged = [];
+    $backups = [];
+    $committed = [];
+    $replaceFile ??= static fn(string $from, string $to): bool => @rename($from, $to);
+
+    try {
+        foreach ($directories as $directory) {
+            if (!is_dir($directory)) return false;
+            $lockPath = $directory . '/.subsieve-write.lock';
+            $handle = @fopen($lockPath, 'c');
+            if ($handle === false || !@flock($handle, LOCK_EX)) {
+                if (is_resource($handle)) @fclose($handle);
+                return false;
+            }
+            @chmod($lockPath, $mode);
+            $locks[] = $handle;
+        }
+
+        foreach ($normalized as $path => $content) {
+            if (is_dir($path) || is_link($path)) return false;
+            try {
+                $nonce = bin2hex(random_bytes(6));
+            } catch (Throwable $e) {
+                $nonce = str_replace('.', '', uniqid('', true));
+            }
+            $tmp = $path . '.tmp.' . getmypid() . '.' . $nonce;
+            $handle = @fopen($tmp, 'xb');
+            if ($handle === false) return false;
+
+            $written = 0;
+            $length = strlen($content);
+            $ok = @flock($handle, LOCK_EX);
+            while ($ok && $written < $length) {
+                $chunk = @fwrite($handle, substr($content, $written));
+                if ($chunk === false || $chunk === 0) {
+                    $ok = false;
+                    break;
+                }
+                $written += $chunk;
+            }
+            if ($ok) $ok = @fflush($handle);
+            if ($ok && function_exists('fsync')) @fsync($handle);
+            @flock($handle, LOCK_UN);
+            @fclose($handle);
+            if (!$ok || $written !== $length) {
+                @unlink($tmp);
+                return false;
+            }
+            @chmod($tmp, $mode);
+            $staged[$path] = $tmp;
+        }
+
+        foreach ($normalized as $path => $_content) {
+            if (!file_exists($path)) {
+                $backups[$path] = null;
+                continue;
+            }
+            $backup = $path . '.bak.' . getmypid() . '.' . bin2hex(random_bytes(4));
+            if (!@copy($path, $backup)) return false;
+            @chmod($backup, $mode);
+            $backups[$path] = $backup;
+        }
+
+        foreach ($staged as $path => $tmp) {
+            if (!$replaceFile($tmp, $path)) {
+                foreach (array_reverse($committed) as $committedPath) {
+                    $backup = $backups[$committedPath] ?? null;
+                    $restored = $backup !== null
+                        ? @rename($backup, $committedPath)
+                        : @unlink($committedPath);
+                    if (!$restored && $backup !== null) {
+                        error_log('SubSieve atomic rollback failed: ' . $committedPath);
+                    }
+                }
+                return false;
+            }
+            $committed[] = $path;
+            unset($staged[$path]);
+        }
+
+        return true;
+    } catch (Throwable $e) {
+        error_log('SubSieve atomic write failed: ' . $e->getMessage());
+        return false;
+    } finally {
+        foreach ($staged as $tmp) @unlink($tmp);
+        foreach ($backups as $backup) {
+            if (is_string($backup) && $backup !== '') @unlink($backup);
+        }
+        foreach (array_reverse($locks) as $handle) {
+            @flock($handle, LOCK_UN);
+            @fclose($handle);
+        }
+    }
+}
+
+function subsieve_atomic_write_json(string $path, array $data, int $mode = 0666): bool {
+    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) return false;
+    return subsieve_atomic_write_files([$path => $json . "\n"], $mode);
+}
+
+function subsieve_atomic_write_nginx_files(array $files, bool $whitelist = false): bool {
+    $signal = $whitelist ? WHITELIST_RELOAD_SIGNAL : NGINX_RELOAD_SIGNAL;
+    $transaction = [];
+    $markerNames = [];
+    foreach ($files as $path => $_content) {
+        $path = (string)$path;
+        $name = basename($path);
+        if ($name === '' || str_contains($name, "\n")) return false;
+        $markerNames[] = $name;
+        if (file_exists($path)) {
+            $previous = @file_get_contents($path);
+            if ($previous === false) return false;
+            $transaction[$path . '.prev'] = $previous;
+        }
+    }
+    foreach ($files as $path => $content) $transaction[$path] = $content;
+    $transaction[$signal] = implode("\n", $markerNames) . "\n";
+
+    $ok = subsieve_atomic_write_files($transaction);
+    if ($ok) invalidate_guard_cache();
+    return $ok;
 }
 
 // ── 写入 nginx 配置前的安全过滤 ────────────────────────────────
@@ -180,24 +340,10 @@ function write_token_blacklist_files(array $entries): bool {
     $lines[] = '}';
     $conf = implode("\n", $lines) . "\n";
 
-    $suffix = '.tmp.' . getmypid();
-    $jsonTmp = TOKEN_BLACKLIST_JSON . $suffix;
-    $confTmp = TOKEN_BLACKLIST_CONF . $suffix;
-    $jsonWritten = file_put_contents($jsonTmp, $json, LOCK_EX) !== false;
-    $confWritten = file_put_contents($confTmp, $conf, LOCK_EX) !== false;
-    if (!$jsonWritten || !$confWritten) {
-        @unlink($jsonTmp);
-        @unlink($confTmp);
-        return false;
-    }
-
-    @chmod($jsonTmp, 0666);
-    @chmod($confTmp, 0666);
-    $confReplaced = @rename($confTmp, TOKEN_BLACKLIST_CONF);
-    $jsonReplaced = $confReplaced && @rename($jsonTmp, TOKEN_BLACKLIST_JSON);
-    @unlink($jsonTmp);
-    @unlink($confTmp);
-    return $confReplaced && $jsonReplaced;
+    return subsieve_atomic_write_nginx_files([
+        TOKEN_BLACKLIST_CONF => $conf,
+        TOKEN_BLACKLIST_JSON => $json . "\n",
+    ]);
 }
 
 /**

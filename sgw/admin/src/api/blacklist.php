@@ -44,8 +44,8 @@ if ($method === 'POST') {
             $added++;
         }
         if ($added > 0) {
-            if (!write_blacklist($entries)) json_err('写入黑名单文件失败，请检查文件权限');
-            $reload = nginx_reload();
+            if (!write_blacklist($entries)) json_err('黑名单保存或重载提交失败，旧规则已保留');
+            $reload = true;
         } else {
             $reload = false;
         }
@@ -71,8 +71,8 @@ if ($method === 'POST') {
         'added_at' => date('Y-m-d H:i'),
     ];
 
-    if (!write_blacklist($entries)) json_err('写入黑名单文件失败，请检查文件权限');
-    $reload = nginx_reload();
+    if (!write_blacklist($entries)) json_err('黑名单保存或重载提交失败，旧规则已保留');
+    $reload = true;
 
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
@@ -93,7 +93,9 @@ if ($method === 'PATCH') {
     unset($e);
 
     if (!$found) json_err('未找到该IP');
-    file_put_contents(BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    if (!subsieve_atomic_write_json(BLACKLIST_JSON, $entries)) {
+        json_err('更新黑名单备注失败，请检查文件权限');
+    }
     json_out(['ok' => true]);
 }
 
@@ -105,8 +107,8 @@ if ($method === 'DELETE') {
     if (!empty($body['ips']) && is_array($body['ips'])) {
         $toRemove = array_map('trim', $body['ips']);
         $entries  = array_values(array_filter(read_blacklist(), fn($e) => !in_array($e['ip'], $toRemove)));
-        if (!write_blacklist($entries)) json_err('写入黑名单文件失败，请检查文件权限');
-        $reload = nginx_reload();
+        if (!write_blacklist($entries)) json_err('黑名单保存或重载提交失败，旧规则已保留');
+        $reload = true;
         json_out(['ok' => true, 'nginx_reloaded' => $reload]);
     }
 
@@ -115,8 +117,8 @@ if ($method === 'DELETE') {
     if (!$ip) json_err('缺少 ip 参数');
 
     $entries = array_filter(read_blacklist(), fn($e) => $e['ip'] !== $ip);
-    if (!write_blacklist(array_values($entries))) json_err('写入黑名单文件失败，请检查文件权限');
-    $reload = nginx_reload();
+    if (!write_blacklist(array_values($entries))) json_err('黑名单保存或重载提交失败，旧规则已保留');
+    $reload = true;
 
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
@@ -132,8 +134,6 @@ function read_blacklist(): array {
 }
 
 function write_blacklist(array $entries): bool {
-    $r1 = file_put_contents(BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-
     $lines = ["# 黑名单 - 由 admin 自动生成 | " . date('Y-m-d H:i:s')];
     foreach ($entries as $e) {
         $ip = trim((string)($e['ip'] ?? ''));
@@ -144,9 +144,12 @@ function write_blacklist(array $entries): bool {
         $cmt = $cmtText !== '' ? " # {$cmtText} ({$at})" : " # {$at}";
         $lines[] = "deny {$ip};{$cmt}";
     }
-    $r2 = file_put_contents(BLACKLIST_CONF, implode("\n", $lines) . "\n", LOCK_EX);
-
-    return $r1 !== false && $r2 !== false;
+    $json = json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) return false;
+    return subsieve_atomic_write_nginx_files([
+        BLACKLIST_CONF => implode("\n", $lines) . "\n",
+        BLACKLIST_JSON => $json . "\n",
+    ]);
 }
 
 // ── 读取 cloud_geo.conf 返回所有CIDR列表（供前端IP范围匹配）──────

@@ -67,9 +67,9 @@ if ($method === 'POST') {
     }
 
     $entries[] = ['token' => $token, 'comment' => $comment, 'added_at' => date('Y-m-d H:i')];
-    if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
+    if (!write_token_blacklist($entries)) json_err('Token黑名单保存或重载提交失败，旧规则已保留');
     invalidate_stats_cache();
-    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
+    json_out(['ok' => true, 'nginx_reloaded' => true]);
 }
 
 // PATCH — 更新备注
@@ -88,8 +88,8 @@ if ($method === 'PATCH') {
     unset($e);
 
     if (!$found) json_err('未找到该Token');
-    if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
-    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
+    if (!write_token_blacklist($entries)) json_err('Token黑名单保存或重载提交失败，旧规则已保留');
+    json_out(['ok' => true, 'nginx_reloaded' => true]);
 }
 
 // DELETE — 移除 Token 黑名单
@@ -100,9 +100,9 @@ if ($method === 'DELETE') {
     if (!$token) json_err('缺少 token 参数');
 
     $entries = array_values(array_filter(read_token_blacklist(), fn($e) => $e['token'] !== $token));
-    if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
+    if (!write_token_blacklist($entries)) json_err('Token黑名单保存或重载提交失败，旧规则已保留');
     invalidate_stats_cache();
-    json_out(['ok' => true, 'nginx_reloaded' => nginx_reload()]);
+    json_out(['ok' => true, 'nginx_reloaded' => true]);
 }
 
 json_err('不支持的请求方式', 405);

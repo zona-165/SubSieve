@@ -21,7 +21,6 @@ if ($action === 'check-alerts') {
 if ($action === 'sync-token-blacklist') {
     $entries = read_json_file(TOKEN_BLACKLIST_JSON);
     $ok = write_token_blacklist_files($entries);
-    if ($ok) nginx_reload();
     echo json_encode(['ok' => $ok, 'entries' => count($entries)], JSON_UNESCAPED_UNICODE) . PHP_EOL;
     exit($ok ? 0 : 1);
 }
@@ -382,9 +381,7 @@ function read_json_file(string $file): array {
 }
 
 function write_json_file(string $file, array $data): bool {
-    $ok = file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
-    @chmod($file, 0666);
-    return $ok;
+    return subsieve_atomic_write_json($file, $data);
 }
 
 function prune_alert_state(array &$state, int $now): void {

@@ -190,7 +190,7 @@ if ($method === 'POST') {
         $safeHost    = safe_conf_value($s['upstream_host'] ?? (parse_url($s['upstream_url'], PHP_URL_HOST) ?: $s['upstream_url']));
         $protectUpdated = write_protect_conf($safePath, $safeBackend, $safeHost);
         if ($protectUpdated) {
-            $nginxReloaded = nginx_reload();
+            $nginxReloaded = true;
         }
     }
 
@@ -233,7 +233,7 @@ function read_settings(): array {
 }
 
 function write_settings(array $s): bool {
-    return file_put_contents(SETTINGS_JSON, json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
+    return subsieve_atomic_write_json(SETTINGS_JSON, $s);
 }
 
 function apply_alert_settings(array $s, array $body): array {
@@ -419,12 +419,14 @@ function clear_alert_history(bool $resetState = false): void {
         ],
         'entries' => [],
     ];
-    @file_put_contents(ALERT_HISTORY_JSON, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    @chmod(ALERT_HISTORY_JSON, 0666);
+    $files = [];
+    $historyJson = json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($historyJson === false) json_err('生成告警历史失败');
+    $files[ALERT_HISTORY_JSON] = $historyJson . "\n";
     if ($resetState) {
-        @file_put_contents(ALERT_STATE_JSON, "{}", LOCK_EX);
-        @chmod(ALERT_STATE_JSON, 0666);
+        $files[ALERT_STATE_JSON] = "{}\n";
     }
+    if (!subsieve_atomic_write_files($files)) json_err('清理告警历史失败，旧数据已保留');
 }
 
 function delete_alert_history_entry(array $body): int {
@@ -454,8 +456,9 @@ function delete_alert_history_entry(array $body): int {
     if ($deleted < 1) {
         json_err('未找到对应告警记录');
     }
-    @file_put_contents(ALERT_HISTORY_JSON, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    @chmod(ALERT_HISTORY_JSON, 0666);
+    if (!subsieve_atomic_write_json(ALERT_HISTORY_JSON, $data)) {
+        json_err('删除告警记录失败，旧数据已保留');
+    }
     return $deleted;
 }
 
@@ -507,7 +510,7 @@ location ^~ $subscribePath {
     add_header X-Subscribe-Filter "active";
 }
 NGINX;
-    return file_put_contents(PROTECT_CONF, $conf, LOCK_EX) !== false;
+    return subsieve_atomic_write_nginx_files([PROTECT_CONF => $conf]);
 }
 
 /**
@@ -785,10 +788,9 @@ function import_alert_history(): void {
     if (is_array($history['context'] ?? null)) {
         $safeHistory['context'] = $history['context'];
     }
-    if (!file_put_contents(ALERT_HISTORY_JSON, json_encode($safeHistory, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX)) {
+    if (!subsieve_atomic_write_json(ALERT_HISTORY_JSON, $safeHistory)) {
         json_err('写入告警历史失败，请检查权限');
     }
-    @chmod(ALERT_HISTORY_JSON, 0666);
     json_out(['ok' => true, 'imported' => count($history['entries']), 'preview' => summarize_alert_history($history)]);
 }
 
@@ -827,5 +829,5 @@ $siteTitle 部署信息
   订阅路径: $subscribePath
   代理到:   $upstreamUrl
 TXT;
-    @file_put_contents(DEPLOY_INFO_FILE, $content, LOCK_EX);
+    subsieve_atomic_write_files([DEPLOY_INFO_FILE => $content]);
 }
