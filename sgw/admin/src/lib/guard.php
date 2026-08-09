@@ -84,6 +84,50 @@ function guard_finding_key(string $kind, string $subject, string $secret): strin
     return $kind . ':' . substr(hash_hmac('sha256', $kind . '|' . $subject, $key), 0, 24);
 }
 
+function guard_normalize_review_keys(array $keys, int $maxKeys = 100): array {
+    $normalized = [];
+    foreach ($keys as $key) {
+        if (!is_string($key)) throw new InvalidArgumentException('风险记录标识无效');
+        $key = trim($key);
+        if (!preg_match('/^[a-z0-9_]+:[a-f0-9]{24}$/', $key)) {
+            throw new InvalidArgumentException('风险记录标识无效');
+        }
+        $normalized[$key] = true;
+    }
+    $normalized = array_keys($normalized);
+    if (!$normalized) throw new InvalidArgumentException('请至少选择一条风险记录');
+    if (count($normalized) > $maxKeys) throw new InvalidArgumentException("单次最多处理 {$maxKeys} 条风险记录");
+    return $normalized;
+}
+
+function guard_apply_review_updates(
+    array $entries,
+    array $keys,
+    string $status,
+    string $note,
+    string $updatedAt,
+    int $maxEntries = 500
+): array {
+    $keys = guard_normalize_review_keys($keys);
+    if (!in_array($status, ['pending', 'watch', 'trusted', 'confirmed'], true)) {
+        throw new InvalidArgumentException('复核状态无效');
+    }
+    if (strlen($note) > 200) $note = substr($note, 0, 200);
+
+    foreach ($keys as $key) {
+        $entries[$key] = [
+            'status' => $status,
+            'note' => $note,
+            'updated_at' => $updatedAt,
+        ];
+    }
+    uasort($entries, fn(array $a, array $b): int => strcmp(
+        (string)($b['updated_at'] ?? ''),
+        (string)($a['updated_at'] ?? '')
+    ));
+    return array_slice($entries, 0, max(1, $maxEntries), true);
+}
+
 function guard_parse_log_line(string $line): ?array {
     $pattern = '/^(\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+) "([^"]*)"(?: "reason=([^"]*)" "provider=([^"]*)")?$/';
     if (!preg_match($pattern, trim($line), $match)) return null;

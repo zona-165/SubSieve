@@ -331,6 +331,8 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .risk-item{padding:14px 0;border-bottom:1px solid var(--border);animation:listIn var(--motion-med) ease both}
 .risk-item:last-child{border-bottom:none}
 .risk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.risk-title-group{display:flex;align-items:flex-start;gap:9px;min-width:0}
+.risk-select-box{width:16px;height:16px;flex:0 0 auto;margin-top:2px;accent-color:var(--accent);cursor:pointer}
 .risk-title{font-size:13px;font-weight:850;color:var(--text)}
 .risk-subject{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#818cf8;overflow-wrap:anywhere;margin-top:3px}
 .risk-score{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(239,68,68,.11);color:#ef4444;font-size:11px;font-weight:850}
@@ -699,6 +701,15 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 
 .review-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .review-toolbar .log-mode-btns{margin:0!important}
+.guard-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-bottom:9px}
+.guard-search-input,.guard-batch-note{width:100%;min-width:0;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input);color:var(--text);padding:8px 10px;font-size:11px;outline:none}
+.guard-search-input:focus,.guard-batch-note:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(13,148,136,.08)}
+.guard-batch-toolbar{display:grid;grid-template-columns:auto auto minmax(120px,.55fr) minmax(180px,1fr) auto;align-items:center;gap:7px;margin-bottom:12px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
+.guard-select-page{display:inline-flex;align-items:center;gap:6px;color:var(--text2);font-size:11px;font-weight:750;white-space:nowrap;cursor:pointer}
+.guard-select-page input{width:15px;height:15px;accent-color:var(--accent)}
+.guard-selected-count{color:var(--text3);font-size:10px;white-space:nowrap}
+.guard-batch-status{min-width:0;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input);color:var(--text);padding:7px 9px;font-size:11px;outline:none}
+.guard-batch-apply:disabled{cursor:not-allowed;opacity:.5}
 .review-size-control{display:flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--text3);font-size:10px}
 .review-size-control .mode-btn{min-width:32px;padding:5px 8px}
 .review-pagination{display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
@@ -814,6 +825,11 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .analysis-core-grid .stats-card{min-height:156px;padding:15px}
   .review-toolbar{align-items:flex-start;flex-direction:column}
   .review-size-control{width:100%;justify-content:flex-start}
+  .guard-batch-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+  .guard-select-page,.guard-selected-count{align-self:center}
+  .guard-batch-status,.guard-batch-note,.guard-batch-apply{min-height:36px}
+  .guard-batch-note{grid-column:1/-1}
+  .guard-batch-apply{grid-column:1/-1}
   .review-pagination{align-items:flex-start;flex-direction:column}
   .review-page-actions{width:100%}
   .review-page-actions .mode-btn{flex:1}
@@ -864,6 +880,8 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .nav-item{padding-inline:8px}
   .topbar-subtitle,.auto-timer{display:none}
   .security-metrics,.pull-limit-summary,.rule-grid{grid-template-columns:minmax(0,1fr)}
+  .guard-search-row,.guard-batch-toolbar{grid-template-columns:minmax(0,1fr)}
+  .guard-batch-note,.guard-batch-apply{grid-column:auto}
   .log-mode-btns .mode-btn,.log-controls .mode-btn{flex-basis:100%}
 }
 </style>
@@ -1138,6 +1156,22 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             <button class="mode-btn" id="guard-size-10" onclick="setGuardPageSize(10)">10</button>
             <button class="mode-btn" id="guard-size-20" onclick="setGuardPageSize(20)">20</button>
           </div>
+        </div>
+        <div class="guard-search-row">
+          <input class="guard-search-input" id="guard-search" type="search" placeholder="搜索 IP、Token、ASN、厂商、UA 或触发详情" oninput="setGuardSearch(this.value)">
+          <button class="mode-btn" onclick="clearGuardSearch()">清除</button>
+        </div>
+        <div class="guard-batch-toolbar" id="guard-batch-toolbar">
+          <label class="guard-select-page"><input id="guard-select-page" type="checkbox" onchange="toggleGuardPageSelection(this.checked)">选择本页</label>
+          <span class="guard-selected-count" id="guard-selected-count">已选 0 条</span>
+          <select class="guard-batch-status" id="guard-batch-status" aria-label="批量复核状态">
+            <option value="watch">持续观察</option>
+            <option value="trusted">判定可信</option>
+            <option value="confirmed">确认异常</option>
+            <option value="pending">恢复待复核</option>
+          </select>
+          <input class="guard-batch-note" id="guard-batch-note" maxlength="200" placeholder="批量备注（可选）">
+          <button class="mode-btn guard-batch-apply" id="guard-batch-apply" onclick="applyGuardBatchReview()" disabled>应用到所选</button>
         </div>
         <div id="ai-analysis-panel" class="ai-analysis-panel"></div>
         <div id="security-findings" class="risk-list"><div class="loading">加载风险队列…</div></div>
@@ -1504,6 +1538,9 @@ let guardReviewFilter = 'active';
 let guardRiskKindFilter = 'all';
 let guardReviewPage = 1;
 let guardReviewPageSize = 5;
+let guardSearchQuery = '';
+let guardSelectedKeys = new Set();
+let guardVisiblePageKeys = [];
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
 let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
@@ -4057,6 +4094,60 @@ function jumpGuardPage() {
   renderGuardFindings();
 }
 
+function setGuardSearch(value) {
+  guardSearchQuery = String(value || '').trim().toLocaleLowerCase();
+  guardReviewPage = 1;
+  renderGuardFindings();
+}
+
+function clearGuardSearch() {
+  const input = document.getElementById('guard-search');
+  if (input) input.value = '';
+  setGuardSearch('');
+}
+
+function guardFindingSearchText(row) {
+  const values = [
+    row.title, row.subject, row.reason, row.source, row.location, row.asn,
+    row.operator, row.network_type, row.provider_name, row.ua,
+    ...(row.sample_ips || []), ...(row.sample_paths || []), ...(row.sample_uas || []),
+    ...(row.provider_asns || []), ...(row.provider_keywords || []),
+    ...Object.entries(row.trigger_details || {}).flat(),
+  ];
+  return values.filter(value => value !== null && value !== undefined).join(' ').toLocaleLowerCase();
+}
+
+function pruneGuardSelection() {
+  const available = new Set((securityData?.findings || []).map(row => row.key));
+  guardSelectedKeys.forEach(key => { if (!available.has(key)) guardSelectedKeys.delete(key); });
+}
+
+function renderGuardBatchToolbar() {
+  const pageToggle = document.getElementById('guard-select-page');
+  const selectedCount = document.getElementById('guard-selected-count');
+  const applyButton = document.getElementById('guard-batch-apply');
+  const visibleSelected = guardVisiblePageKeys.filter(key => guardSelectedKeys.has(key)).length;
+  if (pageToggle) {
+    pageToggle.disabled = guardVisiblePageKeys.length === 0;
+    pageToggle.checked = guardVisiblePageKeys.length > 0 && visibleSelected === guardVisiblePageKeys.length;
+    pageToggle.indeterminate = visibleSelected > 0 && visibleSelected < guardVisiblePageKeys.length;
+  }
+  if (selectedCount) selectedCount.textContent = `已选 ${guardSelectedKeys.size} 条`;
+  if (applyButton) applyButton.disabled = guardSelectedKeys.size === 0;
+}
+
+function toggleGuardSelection(key, checked) {
+  if (checked) guardSelectedKeys.add(key);
+  else guardSelectedKeys.delete(key);
+  renderGuardBatchToolbar();
+}
+
+function toggleGuardPageSelection(checked) {
+  guardVisiblePageKeys.forEach(key => checked ? guardSelectedKeys.add(key) : guardSelectedKeys.delete(key));
+  document.querySelectorAll('.risk-select-box').forEach(input => { input.checked = checked; });
+  renderGuardBatchToolbar();
+}
+
 function renderGuardPagination(total) {
   const target = document.getElementById('guard-pagination');
   if (!target || total <= 0) {
@@ -4080,21 +4171,26 @@ function renderGuardPagination(total) {
 
 function renderGuardFindings() {
   if (!securityData) return;
+  pruneGuardSelection();
   const summary = securityData.review_summary || {};
   document.getElementById('guard-review-summary').textContent = `待复核 ${summary.pending || 0} · 观察 ${summary.watch || 0} · 可信 ${summary.trusted || 0} · 异常 ${summary.confirmed || 0}`;
   let rows = securityData.findings || [];
   if (guardReviewFilter === 'active') rows = rows.filter(row => ['pending','watch'].includes(row.review?.status || 'pending'));
   if (guardReviewFilter === 'trusted') rows = rows.filter(row => row.review?.status === 'trusted');
   if (guardRiskKindFilter !== 'all') rows = rows.filter(row => guardFindingGroup(row) === guardRiskKindFilter);
+  if (guardSearchQuery) rows = rows.filter(row => guardFindingSearchText(row).includes(guardSearchQuery));
   const target = document.getElementById('security-findings');
   if (!rows.length) {
-    target.innerHTML = `<div class="security-empty">${guardReviewFilter === 'active' ? '当前没有待处理风险' : '当前筛选没有记录'}</div>`;
+    guardVisiblePageKeys = [];
+    target.innerHTML = `<div class="security-empty">${guardSearchQuery ? '没有匹配的风险记录' : (guardReviewFilter === 'active' ? '当前没有待处理风险' : '当前筛选没有记录')}</div>`;
     renderGuardPagination(0);
+    renderGuardBatchToolbar();
     return;
   }
   renderGuardPagination(rows.length);
   const pageStart = (guardReviewPage - 1) * guardReviewPageSize;
   rows = rows.slice(pageStart, pageStart + guardReviewPageSize);
+  guardVisiblePageKeys = rows.map(row => row.key);
   target.innerHTML = rows.map((row, index) => {
     const review = row.review || {status:'pending',note:''};
     const subject = row.subject || '-';
@@ -4124,7 +4220,7 @@ function renderGuardFindings() {
     return `
       <div class="risk-item">
         <div class="risk-head">
-          <div><div class="risk-title">${esc(row.title || '风险事件')}</div><div class="risk-subject">${esc(subject)}</div></div>
+          <div class="risk-title-group"><input class="risk-select-box" type="checkbox" aria-label="选择此风险记录" ${guardSelectedKeys.has(row.key) ? 'checked' : ''} onchange="toggleGuardSelection(${jsArg(row.key)},this.checked)"><div><div class="risk-title">${esc(row.title || '风险事件')}</div><div class="risk-subject">${esc(subject)}</div></div></div>
           <span class="risk-score">${esc(row.risk || '关注')} ${Number(row.score || 0)}</span>
         </div>
         <div class="risk-evidence">${meta.map(item => `<span>${esc(item)}</span>`).join('')}${statusSummary}${row.token_count ? `<span>${Number(row.token_count)} 个 Token</span>` : ''}</div>
@@ -4142,11 +4238,21 @@ function renderGuardFindings() {
         </div>
       </div>`;
   }).join('');
+  renderGuardBatchToolbar();
 }
 
 function guardReviewOptions(selected) {
   const options = {pending:'待复核', watch:'持续观察', trusted:'判定可信', confirmed:'确认异常'};
   return Object.entries(options).map(([value,label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+function refreshGuardReviewSummary() {
+  const summary = {pending:0,watch:0,trusted:0,confirmed:0};
+  (securityData?.findings || []).forEach(item => {
+    const status = item.review?.status || 'pending';
+    summary[status] = (summary[status] || 0) + 1;
+  });
+  securityData.review_summary = summary;
 }
 
 async function saveGuardReview(key, index) {
@@ -4160,13 +4266,44 @@ async function saveGuardReview(key, index) {
   if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
   const row = (securityData.findings || []).find(item => item.key === key);
   if (row) row.review = d.review;
-  const summary = {pending:0,watch:0,trusted:0,confirmed:0};
-  (securityData.findings || []).forEach(item => summary[item.review?.status || 'pending']++);
-  securityData.review_summary = summary;
+  refreshGuardReviewSummary();
   renderGuardFindings();
   renderRiskAnalysis();
   renderSecurityMetrics();
   toast('复核状态已保存');
+}
+
+async function applyGuardBatchReview() {
+  const keys = Array.from(guardSelectedKeys);
+  if (!keys.length) { toast('请先选择风险记录', 'err'); return; }
+  const status = document.getElementById('guard-batch-status')?.value || 'watch';
+  const note = document.getElementById('guard-batch-note')?.value.trim() || '';
+  if (status === 'confirmed' && !confirm(`将 ${keys.length} 条记录标记为确认异常。此操作不会自动封禁，是否继续？`)) return;
+
+  const button = document.getElementById('guard-batch-apply');
+  if (button) { button.disabled = true; button.textContent = '保存中…'; }
+  try {
+    const d = await apiFetch('/api/security.php', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+      body:JSON.stringify({action:'batch_review', keys, status, note}),
+    });
+    if (!d.ok) { toast(d.error || '批量保存失败', 'err'); return; }
+    const reviews = d.reviews || {};
+    (securityData.findings || []).forEach(row => { if (reviews[row.key]) row.review = reviews[row.key]; });
+    guardSelectedKeys.clear();
+    const noteInput = document.getElementById('guard-batch-note');
+    if (noteInput) noteInput.value = '';
+    refreshGuardReviewSummary();
+    renderGuardFindings();
+    renderRiskAnalysis();
+    renderSecurityMetrics();
+    toast(`已批量更新 ${Number(d.updated || keys.length)} 条风险记录`);
+  } catch (error) {
+    toast(error?.message || '批量保存失败', 'err');
+  } finally {
+    if (button) { button.textContent = '应用到所选'; button.disabled = guardSelectedKeys.size === 0; }
+  }
 }
 
 async function loadAiModule() {

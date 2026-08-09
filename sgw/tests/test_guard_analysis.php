@@ -115,4 +115,39 @@ check(guard_count_cloud_cidr_lines([
     '    default "";',
 ]) === 3, 'provider-id CIDR lines were not counted');
 
+$reviewKeyA = guard_finding_key('daily_ip_volume', '198.51.100.10', 'unit-test-secret');
+$reviewKeyB = guard_finding_key('token_multi_ip', 'TKN-UNITTEST', 'unit-test-secret');
+$reviewKeyOld = guard_finding_key('scanner', '203.0.113.9', 'unit-test-secret');
+$reviewEntries = guard_apply_review_updates([
+    $reviewKeyOld => ['status' => 'pending', 'note' => '保留', 'updated_at' => '2026-08-01 00:00:00'],
+], [$reviewKeyA, $reviewKeyB, $reviewKeyA], 'trusted', '批量确认可信', '2026-08-04 12:01:00');
+check(count($reviewEntries) === 3, 'batch review did not deduplicate keys or preserve existing entries');
+check(($reviewEntries[$reviewKeyA]['status'] ?? '') === 'trusted', 'batch review status missing');
+check(($reviewEntries[$reviewKeyB]['note'] ?? '') === '批量确认可信', 'batch review note missing');
+check(($reviewEntries[$reviewKeyOld]['note'] ?? '') === '保留', 'batch review overwrote unrelated entry');
+
+$invalidReviewRejected = false;
+try {
+    guard_apply_review_updates([], ['invalid-key'], 'watch', '', '2026-08-04 12:02:00');
+} catch (InvalidArgumentException) {
+    $invalidReviewRejected = true;
+}
+check($invalidReviewRejected, 'invalid batch review key was accepted');
+
+$nonStringReviewRejected = false;
+try {
+    guard_apply_review_updates([], [['invalid']], 'watch', '', '2026-08-04 12:02:00');
+} catch (InvalidArgumentException) {
+    $nonStringReviewRejected = true;
+}
+check($nonStringReviewRejected, 'non-string batch review key was accepted');
+
+$invalidStatusRejected = false;
+try {
+    guard_apply_review_updates([], [$reviewKeyA], 'blocked', '', '2026-08-04 12:02:00');
+} catch (InvalidArgumentException) {
+    $invalidStatusRejected = true;
+}
+check($invalidStatusRejected, 'invalid batch review status was accepted');
+
 echo "guard analysis tests passed\n";

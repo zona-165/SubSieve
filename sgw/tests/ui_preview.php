@@ -38,6 +38,26 @@ if (str_starts_with($path, '/api/')) {
         exit;
     }
     if ($path === '/api/security.php') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            $body = json_decode(file_get_contents('php://input'), true) ?: [];
+            $action = (string)($body['action'] ?? '');
+            $keys = $action === 'batch_review'
+                ? (is_array($body['keys'] ?? null) ? array_values(array_unique($body['keys'])) : [])
+                : [(string)($body['key'] ?? '')];
+            $status = (string)($body['status'] ?? 'pending');
+            $note = (string)($body['note'] ?? '');
+            $reviews = [];
+            foreach ($keys as $key) {
+                if ($key === '') continue;
+                $reviews[$key] = ['status' => $status, 'note' => $note, 'updated_at' => date('Y-m-d H:i:s')];
+            }
+            if ($action === 'batch_review') {
+                echo json_encode(['ok' => true, 'updated' => count($reviews), 'reviews' => $reviews], JSON_UNESCAPED_UNICODE);
+            } else {
+                echo json_encode(['ok' => true, 'review' => reset($reviews)], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
         $previewFindings = [];
         $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
         $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner', 'idc_provider_block'];

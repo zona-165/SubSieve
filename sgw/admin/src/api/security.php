@@ -12,6 +12,7 @@ if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
     $action = (string)($body['action'] ?? '');
     if ($action === 'review') save_guard_review($body);
+    if ($action === 'batch_review') save_guard_reviews_batch($body);
     if ($action === 'release_pull_limit') {
         $fingerprint = trim((string)($body['fingerprint'] ?? ''));
         if (!guard_release_pull_limit($fingerprint)) json_err('暂停记录不存在或已解除', 404);
@@ -386,19 +387,37 @@ function save_guard_review(array $body): void {
     $key = trim((string)($body['key'] ?? ''));
     $status = trim((string)($body['status'] ?? 'pending'));
     $note = safe_comment((string)($body['note'] ?? ''));
-    if (!preg_match('/^[a-z0-9_]+:[a-f0-9]{24}$/', $key)) json_err('风险记录标识无效');
-    if (!in_array($status, ['pending', 'watch', 'trusted', 'confirmed'], true)) json_err('复核状态无效');
-    if (strlen($note) > 200) $note = substr($note, 0, 200);
+    $reviews = guard_read_json(GUARD_REVIEW_JSON);
+    $entries = is_array($reviews['entries'] ?? null) ? $reviews['entries'] : [];
+    try {
+        $entries = guard_apply_review_updates($entries, [$key], $status, $note, date('Y-m-d H:i:s'));
+    } catch (InvalidArgumentException $error) {
+        json_err($error->getMessage());
+    }
+    if (!guard_write_json_atomic(GUARD_REVIEW_JSON, ['entries' => $entries])) json_err('保存复核状态失败');
+    json_out(['ok' => true, 'review' => $entries[$key]]);
+}
+
+function save_guard_reviews_batch(array $body): void {
+    $keys = is_array($body['keys'] ?? null) ? $body['keys'] : [];
+    $status = trim((string)($body['status'] ?? 'pending'));
+    $note = safe_comment((string)($body['note'] ?? ''));
+    try {
+        $keys = guard_normalize_review_keys($keys);
+    } catch (InvalidArgumentException $error) {
+        json_err($error->getMessage());
+    }
 
     $reviews = guard_read_json(GUARD_REVIEW_JSON);
     $entries = is_array($reviews['entries'] ?? null) ? $reviews['entries'] : [];
-    $entries[$key] = [
-        'status' => $status,
-        'note' => $note,
-        'updated_at' => date('Y-m-d H:i:s'),
-    ];
-    uasort($entries, fn(array $a, array $b) => strcmp((string)($b['updated_at'] ?? ''), (string)($a['updated_at'] ?? '')));
-    $entries = array_slice($entries, 0, 500, true);
-    if (!guard_write_json_atomic(GUARD_REVIEW_JSON, ['entries' => $entries])) json_err('保存复核状态失败');
-    json_out(['ok' => true, 'review' => $entries[$key]]);
+    try {
+        $entries = guard_apply_review_updates($entries, $keys, $status, $note, date('Y-m-d H:i:s'));
+    } catch (InvalidArgumentException $error) {
+        json_err($error->getMessage());
+    }
+    if (!guard_write_json_atomic(GUARD_REVIEW_JSON, ['entries' => $entries])) json_err('批量保存复核状态失败');
+
+    $updated = [];
+    foreach ($keys as $key) $updated[$key] = $entries[$key];
+    json_out(['ok' => true, 'updated' => count($updated), 'reviews' => $updated]);
 }
