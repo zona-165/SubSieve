@@ -10,8 +10,6 @@ services:
       - V2B_BACKEND=${V2B_BACKEND}
       - V2B_HOST=${V2B_HOST}
       - SUBSCRIBE_PATH=${SUBSCRIBE_PATH:-/api/v1/client/subscribe}
-      - TRAFFIC_REPORT_PATH=${TRAFFIC_REPORT_PATH:-/api/v1/server/UniProxy}
-      - TRAFFIC_MONITOR_ENABLED=${TRAFFIC_MONITOR_ENABLED:-1}
       - AXISNOW_TRUSTED_IPS=${AXISNOW_TRUSTED_IPS:-}
       - REAL_IP_HEADER=${REAL_IP_HEADER:-X-Forwarded-For}
     volumes:

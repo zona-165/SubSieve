@@ -5,7 +5,6 @@
 
 // 文件路径（共享 volume）— 先定义，以便读取 settings.json
 define('LOG_FILE',          '/var/log/subscribe/access.log');
-define('TRAFFIC_LOG_FILE',  '/var/log/subscribe/uniproxy.log');
 define('WHITELIST_IPS',     '/etc/nginx/subscribe/whitelist_ips.txt');
 define('WHITELIST_CONF',    '/etc/nginx/subscribe/whitelist.conf');
 define('BLACKLIST_JSON',    '/etc/nginx/subscribe/blacklist.json');
@@ -39,7 +38,6 @@ define('TOKEN_LIMIT_APPLY_CONF', '/etc/nginx/subscribe/token_limit_apply.conf');
 define('TOKEN_LIMIT_RELOAD_MARKER', '/etc/nginx/subscribe/.token_limit_reload');
 define('SETTINGS_JSON',     '/etc/nginx/subscribe/admin_settings.json');
 define('PROTECT_CONF',      '/etc/nginx/subscribe/protect.conf');
-define('TRAFFIC_PROXY_CONF','/etc/nginx/subscribe/traffic_proxy.conf');
 define('DEPLOY_INFO_FILE',  '/var/log/subscribe/DEPLOY_INFO.txt');
 
 // 读取持久化设置（覆盖环境变量）

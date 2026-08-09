@@ -69,8 +69,6 @@ mkdir -p /var/log/subscribe
 chmod 777 /var/log/subscribe
 touch /var/log/subscribe/access.log
 chmod 666 /var/log/subscribe/access.log
-touch /var/log/subscribe/uniproxy.log
-chmod 666 /var/log/subscribe/uniproxy.log
 touch /var/log/subscribe/maintenance.log
 chmod 666 /var/log/subscribe/maintenance.log
 

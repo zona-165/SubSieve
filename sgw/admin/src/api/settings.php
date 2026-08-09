@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/_auth.php';
 require_once dirname(__DIR__) . '/lib/guard.php';
-require_once dirname(__DIR__) . '/lib/traffic_monitor.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -162,25 +161,6 @@ if ($method === 'POST') {
     ];
     $pullLimitChanged = count(array_intersect($pullLimitKeys, array_keys($body))) > 0;
     $s = apply_guard_settings($s, $body);
-    $trafficKeys = array_keys(traffic_default_settings());
-    $trafficChanged = count(array_intersect($trafficKeys, array_keys($body))) > 0;
-    $s = apply_traffic_settings($s, $body);
-    if ($trafficChanged && empty($s['upstream_url'])) {
-        $parsedUpstream = parse_protect_conf();
-        if ($parsedUpstream) {
-            $s['upstream_url'] = $parsedUpstream['upstream_url'] ?? '';
-            $s['upstream_host'] = $parsedUpstream['upstream_host'] ?? '';
-            $s['subscribe_path'] = $s['subscribe_path'] ?? ($parsedUpstream['subscribe_path'] ?? '/api/v1/client/subscribe');
-        }
-    }
-    $subscribePathForCheck = rtrim((string)($s['subscribe_path'] ?? '/api/v1/client/subscribe'), '/');
-    $trafficPathForCheck = rtrim((string)($s['traffic_report_path'] ?? '/api/v1/server/UniProxy'), '/');
-    $pathsOverlap = $subscribePathForCheck === $trafficPathForCheck
-        || str_starts_with($subscribePathForCheck . '/', $trafficPathForCheck . '/')
-        || str_starts_with($trafficPathForCheck . '/', $subscribePathForCheck . '/');
-    if ($pathsOverlap) {
-        json_err('流量上报路径不能与订阅路径相同或互相包含');
-    }
     $thresholdRelationshipKeys = [
         'guard_observe_enabled',
         'guard_token_per_minute',
@@ -200,7 +180,6 @@ if ($method === 'POST') {
 
     $nginxReloaded = false;
     $protectUpdated = false;
-    $trafficProxyUpdated = false;
 
     // 若上游配置变更，重新生成 protect.conf
     if ($upstreamChanged && !empty($s['upstream_url']) && !empty($s['subscribe_path'])) {
@@ -213,20 +192,6 @@ if ($method === 'POST') {
         if ($protectUpdated) {
             $nginxReloaded = true;
         }
-    }
-
-    if (($trafficChanged || $upstreamChanged) && !empty($s['upstream_url'])) {
-        $safeTrafficPath = safe_conf_value($s['traffic_report_path'] ?? '/api/v1/server/UniProxy');
-        $safeBackend = safe_conf_value($s['upstream_url']);
-        $safeHost = safe_conf_value($s['upstream_host'] ?? (parse_url($s['upstream_url'], PHP_URL_HOST) ?: $s['upstream_url']));
-        $trafficProxyUpdated = write_traffic_proxy_conf(
-            $safeTrafficPath,
-            $safeBackend,
-            $safeHost,
-            !empty($s['traffic_monitor_enabled'])
-        );
-        if (!$trafficProxyUpdated) json_err('流量上报代理配置更新失败，旧配置已保留');
-        $nginxReloaded = true;
     }
 
     $pullLimitResult = null;
@@ -246,7 +211,6 @@ if ($method === 'POST') {
         'ok'                   => true,
         'nginx_reloaded'       => $nginxReloaded,
         'protect_updated'      => $protectUpdated,
-        'traffic_proxy_updated'=> $trafficProxyUpdated,
         'gateway_port_changed' => $gatewayPortChanged,
         'pull_limit_refreshed' => $pullLimitChanged,
         'msg'                  => $msg,
@@ -348,42 +312,6 @@ function apply_guard_settings(array $s, array $body): array {
         || array_key_exists('guard_pull_limit_enabled', $body)
         || array_key_exists('guard_pull_limit_enforce', $body)) $changed = true;
     if ($changed) invalidate_guard_cache();
-    return $s;
-}
-
-function apply_traffic_settings(array $s, array $body): array {
-    if (array_key_exists('traffic_monitor_enabled', $body)) {
-        $s['traffic_monitor_enabled'] = !empty($body['traffic_monitor_enabled']) ? 1 : 0;
-    }
-    if (array_key_exists('traffic_analysis_enabled', $body)) {
-        $s['traffic_analysis_enabled'] = !empty($body['traffic_analysis_enabled']) ? 1 : 0;
-    }
-    if (array_key_exists('traffic_report_path', $body)) {
-        $path = safe_conf_value(trim((string)$body['traffic_report_path']));
-        if ($path === '') $path = '/api/v1/server/UniProxy';
-        if (!str_starts_with($path, '/')) $path = '/' . $path;
-        if (str_contains($path, '?')) json_err('流量上报路径不能包含查询参数');
-        $s['traffic_report_path'] = rtrim($path, '/') ?: '/api/v1/server/UniProxy';
-    }
-    $ranges = [
-        'traffic_scan_lines' => [1000, 100000, 20000],
-        'traffic_user_5m_gb' => [1, 10000, 10],
-        'traffic_user_1h_gb' => [1, 50000, 50],
-        'traffic_user_24h_gb' => [1, 100000, 100],
-        'traffic_user_hour_ips' => [2, 500, 10],
-        'traffic_upload_ratio' => [2, 100, 5],
-        'traffic_upload_min_gb' => [1, 10000, 1],
-        'traffic_report_5m_requests' => [10, 10000, 120],
-        'traffic_correlation_minutes' => [1, 180, 15],
-    ];
-    foreach ($ranges as $key => [$min, $max, $default]) {
-        if (!array_key_exists($key, $body)) continue;
-        $value = is_numeric($body[$key]) ? (int)$body[$key] : $default;
-        $s[$key] = max($min, min($max, $value));
-    }
-    if (count(array_intersect(array_keys(traffic_default_settings()), array_keys($body))) > 0) {
-        invalidate_guard_cache();
-    }
     return $s;
 }
 
@@ -583,63 +511,6 @@ location ^~ $subscribePath {
 }
 NGINX;
     return subsieve_atomic_write_nginx_files([PROTECT_CONF => $conf]);
-}
-
-function write_traffic_proxy_conf(string $trafficPath, string $backend, string $host, bool $monitorEnabled): bool {
-    $accessLog = $monitorEnabled
-        ? 'access_log /var/log/subscribe/uniproxy.log uniproxy;'
-        : 'access_log off;';
-    $conf = <<<NGINX
-location ^~ $trafficPath {
-    $accessLog
-    client_max_body_size 8m;
-    client_body_buffer_size 8m;
-
-    # 服务器级 IP 黑名单只保护订阅入口，不能误伤节点流量上报。
-    allow all;
-
-    set \$upstream_backend $backend;
-    proxy_pass              \$upstream_backend;
-    proxy_set_header        Host              $host;
-    proxy_set_header        X-Real-IP         \$remote_addr;
-    proxy_set_header        X-Forwarded-For   \$proxy_add_x_forwarded_for;
-    proxy_set_header        REMOTE-HOST       \$remote_addr;
-    proxy_ssl_server_name   on;
-    proxy_ssl_name          $host;
-    proxy_http_version      1.1;
-    proxy_connect_timeout   10s;
-    proxy_send_timeout      30s;
-    proxy_read_timeout      60s;
-
-    add_header Cache-Control no-store;
-    add_header X-Traffic-Monitor "observe";
-}
-
-# V2Node must fetch this endpoint before it can use the UniProxy API. Its
-# node token is carried in the query string, so this route must not use the
-# global access log.
-location = /api/v2/server/config {
-    access_log off;
-    allow all;
-
-    set \$upstream_backend $backend;
-    proxy_pass              \$upstream_backend;
-    proxy_set_header        Host              $host;
-    proxy_set_header        X-Real-IP         \$remote_addr;
-    proxy_set_header        X-Forwarded-For   \$proxy_add_x_forwarded_for;
-    proxy_set_header        REMOTE-HOST       \$remote_addr;
-    proxy_ssl_server_name   on;
-    proxy_ssl_name          $host;
-    proxy_http_version      1.1;
-    proxy_connect_timeout   10s;
-    proxy_send_timeout      30s;
-    proxy_read_timeout      60s;
-
-    add_header Cache-Control no-store;
-    add_header X-Traffic-Monitor "passthrough";
-}
-NGINX;
-    return subsieve_atomic_write_nginx_files([TRAFFIC_PROXY_CONF => $conf]);
 }
 
 /**

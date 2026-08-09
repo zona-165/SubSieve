@@ -253,7 +253,6 @@ function ai_prepare_evidence(array $findings, array $settings, string $secret): 
             'network_type' => ai_clip((string)($row['network_type'] ?? ''), 80),
             'automatic_block' => !empty($row['automatic_block']),
             'review_status' => ai_clip((string)($row['review']['status'] ?? 'pending'), 20),
-            'trigger_details' => ai_text_map($row['trigger_details'] ?? [], 10),
         ];
         if (!empty($settings['include_ua'])) {
             $item['ua'] = ai_clip((string)($row['ua'] ?? ''), 300);
@@ -272,7 +271,7 @@ function ai_prepare_evidence(array $findings, array $settings, string $secret): 
     }
     return [
         'generated_at' => date('c'),
-        'scope' => 'SubSieve subscription and UniProxy traffic risk findings',
+        'scope' => 'SubSieve subscription gateway risk findings',
         'privacy' => [
             'raw_tokens_sent' => false,
             'source_ip_sent' => !empty($settings['include_ip']),
@@ -292,19 +291,6 @@ function ai_integer_map($value, array $allowed): array {
     if (!is_array($value)) return [];
     $result = [];
     foreach ($allowed as $key) if (isset($value[$key])) $result[$key] = max(0, (int)$value[$key]);
-    return $result;
-}
-
-function ai_text_map($value, int $limit = 10): array {
-    if (!is_array($value)) return [];
-    $result = [];
-    foreach ($value as $key => $item) {
-        if (count($result) >= max(1, $limit)) break;
-        if (!is_scalar($item) && $item !== null) continue;
-        $label = ai_clip((string)$key, 60);
-        if ($label === '') continue;
-        $result[$label] = ai_clip((string)$item, 300);
-    }
     return $result;
 }
 

@@ -8,7 +8,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [entrypoint] $*" | tee -a "$LOG"; }
 
 load_persisted_gateway_settings() {
     local settings="/etc/nginx/subscribe/admin_settings.json"
-    local backend host path traffic_path traffic_enabled derived_host loaded=0
+    local backend host path derived_host loaded=0
     [[ -s "$settings" ]] || return 0
     jq -e 'type == "object"' "$settings" >/dev/null 2>&1 || {
         log "[警告] admin_settings.json 格式无效，继续使用 .env 配置"
@@ -18,8 +18,6 @@ load_persisted_gateway_settings() {
     backend=$(jq -r 'if (.upstream_url | type) == "string" then .upstream_url else empty end' "$settings")
     host=$(jq -r 'if (.upstream_host | type) == "string" then .upstream_host else empty end' "$settings")
     path=$(jq -r 'if (.subscribe_path | type) == "string" then .subscribe_path else empty end' "$settings")
-    traffic_path=$(jq -r 'if (.traffic_report_path | type) == "string" then .traffic_report_path else empty end' "$settings")
-    traffic_enabled=$(jq -r 'if has("traffic_monitor_enabled") then (.traffic_monitor_enabled | if . == 0 or . == "0" or . == false then "0" else "1" end) else empty end' "$settings")
 
     if [[ -n "$backend" ]]; then
         derived_host="${backend#*://}"
@@ -41,18 +39,7 @@ load_persisted_gateway_settings() {
         log "[警告] 持久化 subscribe_path 不合法，继续使用 .env 配置"
     fi
 
-    if [[ -n "$traffic_path" && "$traffic_path" == /* && ! "$traffic_path" =~ [[:space:]\{\}\;\#\?] ]]; then
-        TRAFFIC_REPORT_PATH="$traffic_path"
-        loaded=1
-    elif [[ -n "$traffic_path" ]]; then
-        log "[警告] 持久化 traffic_report_path 不合法，继续使用默认配置"
-    fi
-    if [[ "$traffic_enabled" == "0" || "$traffic_enabled" == "1" ]]; then
-        TRAFFIC_MONITOR_ENABLED="$traffic_enabled"
-        loaded=1
-    fi
-
-    export V2B_BACKEND V2B_HOST SUBSCRIBE_PATH TRAFFIC_REPORT_PATH TRAFFIC_MONITOR_ENABLED
+    export V2B_BACKEND V2B_HOST SUBSCRIBE_PATH
     [[ "$loaded" -eq 1 ]] && log "已加载后台持久化网关设置：${V2B_BACKEND}${SUBSCRIBE_PATH}"
 }
 
@@ -60,8 +47,6 @@ load_persisted_gateway_settings
 
 [[ -z "${V2B_BACKEND:-}" ]] && { echo "❌ V2B_BACKEND 未设置"; exit 1; }
 [[ -z "${V2B_HOST:-}" ]]    && { echo "❌ V2B_HOST 未设置"; exit 1; }
-TRAFFIC_REPORT_PATH="${TRAFFIC_REPORT_PATH:-/api/v1/server/UniProxy}"
-TRAFFIC_MONITOR_ENABLED="${TRAFFIC_MONITOR_ENABLED:-1}"
 
 is_valid_trusted_ip() {
     local value="$1"
@@ -175,17 +160,6 @@ envsubst '${V2B_BACKEND} ${V2B_HOST} ${SUBSCRIBE_PATH}' \
     < /etc/nginx/templates-src/subscribe_protect.conf.template \
     > /etc/nginx/subscribe/protect.conf
 
-if [[ "$TRAFFIC_MONITOR_ENABLED" == "1" ]]; then
-    TRAFFIC_ACCESS_LOG='access_log /var/log/subscribe/uniproxy.log uniproxy;'
-else
-    TRAFFIC_ACCESS_LOG='access_log off;'
-fi
-export TRAFFIC_REPORT_PATH TRAFFIC_ACCESS_LOG
-log "生成 traffic_proxy.conf（路径 ${TRAFFIC_REPORT_PATH}，观察 ${TRAFFIC_MONITOR_ENABLED}）..."
-envsubst '${V2B_BACKEND} ${V2B_HOST} ${TRAFFIC_REPORT_PATH} ${TRAFFIC_ACCESS_LOG}' \
-    < /etc/nginx/templates-src/uniproxy_proxy.conf.template \
-    > /etc/nginx/subscribe/traffic_proxy.conf
-
 write_real_ip_conf
 
 cp /etc/nginx/templates-src/nginx.conf /etc/nginx/nginx.conf
@@ -271,9 +245,6 @@ chmod 666 \
     /etc/nginx/subscribe/token_limit_rate.conf \
     /etc/nginx/subscribe/token_limit_apply.conf \
     /etc/nginx/subscribe/token_limit_state.json
-
-touch /var/log/subscribe/uniproxy.log
-chmod 666 /var/log/subscribe/uniproxy.log
 
 # 初始化云厂商策略文件。具体默认值由更新脚本根据目录生成。
 [[ ! -f /etc/nginx/subscribe/cloud_provider_settings.json ]] && echo '{"version":1,"enabled":{}}' > /etc/nginx/subscribe/cloud_provider_settings.json
