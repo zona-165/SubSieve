@@ -314,8 +314,12 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .security-section-sub{color:var(--text3);font-size:11px;margin-top:3px}
 .mechanism-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .mechanism-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;padding:11px;border:1px solid var(--border);border-radius:9px;background:rgba(100,116,139,.045)}
-.mechanism-config{align-self:center;border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:800;cursor:pointer;padding:5px 2px}
-.mechanism-config:hover{text-decoration:underline}
+.mechanism-item.configurable{cursor:pointer;transition:border-color var(--motion-fast),background var(--motion-fast),transform var(--motion-fast)}
+.mechanism-item.configurable:hover,.mechanism-item.configurable:focus-visible{border-color:rgba(13,148,136,.34);background:rgba(13,148,136,.055);transform:translateY(-1px);outline:none}
+.mechanism-config{align-self:center;color:var(--accent);font-size:11px;font-weight:800;padding:5px 2px}
+.mechanism-item.configurable:hover .mechanism-config,.mechanism-item.configurable:focus-visible .mechanism-config{text-decoration:underline}
+.quick-config-target{animation:quickConfigTarget 1.65s ease both}
+@keyframes quickConfigTarget{0%,100%{box-shadow:0 0 0 0 rgba(13,148,136,0)}22%{box-shadow:0 0 0 4px rgba(13,148,136,.2)}55%{box-shadow:0 0 0 2px rgba(13,148,136,.1)}}
 .mechanism-dot{width:9px;height:9px;margin-top:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.10)}
 .mechanism-dot.warn{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.10)}
 .mechanism-dot.error{background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.10)}
@@ -4031,17 +4035,68 @@ async function releasePullLimit(fingerprint) {
 
 function renderSecurityMechanisms() {
   const rows = securityData.mechanisms || [];
-  document.getElementById('security-mechanisms').innerHTML = rows.length ? rows.map(row => `
-    <div class="mechanism-item">
+  document.getElementById('security-mechanisms').innerHTML = rows.length ? rows.map(row => {
+    const target = MECHANISM_CONFIG_TARGETS[row.key];
+    const openAction = target ? `openMechanismConfig(${jsArg(row.key)})` : '';
+    return `
+    <div class="mechanism-item ${target ? 'configurable' : ''}" ${target ? `role="button" tabindex="0" onclick="${openAction}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${openAction}}"` : ''}>
       <span class="mechanism-dot ${esc(row.state || '')}"></span>
       <div><div class="mechanism-title">${esc(row.title || '-')}</div><div class="mechanism-detail">${esc(row.detail || '-')}</div></div>
-      ${row.key === 'pull_limit' ? '<button class="mechanism-config" onclick="openProtectionRuleSettings()">配置</button>' : ''}
-    </div>`).join('') : '<div class="security-empty">暂无机制状态</div>';
+      ${target ? `<span class="mechanism-config">${esc(target.label || '配置')}</span>` : ''}
+    </div>`;
+  }).join('') : '<div class="security-empty">暂无机制状态</div>';
+}
+
+const MECHANISM_CONFIG_TARGETS = {
+  gateway:      {tab:'settings', cardTitle:'机场（反代目标）', label:'配置'},
+  rate_limit:   {tab:'protection', selector:'#pull-limit-section', label:'配置'},
+  cloud:        {access:'blacklist', selector:'[data-access-pane="blacklist"] .idc-section', label:'配置'},
+  ip_policy:    {access:'whitelist', selector:'[data-access-pane="whitelist"] .card', label:'管理'},
+  ua_policy:    {access:'ua_blacklist', selector:'[data-access-pane="ua_blacklist"]', label:'管理'},
+  token_policy: {access:'token_blacklist', selector:'[data-access-pane="token_blacklist"]', label:'管理'},
+  pull_limit:   {tab:'protection', selector:'#pull-limit-section', label:'配置'},
+  observation:  {tab:'protection', selector:'#guard-threshold-section', label:'配置'},
+  stats_cache:  {tab:'settings', cardTitle:'分析统计缓存', label:'查看'},
+  intel:        {tab:'logs', selector:'#panel-logs .log-status-summary', label:'查看'},
+  retention:    {tab:'security', selector:'#security-health-section', label:'查看'},
+  alerts:       {tab:'settings', cardTitle:'告警推送', label:'配置'},
+  ai_review:    {tab:'settings', cardTitle:'AI 风险研判', label:'配置'},
+};
+
+function findSettingsCard(title) {
+  return Array.from(document.querySelectorAll('#panel-settings .card')).find(card => card.querySelector('.card-title')?.textContent.trim() === title) || null;
+}
+
+function focusQuickConfigTarget(element) {
+  if (!element) return false;
+  element.classList.remove('quick-config-target');
+  void element.offsetWidth;
+  element.classList.add('quick-config-target');
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  element.scrollIntoView({behavior, block:'start'});
+  window.setTimeout(() => element.classList.remove('quick-config-target'), 1800);
+  return true;
+}
+
+async function openMechanismConfig(key) {
+  const target = MECHANISM_CONFIG_TARGETS[key];
+  if (!target) return;
+  const tab = target.access ? 'access' : target.tab;
+  if (target.access) {
+    activeAccessSection = target.access;
+    openPanelTab(target.access);
+  } else {
+    openPanelTab(tab);
+  }
+  await loadTab(tab).catch(() => {});
+  if (target.access) showAccessSection(target.access);
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const element = target.cardTitle ? findSettingsCard(target.cardTitle) : document.querySelector(target.selector);
+  if (!focusQuickConfigTarget(element)) toast('对应区域尚未加载，请稍后重试', 'err');
 }
 
 function openProtectionRuleSettings() {
-  openPanelTab('protection');
-  requestAnimationFrame(() => document.getElementById('pull-limit-section')?.scrollIntoView({behavior:'smooth', block:'start'}));
+  openMechanismConfig('pull_limit');
 }
 
 function renderSecurityHealth() {
