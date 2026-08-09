@@ -172,6 +172,9 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;d
 .mode-btn.danger:hover{background:rgba(239,68,68,.15)}
 .mode-btn.import-btn{border-color:rgba(99,102,241,.3);color:var(--accent)}
 .mode-btn.import-btn:hover{background:rgba(99,102,241,.15)}
+button{touch-action:manipulation}
+button.button-responding:not(:disabled){pointer-events:none;filter:brightness(.94) saturate(.92);transform:translateY(1px) scale(.985)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+@media(prefers-reduced-motion:reduce){button.button-responding:not(:disabled){transform:none!important}}
 .radio-group{display:flex;align-items:center;gap:14px;margin-left:auto}
 .radio-group label{display:flex;align-items:center;gap:5px;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap}
 .radio-group input[type=radio]{accent-color:var(--accent)}
@@ -360,7 +363,14 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .ai-advisory{margin-top:10px;color:var(--text3);font-size:10px}
 .ai-secret-status{display:inline-flex;align-items:center;gap:6px;color:var(--text3);font-size:11px}
 .ai-secret-status::before{content:"";width:7px;height:7px;border-radius:50%;background:#94a3b8}.ai-secret-status.ready::before{background:#22c55e}
-.review-select{min-width:112px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:6px 8px;border-radius:8px;font-size:11px;outline:none}
+.review-choice-group{display:flex;align-items:center;gap:3px;flex:0 0 auto;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--bg2)}
+.review-choice-btn{min-height:30px;padding:6px 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text3);font:760 10px/1 system-ui;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,color .15s,transform .15s}
+.review-choice-btn:hover{border-color:var(--border2);background:var(--bg3);color:var(--text)}
+.review-choice-btn.active{border-color:color-mix(in srgb,var(--choice-color) 34%,var(--border));background:color-mix(in srgb,var(--choice-color) 12%,var(--bg3));color:var(--choice-color);font-weight:850}
+.review-choice-btn[data-status="pending"]{--choice-color:#64748b}
+.review-choice-btn[data-status="watch"]{--choice-color:#d97706}
+.review-choice-btn[data-status="trusted"]{--choice-color:#059669}
+.review-choice-btn[data-status="confirmed"]{--choice-color:#e11d48}
 .rule-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
 .rule-field label{display:block;color:var(--text2);font-size:11px;margin-bottom:5px}
 .rule-field .ip-input{width:100%;min-width:0}
@@ -624,7 +634,9 @@ tbody tr:nth-child(n+6),.top-row:nth-child(n+6),.scanner-report:nth-child(n+6),.
   .mechanism-grid{grid-template-columns:1fr}
   .rule-grid{grid-template-columns:1fr 1fr;gap:8px}
   .risk-head{align-items:flex-start}
-  .risk-actions .mode-btn,.risk-actions .review-select{flex:1 1 calc(50% - 7px);min-height:34px}
+  .risk-actions .mode-btn{flex:1 1 calc(50% - 7px);min-height:34px}
+  .risk-actions .review-choice-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;flex:1 1 100%}
+  .risk-actions .review-choice-btn{width:100%;min-height:34px}
   .ai-analysis-grid{grid-template-columns:1fr}
   .ai-analysis-head{flex-direction:column}.ai-analysis-meta{text-align:left}
   .health-row,.action-row{grid-template-columns:90px minmax(0,1fr);gap:8px}
@@ -4311,9 +4323,9 @@ function renderGuardFindings() {
         ${intel.length ? `<div class="risk-intel">${intel.map(item => `<span>${esc(item)}</span>`).join('')}</div>` : ''}
         ${triggerDetail}
         <div class="risk-actions">
-          <select class="review-select" id="guard-review-${index}">${guardReviewOptions(review.status)}</select>
+          ${guardReviewChoices(review.status, index)}
           <input class="comment-input" id="guard-note-${index}" value="${esc(review.note || '')}" placeholder="复核备注（可选）" style="min-width:160px;padding:7px 9px;font-size:11px">
-          <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index})">保存判断</button>
+          <button class="mode-btn" onclick="saveGuardReview(${jsArg(row.key)},${index},this)">保存判断</button>
           <button class="mode-btn ai-run-btn" onclick="runAiAnalysis(${jsArg(row.key)})">AI 研判</button>
           ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
           ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
@@ -4324,9 +4336,25 @@ function renderGuardFindings() {
   renderGuardBatchToolbar();
 }
 
-function guardReviewOptions(selected) {
+function guardReviewChoices(selected, index) {
   const options = {pending:'待复核', watch:'持续观察', trusted:'判定可信', confirmed:'确认异常'};
-  return Object.entries(options).map(([value,label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+  const current = Object.hasOwn(options, selected) ? selected : 'pending';
+  return `<div class="review-choice-group" role="group" aria-label="复核状态">
+    <input type="hidden" id="guard-review-${index}" value="${current}">
+    ${Object.entries(options).map(([value,label]) => `<button type="button" class="review-choice-btn ${current === value ? 'active' : ''}" data-status="${value}" aria-pressed="${current === value ? 'true' : 'false'}" onclick="setGuardReviewStatus(${index},'${value}',this)">${label}</button>`).join('')}
+  </div>`;
+}
+
+function setGuardReviewStatus(index, status, button) {
+  const input = document.getElementById('guard-review-' + index);
+  if (!input || !['pending','watch','trusted','confirmed'].includes(status)) return;
+  input.value = status;
+  const group = button.closest('.review-choice-group');
+  group?.querySelectorAll('.review-choice-btn').forEach(item => {
+    const active = item.dataset.status === status;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
 }
 
 function refreshGuardReviewSummary() {
@@ -4338,22 +4366,28 @@ function refreshGuardReviewSummary() {
   securityData.review_summary = summary;
 }
 
-async function saveGuardReview(key, index) {
+async function saveGuardReview(key, index, button=null) {
   const status = document.getElementById('guard-review-' + index)?.value || 'pending';
   const note = document.getElementById('guard-note-' + index)?.value.trim() || '';
-  const d = await apiFetch('/api/security.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-    body:JSON.stringify({action:'review', key, status, note}),
-  });
-  if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
-  const row = (securityData.findings || []).find(item => item.key === key);
-  if (row) row.review = d.review;
-  refreshGuardReviewSummary();
-  renderGuardFindings();
-  renderRiskAnalysis();
-  renderSecurityMetrics();
-  toast('复核状态已保存');
+  const oldText = button?.textContent || '保存判断';
+  if (button) { button.disabled = true; button.textContent = '保存中…'; }
+  try {
+    const d = await apiFetch('/api/security.php', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+      body:JSON.stringify({action:'review', key, status, note}),
+    });
+    if (!d.ok) { toast(d.error || '保存失败', 'err'); return; }
+    const row = (securityData.findings || []).find(item => item.key === key);
+    if (row) row.review = d.review;
+    refreshGuardReviewSummary();
+    renderGuardFindings();
+    renderRiskAnalysis();
+    renderSecurityMetrics();
+    toast('复核状态已保存');
+  } finally {
+    if (button?.isConnected) { button.disabled = false; button.textContent = oldText; }
+  }
 }
 
 async function applyGuardBatchReview() {
@@ -4666,7 +4700,28 @@ async function importLogs(input) {
 }
 
 // ── 初始化 ────────────────────────────────────────────────────
+function installButtonClickFeedback() {
+  if (document.documentElement.dataset.buttonFeedbackReady === '1') return;
+  document.documentElement.dataset.buttonFeedbackReady = '1';
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('button');
+    if (!button || button.disabled) return;
+    const now = Date.now();
+    const unlockAt = Number(button.dataset.clickUnlockAt || 0);
+    if (now < unlockAt) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    const lockMs = Math.max(300, Math.min(1200, Number(button.dataset.clickLock || 520)));
+    button.dataset.clickUnlockAt = String(now + lockMs);
+    button.classList.add('button-responding');
+    window.setTimeout(() => button.classList.remove('button-responding'), lockMs);
+  }, true);
+}
+
 async function initDashboard() {
+  installButtonClickFeedback();
   mountWorkspaceLayout();
   resetCountdown();
   await loadTab('security', {force:true}).catch(() => {});
