@@ -774,11 +774,28 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 #panel-logs .log-controls .radio-group{grid-column:1/4;margin-left:0}
 .log-page-size{grid-column:4/6;display:flex;gap:4px;justify-self:end}
 #panel-logs .log-table-wrap{padding:0;overflow:auto}
-#panel-logs .log-table-wrap table{width:100%;min-width:1280px}
-#panel-logs .log-table-wrap th,#panel-logs .log-table-wrap td{padding:10px 9px;vertical-align:middle}
+#panel-logs .log-table-wrap table{width:100%;min-width:1120px;table-layout:fixed}
+#panel-logs .log-table-wrap th,#panel-logs .log-table-wrap td{padding:11px 9px;vertical-align:top}
 #panel-logs .log-table-wrap th{position:sticky;top:0;z-index:2;background:var(--bg2);font-size:10px;letter-spacing:0}
-#panel-logs .log-table-wrap td{font-size:11px}
+#panel-logs .log-table-wrap td{font-size:11px;line-height:1.45}
 #panel-logs .copy-btn{width:24px;height:24px;display:inline-grid;place-items:center;padding:0;font-size:13px;line-height:1}
+.log-time-status{display:grid;gap:7px;align-content:start}
+.log-time-status .badge{justify-self:start}
+.log-time-value{color:var(--text3);font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.log-source-main{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0}
+.log-source-main>code{max-width:100%;overflow:hidden;color:var(--text);font:760 11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;text-overflow:ellipsis;white-space:nowrap}
+.log-request-stack{display:grid;gap:7px;min-width:0}
+.log-field-row{display:grid;grid-template-columns:34px minmax(0,1fr) 24px;gap:5px;align-items:center;min-width:0}
+.log-field-label{color:var(--text3);font-size:9px;font-weight:820}
+.log-field-value{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-token-value{color:#818cf8;font:10px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+.log-request-value{color:var(--text2);font-size:10px}
+#panel-logs .log-ua-source .ua-cell-wrap{width:100%;max-width:none;align-items:flex-start}
+#panel-logs .log-ua-source .ua-cell{display:-webkit-box;max-width:none;white-space:normal;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere;line-height:1.45}
+#panel-logs .log-ip-count{display:grid;min-width:0;gap:3px;white-space:normal}
+#panel-logs .log-intel-cell{min-width:0;max-width:none}
+#panel-logs .log-intel-primary,#panel-logs .log-intel-detail{align-items:flex-start}
+#panel-logs .log-intel-meta{white-space:normal;overflow-wrap:anywhere}
 
 @media (max-width: 1120px){
   .protection-stack>#guard-threshold-section .rule-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -855,6 +872,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   #panel-logs .log-page-size .mode-btn{min-width:0;padding:7px 4px}
   #panel-logs .log-table-wrap{max-width:100%;overflow:visible;border:0;background:transparent}
   #panel-logs .log-table-wrap table{display:block;width:100%;min-width:0}
+  #panel-logs .log-table-wrap colgroup{display:none}
   #panel-logs .log-table-wrap thead{display:none}
   #panel-logs .log-table-wrap tbody{display:grid;gap:10px}
   #panel-logs .log-table-wrap tbody tr{display:grid;width:100%;grid-template-columns:minmax(0,1fr);padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);box-shadow:0 6px 16px rgba(0,0,0,.045)}
@@ -864,20 +882,20 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   #panel-logs .log-table-wrap tbody td[colspan]{display:block;grid-column:1/-1;padding:22px 8px;text-align:center;border-bottom:0}
   #panel-logs .log-table-wrap tbody td[colspan]::before{display:none}
   #panel-logs .log-table-wrap .log-ip-source{order:1}
-  #panel-logs .log-table-wrap .log-status-cell{order:2}
+  #panel-logs .log-table-wrap .log-time-status-cell{order:2}
   #panel-logs .log-table-wrap .log-count-cell{order:3}
   #panel-logs .log-table-wrap .log-intel-cell{order:4}
-  #panel-logs .log-table-wrap .log-token-cell{order:5}
-  #panel-logs .log-table-wrap .log-request-cell{order:6}
-  #panel-logs .log-table-wrap .log-ua-source{order:7}
-  #panel-logs .log-table-wrap .log-time-cell{order:8}
-  #panel-logs .log-table-wrap .comment-cell,#panel-logs .log-table-wrap .log-muted-cell{order:9;max-width:none!important;white-space:normal!important}
+  #panel-logs .log-table-wrap .log-request-context{order:5}
+  #panel-logs .log-table-wrap .log-ua-source{order:6}
+  #panel-logs .log-table-wrap .comment-cell,#panel-logs .log-table-wrap .log-muted-cell{order:7;max-width:none!important;white-space:normal!important}
   #panel-logs .log-table-wrap .ip-cell>div{display:flex!important;flex-wrap:wrap!important;gap:6px!important}
   #panel-logs .log-table-wrap .log-ip-count{min-width:0;flex-wrap:wrap}
-  #panel-logs .log-table-wrap .log-token-cell>div{display:grid!important;width:100%;grid-template-columns:minmax(0,1fr) auto;gap:6px!important}
-  #panel-logs .log-table-wrap .log-token-cell span{overflow-wrap:anywhere}
-  #panel-logs .log-table-wrap .req-cell-wrap,#panel-logs .log-table-wrap .ua-cell-wrap{width:100%;max-width:none;align-items:flex-start}
-  #panel-logs .log-table-wrap .req-cell,#panel-logs .log-table-wrap .ua-cell{display:block;max-width:none;white-space:normal;overflow-wrap:anywhere;line-height:1.55}
+  #panel-logs .log-table-wrap .log-time-status{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  #panel-logs .log-table-wrap .log-request-stack{width:100%}
+  #panel-logs .log-table-wrap .log-field-row{grid-template-columns:40px minmax(0,1fr) 28px;gap:7px}
+  #panel-logs .log-table-wrap .log-field-value{white-space:normal;overflow-wrap:anywhere}
+  #panel-logs .log-table-wrap .ua-cell-wrap{width:100%;max-width:none;align-items:flex-start}
+  #panel-logs .log-table-wrap .ua-cell{display:block;max-width:none;white-space:normal;overflow-wrap:anywhere;line-height:1.55}
   #panel-logs .page-controls{justify-content:space-between;padding:8px 2px}
   #panel-logs #page-info{order:-1;width:100%}
 
@@ -1116,13 +1134,15 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
         </div>
         <div class="log-table-wrap">
           <table>
+            <colgroup>
+              <col style="width:10%"><col style="width:15%"><col style="width:7%"><col style="width:10%"><col style="width:22%"><col style="width:22%"><col style="width:14%">
+            </colgroup>
             <thead>
               <tr>
-                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th title="当前筛选范围内：总次数与成功 / 403 / 429 / 444 分布">该 IP 计数</th><th>IP 情报</th><th>Token</th>
-                <th>请求</th><th>UA</th>
+                <th>时间 / 状态</th><th>来源 IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注</th><th title="当前筛选范围内：总次数与成功 / 403 / 429 / 444 分布">本页统计</th><th>IP 情报</th><th>订阅请求</th><th>客户端</th>
               </tr>
             </thead>
-            <tbody id="log-tbody"><tr><td colspan="9" class="loading">加载中…</td></tr></tbody>
+            <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
           </table>
         </div>
         <!-- 分页控件（瀑布流模式下隐藏） -->
@@ -1922,7 +1942,7 @@ function isCloudIp(ip) {
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
-  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="9" class="loading">加载中…</td></tr>';
+  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
   document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">统计加载中…</span></div>';
   const [logsData, blData, cloudData, wlData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
@@ -1936,7 +1956,7 @@ async function loadLogs() {
   wlCommentMap = {}; (wlData.entries || []).forEach(e => wlCommentMap[e.ip] = e.comment || '');
   blCommentMap = {}; (blData.entries || []).forEach(e => blCommentMap[e.ip] = e.comment || '');
   if (!logsData.ok) {
-    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="9" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
+    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
     document.getElementById('log-status-summary').innerHTML = '<div class="log-status-heading"><span class="log-status-title">当前筛选</span><span class="log-status-caption">暂时无法统计</span></div>';
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
   }
@@ -1996,7 +2016,7 @@ function renderLogs() {
 
     if (!displayRows.length) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="9" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
       return;
     }
     renderLogRows(displayRows, ipStatusStats);
@@ -2006,7 +2026,7 @@ function renderLogs() {
     document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
     if (!total) {
       document.getElementById('log-tbody').innerHTML =
-        '<tr><td colspan="9" class="empty">暂无匹配记录</td></tr>';
+        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
       return;
     }
     renderLogRows(rows, ipStatusStats);
@@ -2205,9 +2225,10 @@ function renderLogRows(rows, ipStatusStats) {
         : isCloud
           ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
           : `<button class="add-btn-sm" onclick="quickBlacklist(${jsArg(l.ip)})">封</button><button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickAddWhitelistFromLog(${jsArg(l.ip)})">白</button>`;
-    const tokenHtml = l.token
-      ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" title="复制 Token" aria-label="复制 Token" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">⧉</button></div>`
-      : '—';
+    const tokenRow = l.token
+      ? `<div class="log-field-row"><span class="log-field-label">Token</span><span class="log-field-value log-token-value" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" title="复制 Token" aria-label="复制 Token" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">⧉</button></div>`
+      : '<div class="log-field-row"><span class="log-field-label">Token</span><span class="log-field-value log-token-value">—</span><span></span></div>';
+    const requestRow = `<div class="log-field-row"><span class="log-field-label">路径</span><span class="log-field-value log-request-value" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" title="复制请求" aria-label="复制请求" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">⧉</button></div>`;
     const ipStats = ipStatusStats.get(l.ip) || {total:0,s200:0,s403:0,s429:0,s444:0};
     // 备注列：从白名单/黑名单备注映射获取，支持行内编辑
     const commentCell = isWhitelisted
@@ -2217,14 +2238,12 @@ function renderLogRows(rows, ipStatusStats) {
         : `<td class="log-muted-cell" data-label="备注" style="color:#475569;opacity:.55;font-size:11px">—</td>`;
     return `
     <tr>
-      <td class="log-time-cell" data-label="时间" style="white-space:nowrap;color:#64748b;font-size:11px">${esc(l.time)}</td>
-      <td class="ip-cell log-ip-source" data-label="来源 IP"><div style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap"><span>${esc(l.ip)}</span><button class="copy-btn" title="复制 IP" aria-label="复制 IP" data-val="${esc(l.ip)}" onclick="copyText(this.dataset.val)">⧉</button><span style="display:inline-block;width:2px"></span>${ipBtn}</div></td>
+      <td class="log-time-status-cell" data-label="时间 / 状态"><div class="log-time-status"><span class="log-time-value">${esc(l.time)}</span>${statusBadge(l.status)}</div></td>
+      <td class="ip-cell log-ip-source" data-label="来源 IP"><div class="log-source-main"><code>${esc(l.ip)}</code><button class="copy-btn" title="复制 IP" aria-label="复制 IP" data-val="${esc(l.ip)}" onclick="copyText(this.dataset.val)">⧉</button>${ipBtn}</div></td>
       ${commentCell}
-      <td class="log-status-cell" data-label="状态">${statusBadge(l.status)}</td>
       <td class="log-count-cell" data-label="请求统计"><div class="log-ip-count"><strong>${ipStats.total}次</strong><span class="log-ip-breakdown" title="成功 / 拦截403 / 限速429 / 断连444"><span class="s200">${ipStats.s200}</span>/<span class="s403">${ipStats.s403}</span>/<span class="s429">${ipStats.s429}</span>/<span class="s444">${ipStats.s444}</span></span></div></td>
       <td class="log-intel-cell" data-label="IP 情报" data-intel-ip="${esc(l.ip)}">${renderLogIpIntel(l.ip)}</td>
-      <td class="log-token-cell" data-label="Token" style="min-width:100px;max-width:200px">${tokenHtml}</td>
-      <td class="log-request-cell" data-label="请求"><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" title="复制请求" aria-label="复制请求" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">⧉</button></div></td>
+      <td class="log-request-context" data-label="订阅请求"><div class="log-request-stack">${tokenRow}${requestRow}</div></td>
       <td class="log-ua-source" data-label="客户端"><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" title="复制 UA" aria-label="复制 UA" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">⧉</button>` : ''}</div></td>
     </tr>`;
   }).join('');
