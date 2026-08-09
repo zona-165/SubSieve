@@ -46,10 +46,20 @@ ui_check(str_contains($source, 'id="traffic-monitor-section"'), 'traffic monitor
 ui_check(str_contains($source, 'id="cfg-traffic-report-path"'), 'custom UniProxy path is missing from gateway settings');
 ui_check(str_contains($source, 'id="cfg-traffic-monitor-enabled"'), 'traffic capture switch is missing');
 ui_check(str_contains($source, 'id="cfg-traffic-analysis-enabled"'), 'traffic analysis switch is missing');
+ui_check(str_contains($source, 'id="cfg-node-api-host"'), 'node ApiHost field is missing');
+ui_check(str_contains($source, '节点 ApiHost（配置到节点）'), 'node ApiHost guidance is missing');
+ui_check(str_contains($source, 'id="traffic-ingress-status"'), 'traffic ingress status is missing');
+ui_check(str_contains($source, 'async function refreshTrafficIngressStatus'), 'traffic ingress refresh action is missing');
+ui_check(str_contains($source, "mountWorkspaceLayout();\n  renderTrafficIngressStatus();"), 'node ApiHost is not rendered before background APIs finish');
+ui_check(str_contains($source, 'function gatewayApiHost()'), 'gateway ApiHost calculation is missing');
+ui_check(str_contains($source, 'location.hostname'), 'node ApiHost does not use the current gateway hostname');
+ui_check(str_contains($source, "const protocol = 'https:'"), 'node ApiHost is not pinned to the TLS gateway');
+ui_check(str_contains($source, 'V1 UniProxy + V2 config'), 'V2Node route compatibility is not explained');
 ui_check(str_contains($source, '记录 push / alive 数据用于统计'), 'traffic capture switch purpose is unclear');
 ui_check(str_contains($source, '生成流量风险事件'), 'traffic analysis switch purpose is unclear');
 ui_check(!str_contains($source, 'id="traffic-monitor-enabled"'), 'duplicate traffic switch still exists in protection settings');
 ui_check(str_contains($source, '流量异常只进入人工复核，不会自动封禁'), 'traffic evidence boundary is missing');
 ui_check(str_contains($source, '.traffic-monitor-summary{grid-template-columns:minmax(0,1fr)}'), 'narrow mobile traffic summary layout is missing');
+ui_check(str_contains($source, '.traffic-api-row{grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr))}'), 'mobile node ApiHost controls are not stacked');
 
 echo "dashboard UI contract tests passed\n";

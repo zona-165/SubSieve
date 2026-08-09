@@ -44,8 +44,10 @@ $clientIp = '198.51.100.81';
 $lines = [
     traffic_test_line('push', $now - 60, '192.0.2.10', [$rawUserId => [2 * $gib, 5 * $gib]]),
     traffic_test_line('push', $now - 30, '192.0.2.10', [$rawUserId => [1 * $gib, 5 * $gib]]),
-    traffic_test_line('alive', $now - 20, '192.0.2.10', [$rawUserId => [$clientIp, '203.0.113.22']]),
+    traffic_test_line('alive', $now - 20, '192.0.2.10', [$rawUserId => [$clientIp . '_node-7', '203.0.113.22']]),
     traffic_test_line('push', $now - 10, '192.0.2.11', '{invalid-json'),
+    traffic_test_line('user', $now - 5, '192.0.2.10', ''),
+    traffic_test_line('alivelist', $now - 4, '192.0.2.10', ''),
 ];
 $subscriptionLines = [traffic_subscribe_line($clientIp, $now - 15, $rawToken)];
 $settings = array_merge(traffic_default_settings(), [
@@ -54,10 +56,16 @@ $settings = array_merge(traffic_default_settings(), [
 ]);
 
 $result = traffic_analyze_logs($lines, $subscriptionLines, $settings, $now, '/go/test/', $secret);
+$parsedAlive = traffic_parse_log_line($lines[2], '/api/v1/server/UniProxy', $secret);
+$userFingerprint = traffic_user_fingerprint($rawUserId, $secret);
 traffic_check(($result['summary']['observed_reports'] ?? 0) === 4, 'report count mismatch');
 traffic_check(($result['summary']['push_reports'] ?? 0) === 3, 'push report count mismatch');
 traffic_check(($result['summary']['alive_reports'] ?? 0) === 1, 'alive report count mismatch');
 traffic_check(($result['summary']['users_24h'] ?? 0) === 1, 'user fingerprint count mismatch');
+traffic_check(
+    in_array($clientIp, $parsedAlive['users'][$userFingerprint]['ips'] ?? [], true),
+    'alive IP with node suffix was not normalized'
+);
 traffic_check(($result['summary']['parse_errors'] ?? 0) === 1, 'invalid JSON was not counted');
 traffic_check(($result['summary']['correlated_findings'] ?? 0) === 1, 'subscription correlation was not detected');
 traffic_check(count($result['findings']) === 1, 'expected one user traffic finding');
@@ -124,6 +132,11 @@ traffic_check(str_contains($nginx, 'log_format  uniproxy  escape=json'), 'JSON t
 traffic_check(str_contains($nginx, '"uri":"$uri"'), 'traffic log does not use query-safe URI');
 traffic_check(!str_contains($nginx, '"uri":"$request_uri"'), 'traffic log records query strings');
 traffic_check(str_contains($proxyTemplate, 'proxy_pass'), 'UniProxy transparent proxy missing');
+traffic_check(str_contains($proxyTemplate, 'location = /api/v2/server/config'), 'V2Node config proxy missing');
+traffic_check(
+    preg_match('#location = /api/v2/server/config\s*\{[^}]*access_log off;#s', $proxyTemplate) === 1,
+    'V2Node config route may leak query credentials to the access log'
+);
 traffic_check(!str_contains($proxyTemplate, 'return 403') && !str_contains($proxyTemplate, 'limit_req'), 'subscription blocking leaked into traffic proxy');
 traffic_check(str_contains($proxyTemplate, 'allow all;'), 'server-level IP blacklist can block traffic reports');
 traffic_check(str_contains($proxyTemplate, 'client_body_buffer_size 8m;'), 'large JSON reports may not be available to the analyzer');

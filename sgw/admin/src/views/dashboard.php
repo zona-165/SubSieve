@@ -770,6 +770,17 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .traffic-monitor-switch{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 12px;padding:11px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg2)}
 .traffic-monitor-switch strong{display:block;color:var(--text);font-size:12px}
 .traffic-monitor-switch small{display:block;margin-top:3px;color:var(--text3);font-size:10px;line-height:1.5}
+.traffic-ingress{display:grid;gap:9px;padding-top:12px;border-top:1px solid var(--border)}
+.traffic-ingress-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.traffic-ingress-title{color:var(--text);font-size:12px;font-weight:820}
+.traffic-ingress-status{color:var(--text3);font-size:10px;font-weight:800}
+.traffic-ingress-status.ready{color:#16a34a}
+.traffic-ingress-status.warning{color:#d97706}
+.traffic-ingress-status.paused{color:var(--text3)}
+.traffic-api-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center}
+.traffic-api-row input{width:100%;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.traffic-ingress-note{color:var(--text3);font-size:10px;line-height:1.6}
+.traffic-ingress-note code{color:var(--text2);font-size:10px}
 
 .workspace-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
 .workspace-intro h1{font-size:22px;line-height:1.2;font-weight:850}
@@ -899,6 +910,9 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .review-page-actions{width:100%}
   .review-page-actions .mode-btn{flex:1}
   .traffic-monitor-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .traffic-api-row{grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr))}
+  .traffic-api-row input{grid-column:1/-1}
+  .traffic-api-row .mode-btn{width:100%;min-height:34px}
 
   #panel-logs>.card{padding:10px;background:transparent;border:0;box-shadow:none}
   #panel-logs .log-mode-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
@@ -1421,7 +1435,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
           <div style="display:flex;flex-direction:column;gap:12px">
             <div style="display:flex;gap:8px;align-items:flex-end;overflow:hidden">
               <div style="flex:1;min-width:0">
-                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址</label>
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场真实上游（反代目标）</label>
                 <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSgUrlClean) ?>" style="width:100%;box-sizing:border-box">
               </div>
               <div style="flex:0 0 80px;min-width:0">
@@ -1436,6 +1450,21 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">UniProxy 流量上报路径</label>
               <input class="ip-input" id="cfg-traffic-report-path" placeholder="/api/v1/server/UniProxy" value="<?= _val($_preSg['traffic_report_path'] ?? '/api/v1/server/UniProxy') ?>" style="width:100%">
+            </div>
+            <div class="traffic-ingress">
+              <div class="traffic-ingress-head">
+                <span class="traffic-ingress-title">节点接入</span>
+                <span class="traffic-ingress-status" id="traffic-ingress-status">检查中</span>
+              </div>
+              <label style="display:block;color:var(--text2);font-size:12px">节点 ApiHost（配置到节点）</label>
+              <div class="traffic-api-row">
+                <input class="ip-input" id="cfg-node-api-host" value="" readonly aria-label="节点 ApiHost">
+                <button class="mode-btn" type="button" onclick="copyText(document.getElementById('cfg-node-api-host').value)">复制</button>
+                <button class="mode-btn" type="button" onclick="refreshTrafficIngressStatus()">检查接入</button>
+              </div>
+              <div class="traffic-ingress-note">
+                V2Board 的 <code>server_api_url</code> 与现有 V2Node 的 <code>ApiHost</code> 应填写此地址；上方仍填写机场真实地址。网关透明代理 <code>V1 UniProxy + V2 config</code>，不会记录 V2 配置请求中的节点 Token。
+              </div>
             </div>
             <label class="traffic-monitor-switch" style="margin:0">
               <span><strong>读取流量上报</strong><small>记录 push / alive 数据用于统计；关闭后仍透明转发节点请求</small></span>
@@ -2151,6 +2180,61 @@ function copyText(text) {
   navigator.clipboard.writeText(text)
     .then(() => toast('已复制'))
     .catch(() => toast('复制失败，请手动复制','err'));
+}
+
+function gatewayApiHost() {
+  const configuredPort = Number(currentSettings.gateway_port || document.getElementById('cfg-gateway-port')?.value || 443);
+  const protocol = 'https:';
+  const port = configuredPort > 0 ? configuredPort : 443;
+  const defaultPort = protocol === 'https:' ? 443 : 80;
+  return `${protocol}//${location.hostname}${port === defaultPort ? '' : ':' + port}`;
+}
+
+function renderTrafficIngressStatus() {
+  const input = document.getElementById('cfg-node-api-host');
+  const status = document.getElementById('traffic-ingress-status');
+  if (!input || !status) return;
+  input.value = gatewayApiHost();
+  status.className = 'traffic-ingress-status';
+  const captureEnabled = Number(currentSettings.traffic_monitor_enabled ?? securityData?.rules?.traffic_monitor_enabled ?? 1) === 1;
+  if (!captureEnabled) {
+    status.textContent = '读取已关闭';
+    status.classList.add('paused');
+    return;
+  }
+  if (!securityData) {
+    status.textContent = '检查中';
+    return;
+  }
+  const traffic = securityData.traffic || {};
+  const reports = Number(traffic.observed_reports || 0);
+  if (reports < 1 || !traffic.last_report_at) {
+    status.textContent = '代理就绪 · 尚未接入节点';
+    status.classList.add('warning');
+    return;
+  }
+  const parsed = Date.parse(String(traffic.last_report_at).replace(' ', 'T'));
+  const stale = Number.isFinite(parsed) && Date.now() - parsed > 10 * 60 * 1000;
+  status.textContent = `${stale ? '上报已停止' : '已接入'} · ${traffic.last_report_at}`;
+  status.classList.add(stale ? 'warning' : 'ready');
+}
+
+async function refreshTrafficIngressStatus() {
+  const status = document.getElementById('traffic-ingress-status');
+  renderTrafficIngressStatus();
+  if (status) status.textContent = '检查中';
+  try {
+    await loadSecurity({force:true});
+    renderTrafficIngressStatus();
+    const reports = Number(securityData?.traffic?.observed_reports || 0);
+    toast(reports > 0 ? '已收到节点流量上报' : '代理已就绪，但尚未收到节点请求');
+  } catch (error) {
+    if (status) {
+      status.textContent = '检查失败';
+      status.className = 'traffic-ingress-status warning';
+    }
+    toast('接入状态检查失败', 'err');
+  }
 }
 
 // ── 日志模式切换 ───────────────────────────────────────────────
@@ -3338,6 +3422,7 @@ async function loadSettings() {
   renderAlertHistory(data.alert_history || {});
   await loadAiModule();
   restoreDirtyConfigValues(dirtySnapshot);
+  renderTrafficIngressStatus();
 }
 
 function renderStatsCacheInfo(cache) {
@@ -3832,6 +3917,8 @@ async function saveUpstreamSettings() {
     toast('✅ ' + (d.msg || '上游配置已更新'));
     if (path) activeSubscribePath = path;
     await loadSettings();
+    try { await loadSecurity({force:true}); } catch (e) {}
+    renderTrafficIngressStatus();
     renderLogs();
   } else {
     toast(d.error || '保存失败', 'err');
@@ -4971,6 +5058,7 @@ function renderTrafficMonitor() {
   document.getElementById('traffic-monitor-summary').innerHTML = rows.map(([value,label]) => `
     <div class="traffic-summary-item"><div class="traffic-summary-value">${esc(String(value))}</div><div class="traffic-summary-label">${esc(label)}</div></div>`).join('') +
     `<div class="traffic-summary-item" style="grid-column:1/-1"><div class="traffic-summary-value" style="font-size:12px">${esc(traffic.last_report_at || '尚未收到上报')}</div><div class="traffic-summary-label">最后上报 · ${Number(traffic.parse_errors || 0)} 条解析失败</div></div>`;
+  renderTrafficIngressStatus();
 }
 
 async function saveTrafficSettings() {
@@ -5157,6 +5245,7 @@ async function initDashboard() {
   installButtonClickFeedback();
   installUnsavedChangeTracking();
   mountWorkspaceLayout();
+  renderTrafficIngressStatus();
   resetCountdown();
   await loadTab('security', {force:true}).catch(() => {});
   scheduleBackgroundPreload();

@@ -98,6 +98,11 @@ function traffic_parse_log_line(string $line, string $basePath, string $secret):
                 $ips = [];
                 foreach (is_array($value) ? $value : [] as $ip) {
                     $ip = trim((string)$ip);
+                    // Some V2Board-compatible nodes append a node marker as
+                    // "IP_nodeId". Match the panel's normalization behavior.
+                    if (!filter_var($ip, FILTER_VALIDATE_IP) && str_contains($ip, '_')) {
+                        $ip = explode('_', $ip, 2)[0];
+                    }
                     if (filter_var($ip, FILTER_VALIDATE_IP)) $ips[$ip] = true;
                     if (count($ips) >= 100) break;
                 }
@@ -172,6 +177,9 @@ function traffic_analyze_logs(
     foreach ($lines as $line) {
         $entry = traffic_parse_log_line((string)$line, $rules['traffic_report_path'], $secret);
         if (!$entry) continue;
+        // user/alivelist are control-plane reads. They share the UniProxy
+        // prefix but are not traffic reports and must not inflate metrics.
+        if (!in_array($entry['action'], ['push', 'alive'], true)) continue;
         $reports++;
         $lastReport = max($lastReport, $entry['ts']);
         if (!$entry['body_valid']) $parseErrors++;

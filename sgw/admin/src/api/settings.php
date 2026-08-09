@@ -614,6 +614,30 @@ location ^~ $trafficPath {
     add_header Cache-Control no-store;
     add_header X-Traffic-Monitor "observe";
 }
+
+# V2Node must fetch this endpoint before it can use the UniProxy API. Its
+# node token is carried in the query string, so this route must not use the
+# global access log.
+location = /api/v2/server/config {
+    access_log off;
+    allow all;
+
+    set \$upstream_backend $backend;
+    proxy_pass              \$upstream_backend;
+    proxy_set_header        Host              $host;
+    proxy_set_header        X-Real-IP         \$remote_addr;
+    proxy_set_header        X-Forwarded-For   \$proxy_add_x_forwarded_for;
+    proxy_set_header        REMOTE-HOST       \$remote_addr;
+    proxy_ssl_server_name   on;
+    proxy_ssl_name          $host;
+    proxy_http_version      1.1;
+    proxy_connect_timeout   10s;
+    proxy_send_timeout      30s;
+    proxy_read_timeout      60s;
+
+    add_header Cache-Control no-store;
+    add_header X-Traffic-Monitor "passthrough";
+}
 NGINX;
     return subsieve_atomic_write_nginx_files([TRAFFIC_PROXY_CONF => $conf]);
 }
