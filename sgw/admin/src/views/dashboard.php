@@ -1280,31 +1280,8 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">确认新密码</label>
               <input class="ip-input" id="cfg-confirm-pass" type="password" placeholder="再次输入新密码" style="width:100%">
             </div>
-            <div class="apply-hint" id="credential-security-status">密码状态加载中…</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="mode-btn" id="totp-setup-btn" onclick="prepareTotp()">配置两步验证</button>
-              <button class="mode-btn" id="totp-disable-btn" onclick="showTotpDisable()" style="display:none">关闭两步验证</button>
-            </div>
-            <div id="totp-setup-panel" style="display:none;padding:12px;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input)">
-              <div class="apply-hint" style="margin-bottom:8px">在验证器应用中选择“手动输入密钥”，然后输入当前 6 位验证码。密钥仅在本次配置中显示。</div>
-              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">手动密钥</label>
-              <code id="totp-secret" style="display:block;overflow-wrap:anywhere;user-select:all;color:var(--text);margin-bottom:10px"></code>
-              <input class="ip-input" id="totp-enable-code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="width:100%;margin-bottom:8px">
-              <div style="display:flex;gap:8px">
-                <button class="btn-primary" onclick="enableTotp()">确认启用</button>
-                <button class="mode-btn" onclick="cancelTotpSetup()">取消</button>
-              </div>
-            </div>
-            <div id="totp-disable-panel" style="display:none;padding:12px;border:1px solid var(--border2);border-radius:7px;background:var(--bg-input)">
-              <div class="apply-hint" style="margin-bottom:8px">输入验证器中的当前验证码后关闭两步验证。</div>
-              <input class="ip-input" id="totp-disable-code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="width:100%;margin-bottom:8px">
-              <div style="display:flex;gap:8px">
-                <button class="btn-danger" onclick="disableTotp()">确认关闭</button>
-                <button class="mode-btn" onclick="hideTotpDisable()">取消</button>
-              </div>
-            </div>
-            <div class="apply-hint" style="color:#eab308">修改用户名、密码或启用两步验证后会立即退出当前会话。</div>
-            <div class="apply-hint" style="color:#64748b;font-size:11px;line-height:1.5">密码只保存不可逆哈希，后台无法查看原密码。忘记凭证时请使用 README 中的宿主机恢复命令。</div>
+            <div class="apply-hint" style="color:#eab308">⚠️ 修改后需重新登录，请牢记新密码</div>
+            <div class="apply-hint" style="color:#64748b;font-size:11px;line-height:1.5">如忘记密码，请在宿主机 SSH 执行：<br><code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;font-size:11px;user-select:all">docker exec subscribe-admin cat /etc/nginx/subscribe/admin_settings.json</code></div>
             <button class="btn-primary" onclick="saveCredSettings()">保存凭证设置</button>
           </div>
         </div>
@@ -1509,7 +1486,6 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 <script>
 // ── 状态 ─────────────────────────────────────────────────────
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
-const CSRF_TOKEN = <?= json_encode(admin_csrf_token()) ?>;
 let activeSubscribePath = <?= json_encode($_preSg['subscribe_path'] ?? '/api/v1/client/subscribe') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
@@ -1790,18 +1766,13 @@ function manualRefresh() {
 // ── 工具 ──────────────────────────────────────────────────────
 async function apiFetch(url, opts={}) {
   try {
-    const method = String(opts.method || 'GET').toUpperCase();
-    const headers = {'X-Requested-With':'XMLHttpRequest', ...(opts.headers || {})};
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = CSRF_TOKEN;
-    const r = await fetch(BASE + url, {...opts, headers, credentials:'same-origin'});
+    const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
     const ct = r.headers.get('Content-Type') || '';
     if (!ct.includes('application/json')) {
       return {ok: false, error: `HTTP ${r.status}：服务器未返回 JSON`};
     }
     try {
-      const data = await r.json();
-      if (r.status === 401) setTimeout(() => { location.href = BASE + '/'; }, 150);
-      return data;
+      return await r.json();
     } catch(e) {
       return {ok: false, error: `HTTP ${r.status}：JSON 解析失败`};
     }
@@ -2938,7 +2909,6 @@ async function loadSettings() {
   document.getElementById('cfg-admin-user').value   = currentSettings.admin_user || '';
   document.getElementById('cfg-new-pass').value     = '';
   document.getElementById('cfg-confirm-pass').value = '';
-  renderCredentialSecurity();
   // 填充上游设置（分离 URL 和端口）
   const _rawUrl = currentSettings.upstream_url || '';
   let _displayUrl = _rawUrl, _displayPort = 443;
@@ -2961,15 +2931,9 @@ async function loadSettings() {
   const alertChannel = document.getElementById('cfg-alert-channel');
   if (alertChannel) alertChannel.value = currentSettings.alert_channel || 'webhook';
   const alertWebhook = document.getElementById('cfg-alert-webhook-url');
-  if (alertWebhook) {
-    alertWebhook.value = '';
-    alertWebhook.placeholder = currentSettings.alert_webhook_configured ? '已安全保存，留空保持不变' : 'https://example.com/webhook';
-  }
+  if (alertWebhook) alertWebhook.value = currentSettings.alert_webhook_url || '';
   const alertTelegramToken = document.getElementById('cfg-alert-telegram-token');
-  if (alertTelegramToken) {
-    alertTelegramToken.value = '';
-    alertTelegramToken.placeholder = currentSettings.alert_telegram_token_configured ? '已安全保存，留空保持不变' : '123456:ABC…';
-  }
+  if (alertTelegramToken) alertTelegramToken.value = currentSettings.alert_telegram_bot_token || '';
   const alertTelegramChat = document.getElementById('cfg-alert-telegram-chat');
   if (alertTelegramChat) alertTelegramChat.value = currentSettings.alert_telegram_chat_id || '';
   const alertScannerScore = document.getElementById('cfg-alert-scanner-score');
@@ -3430,96 +3394,19 @@ async function saveCredSettings() {
   const confPass= document.getElementById('cfg-confirm-pass').value;
   if (!user) { toast('用户名不能为空', 'err'); return; }
   const body = {admin_user: user};
-  if (newPass) {
-    if (newPass.length < 10) { toast('密码至少需要 10 位', 'err'); return; }
-    body.new_pass = newPass;
-    body.confirm_pass = confPass;
-  }
+  if (newPass) { body.new_pass = newPass; body.confirm_pass = confPass; }
   const d = await apiFetch('/api/settings.php', {
     method: 'POST', body: JSON.stringify(body),
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok) {
-    toast('✅ ' + (d.msg || '凭证设置已保存'));
+    toast('✅ 凭证已更新，请重新登录');
     document.getElementById('cfg-new-pass').value = '';
     document.getElementById('cfg-confirm-pass').value = '';
-    if (d.reauth_required) setTimeout(() => { location.href = BASE + '/logout'; }, 900);
+    if (newPass) setTimeout(() => location.reload(), 2000);
   } else {
     toast(d.error || '保存失败', 'err');
   }
-}
-
-function renderCredentialSecurity() {
-  const hashed = !!currentSettings.admin_password_hashed;
-  const totpEnabled = !!currentSettings.admin_totp_enabled;
-  const status = document.getElementById('credential-security-status');
-  if (status) {
-    status.textContent = `${hashed ? '密码已使用安全哈希保存' : '旧密码将在下次成功登录后自动迁移'} · 两步验证${totpEnabled ? '已启用' : '未启用'}`;
-    status.style.color = hashed && totpEnabled ? '#22c55e' : '#eab308';
-  }
-  const setupBtn = document.getElementById('totp-setup-btn');
-  const disableBtn = document.getElementById('totp-disable-btn');
-  if (setupBtn) setupBtn.style.display = totpEnabled ? 'none' : '';
-  if (disableBtn) disableBtn.style.display = totpEnabled ? '' : 'none';
-  if (totpEnabled) cancelTotpSetup();
-  else hideTotpDisable();
-}
-
-async function prepareTotp() {
-  const d = await apiFetch('/api/settings.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({_prepare_totp:1}),
-  });
-  if (!d.ok) { toast(d.error || '生成密钥失败', 'err'); return; }
-  document.getElementById('totp-secret').textContent = d.secret || '';
-  document.getElementById('totp-enable-code').value = '';
-  document.getElementById('totp-setup-panel').style.display = 'block';
-  document.getElementById('totp-enable-code').focus();
-}
-
-function cancelTotpSetup() {
-  const panel = document.getElementById('totp-setup-panel');
-  if (panel) panel.style.display = 'none';
-  const secret = document.getElementById('totp-secret');
-  if (secret) secret.textContent = '';
-}
-
-async function enableTotp() {
-  const code = document.getElementById('totp-enable-code').value.trim();
-  if (!/^\d{6}$/.test(code)) { toast('请输入 6 位验证码', 'err'); return; }
-  const d = await apiFetch('/api/settings.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({_enable_totp:1, code}),
-  });
-  if (!d.ok) { toast(d.error || '启用失败', 'err'); return; }
-  toast('✅ 两步验证已启用，请重新登录');
-  setTimeout(() => { location.href = BASE + '/logout'; }, 900);
-}
-
-function showTotpDisable() {
-  document.getElementById('totp-disable-panel').style.display = 'block';
-  document.getElementById('totp-disable-code').value = '';
-  document.getElementById('totp-disable-code').focus();
-}
-
-function hideTotpDisable() {
-  const panel = document.getElementById('totp-disable-panel');
-  if (panel) panel.style.display = 'none';
-}
-
-async function disableTotp() {
-  const code = document.getElementById('totp-disable-code').value.trim();
-  if (!/^\d{6}$/.test(code)) { toast('请输入 6 位验证码', 'err'); return; }
-  const d = await apiFetch('/api/settings.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({_disable_totp:1, code}),
-  });
-  if (!d.ok) { toast(d.error || '关闭失败', 'err'); return; }
-  toast('✅ 两步验证已关闭，请重新登录');
-  if (d.reauth_required) setTimeout(() => { location.href = BASE + '/logout'; }, 900);
 }
 
 async function saveGatewayPort() {
@@ -3575,9 +3462,11 @@ async function saveUpstreamSettings() {
 }
 
 function getAlertSettingsPayload() {
-  const payload = {
+  return {
     alert_enabled: document.getElementById('cfg-alert-enabled').checked ? 1 : 0,
     alert_channel: document.getElementById('cfg-alert-channel').value || 'webhook',
+    alert_webhook_url: document.getElementById('cfg-alert-webhook-url').value.trim(),
+    alert_telegram_bot_token: document.getElementById('cfg-alert-telegram-token').value.trim(),
     alert_telegram_chat_id: document.getElementById('cfg-alert-telegram-chat').value.trim(),
     alert_scanner_score: parseInt(document.getElementById('cfg-alert-scanner-score').value || '80', 10),
     alert_susp_ip_score: parseInt(document.getElementById('cfg-alert-susp-ip-score').value || '90', 10),
@@ -3588,11 +3477,6 @@ function getAlertSettingsPayload() {
     alert_quiet_start: document.getElementById('cfg-alert-quiet-start').value || '23:00',
     alert_quiet_end: document.getElementById('cfg-alert-quiet-end').value || '08:00',
   };
-  const webhook = document.getElementById('cfg-alert-webhook-url').value.trim();
-  const telegramToken = document.getElementById('cfg-alert-telegram-token').value.trim();
-  if (webhook) payload.alert_webhook_url = webhook;
-  if (telegramToken) payload.alert_telegram_bot_token = telegramToken;
-  return payload;
 }
 
 function applyAlertPreset(name) {
@@ -3630,14 +3514,13 @@ function validateAlertPayload(body, forTest = false) {
   if (!body.alert_enabled && forTest) body.alert_enabled = 1;
   if (!body.alert_enabled && !forTest) return true;
   if (body.alert_channel === 'telegram') {
-    const tokenReady = !!body.alert_telegram_bot_token || !!currentSettings.alert_telegram_token_configured;
-    if (!tokenReady || !body.alert_telegram_chat_id) {
+    if (!body.alert_telegram_bot_token || !body.alert_telegram_chat_id) {
       toast('请填写 Telegram Bot Token 和 Chat ID', 'err');
       return false;
     }
     return true;
   }
-  if (!body.alert_webhook_url && !currentSettings.alert_webhook_configured) {
+  if (!body.alert_webhook_url) {
     toast('请填写 Webhook URL', 'err');
     return false;
   }
@@ -3749,7 +3632,7 @@ async function importAlertHistory(input) {
     const previewRes = await fetch(BASE + '/api/settings.php?preview_alert_history=1', {
       method: 'POST',
       body: previewFd,
-      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
       credentials: 'same-origin',
     });
     const previewData = await previewRes.json();
@@ -3783,7 +3666,7 @@ async function importAlertHistory(input) {
     const r = await fetch(BASE + '/api/settings.php?import_alert_history=1', {
       method: 'POST',
       body: fd,
-      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
       credentials: 'same-origin',
     });
     const d = await r.json();
@@ -4537,7 +4420,7 @@ async function importLogs(input) {
     fd.append('log', file);
     const r = await fetch(BASE + '/api/logs.php', {
       method: 'POST',
-      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN},
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
       body: fd,
     });
     if (r.status === 413) {

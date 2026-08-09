@@ -35,7 +35,6 @@ sgw/
         ├── index.php             ← 路由 + 鉴权 + API转发
         ├── config.php            ← 配置常量 + 工具函数
         ├── lib/
-        │   ├── admin_security.php ← 密码哈希、登录限速、CSRF 与 TOTP
         │   └── ai_guard.php      ← 多厂商 AI 适配、脱敏与结果校验
         ├── api/
         │   ├── _auth.php         ← API 鉴权中间件
@@ -158,32 +157,9 @@ cd sgw
 https://你的域名或IP:64444/<随机路径>
 ```
 
-首次部署的路径和账号密码见 `DEPLOY_INFO.txt`，或查看 `.env` 中的 `ADMIN_SECRET_PATH` / `ADMIN_PASS`。在后台修改密码后，服务器只保存不可逆哈希，不再提供原密码查看。
+路径和账号密码见 `DEPLOY_INFO.txt`，或查看 `.env` 中的 `ADMIN_SECRET_PATH` / `ADMIN_PASS`。
 
 后台会话 Cookie 默认启用 `Secure`、`HttpOnly` 和 `SameSite=Strict`，登录成功后会更换 Session ID。所有页面和 API 都必须先经过 Secret Path 路由，不能绕过隐藏路径直接执行 PHP 接口。
-
-### 后台登录安全
-
-- 旧版明文密码会在下一次成功登录后自动迁移为 PHP `password_hash`；以后修改密码也只写入哈希。
-- 同一来源 10 分钟内连续失败 5 次会锁定登录 15 分钟。限速文件只保存来源 IP 的 HMAC 标识，不保存原始 IP。
-- 所有新增、修改、删除和文件导入请求都要求当前会话的 CSRF Token；页面刷新会取得新的安全令牌。
-- 可在「系统设置 → 登录凭证」启用 TOTP 两步验证，支持常见验证器应用的手动密钥导入。密钥只在配置确认前显示一次，不发送给外部二维码服务。
-- 修改用户名、密码、启用或关闭两步验证会作废全部已登录会话。
-- `admin_settings.json`、登录限速状态和 AI 密钥文件在容器中使用 `0600` 权限；设置 API 不回显密码哈希、TOTP 密钥、Webhook URL 或 Telegram Bot Token。
-
-忘记密码时，在宿主机执行下面的命令。密码通过标准输入传入，不会写入仓库或作为命令参数出现在进程列表中：
-
-```bash
-read -rsp "新密码（至少 10 位）: " PASS; echo
-printf '%s' "$PASS" | docker exec -i subscribe-admin php /var/www/html/maintenance.php reset-admin-password
-unset PASS
-```
-
-如果验证器设备丢失，可先通过 SSH 关闭 TOTP，所有现有后台会话也会同时失效：
-
-```bash
-docker exec subscribe-admin php /var/www/html/maintenance.php disable-admin-totp
-```
 
 ---
 
@@ -319,9 +295,6 @@ bash healthcheck.sh --wait 30
 # 查看后台维护任务日志（统计预热 / 告警检查 / 日志清理）
 docker exec subscribe-admin sh -lc 'tail -50 /var/log/subscribe/maintenance.log'
 
-# 本地验证后台密码、CSRF、登录锁定和 TOTP 安全逻辑
-php tests/test_admin_security.php
-
 # 进入 gateway 容器调试
 docker exec -it subscribe-gateway sh
 ```
@@ -330,7 +303,6 @@ docker exec -it subscribe-gateway sh
 
 ## 更新日志
 
-- 2026-08-09：完成后台登录安全加固：明文密码自动迁移为不可逆哈希，登录失败限速并匿名化来源，所有写 API 增加 CSRF 校验，支持可选 TOTP 两步验证；凭证变更会作废全部会话，敏感设置不再通过 API 回显，并提供宿主机密码/TOTP 恢复命令。
 - 2026-08-09：防护策略增加清晰的“用量监控 / 超限后自动执行”滑动开关与运行总览配置入口；自动执行仅在监控开启时可用，首次启用需要确认，保存后立即刷新 Token 限速配置。
 - 2026-08-09：修复运行总览只识别旧版 `CIDR 1;` 规则、未统计新版 `CIDR provider_id;` 厂商映射，导致云服务商 / IDC CIDR 实际生效却错误显示 0 条并标红的问题。
 - 2026-08-09：新增可插拔 AI 风险研判，支持 OpenAI-compatible、Anthropic Messages 与 Gemini 协议及多家厂商预设；API Token 独立保存且不回显、不导出、不进入 Git，风险数据默认脱敏，AI 结果只提供人工复核建议并禁止自动处置；补充队列/单条研判、定时分析、连接测试和手机端布局。
