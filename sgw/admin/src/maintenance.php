@@ -97,13 +97,68 @@ function prune_old_logs(int $retentionDays): array {
         @unlink(dirname(IP_INTEL_CACHE_JSON) . '/stats_cache.json');
     }
 
+    $traffic = prune_traffic_log($cutoff);
+    if (empty($traffic['ok'])) return $traffic;
+
+    $logsReopened = false;
+    if ($deleted > 0 || (int)($traffic['deleted'] ?? 0) > 0) {
+        // Both logs are atomically replaced above. Ask the gateway to reopen
+        // its file descriptors so new entries keep reaching the active files.
+        $logsReopened = nginx_reload();
+    }
+
     return [
         'ok' => true,
         'retention_days' => $retentionDays,
         'deleted' => $deleted,
         'kept' => $kept,
+        'traffic_deleted' => (int)($traffic['deleted'] ?? 0),
+        'traffic_kept' => (int)($traffic['kept'] ?? 0),
+        'logs_reopened' => $logsReopened,
         'time' => date('Y-m-d H:i:s'),
     ];
+}
+
+function prune_traffic_log(int $cutoff): array {
+    if (!file_exists(TRAFFIC_LOG_FILE)) return ['ok' => true, 'deleted' => 0, 'kept' => 0, 'missing' => true];
+    $in = @fopen(TRAFFIC_LOG_FILE, 'r');
+    if (!$in) return ['ok' => false, 'error' => 'cannot open traffic log file', 'file' => TRAFFIC_LOG_FILE];
+    $tmp = tempnam(sys_get_temp_dir(), 'ss_traffic_prune_');
+    if ($tmp === false) {
+        fclose($in);
+        return ['ok' => false, 'error' => 'cannot create traffic log temp file'];
+    }
+    $out = @fopen($tmp, 'w');
+    if (!$out) {
+        fclose($in);
+        @unlink($tmp);
+        return ['ok' => false, 'error' => 'cannot write traffic log temp file'];
+    }
+    $deleted = 0;
+    $kept = 0;
+    while (($line = fgets($in)) !== false) {
+        $trimmed = trim($line);
+        if ($trimmed === '') continue;
+        $row = json_decode($trimmed, true);
+        $ts = is_array($row) ? (strtotime((string)($row['time'] ?? '')) ?: null) : null;
+        if ($ts !== null && $ts < $cutoff) {
+            $deleted++;
+            continue;
+        }
+        fwrite($out, rtrim($line, "\r\n") . "\n");
+        $kept++;
+    }
+    fclose($in);
+    fclose($out);
+    if (!@rename($tmp, TRAFFIC_LOG_FILE)) {
+        if (!@copy($tmp, TRAFFIC_LOG_FILE)) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => 'cannot replace traffic log file'];
+        }
+        @unlink($tmp);
+    }
+    @chmod(TRAFFIC_LOG_FILE, 0666);
+    return ['ok' => true, 'deleted' => $deleted, 'kept' => $kept];
 }
 
 function extract_log_date_ts(string $line): ?int {

@@ -14,7 +14,7 @@ CLOUD_PROVIDER_SETTINGS="$SUBSCRIBE_DIR/cloud_provider_settings.json"
 
 is_runtime_rule_file() {
     case "$1" in
-        blacklist.conf|blacklist.json|ua_custom.conf|ua_blacklist.json|ua_whitelist.conf|ua_whitelist.json|token_blacklist.conf|token_blacklist.json|protect.conf)
+        blacklist.conf|blacklist.json|ua_custom.conf|ua_blacklist.json|ua_whitelist.conf|ua_whitelist.json|token_blacklist.conf|token_blacklist.json|protect.conf|traffic_proxy.conf)
             return 0
             ;;
     esac

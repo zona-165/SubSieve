@@ -1,0 +1,24 @@
+location ^~ ${TRAFFIC_REPORT_PATH} {
+    ${TRAFFIC_ACCESS_LOG}
+    client_max_body_size 8m;
+    client_body_buffer_size 8m;
+
+    # 服务器级 IP 黑名单只保护订阅入口，不能误伤节点流量上报。
+    allow all;
+
+    set $upstream_backend ${V2B_BACKEND};
+    proxy_pass              $upstream_backend;
+    proxy_set_header        Host              ${V2B_HOST};
+    proxy_set_header        X-Real-IP         $remote_addr;
+    proxy_set_header        X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header        REMOTE-HOST       $remote_addr;
+    proxy_ssl_server_name   on;
+    proxy_ssl_name          ${V2B_HOST};
+    proxy_http_version      1.1;
+    proxy_connect_timeout   10s;
+    proxy_send_timeout      30s;
+    proxy_read_timeout      60s;
+
+    add_header Cache-Control no-store;
+    add_header X-Traffic-Monitor "observe";
+}

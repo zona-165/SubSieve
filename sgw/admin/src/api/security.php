@@ -5,6 +5,7 @@ if (PHP_SAPI === 'cli') {
     require_once __DIR__ . '/_auth.php';
 }
 require_once dirname(__DIR__) . '/lib/guard.php';
+require_once dirname(__DIR__) . '/lib/traffic_monitor.php';
 
 $method = PHP_SAPI === 'cli' ? 'CLI' : ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
@@ -39,12 +40,21 @@ json_out($payload);
 
 function build_security_snapshot(): array {
     $settings = guard_read_json(SETTINGS_JSON);
-    $rules = guard_normalize_settings($settings);
+    $rules = array_merge(guard_normalize_settings($settings), traffic_normalize_settings($settings));
     $subscribePath = trim((string)($settings['subscribe_path'] ?? '/api/v1/client/subscribe'));
     if ($subscribePath === '') $subscribePath = '/api/v1/client/subscribe';
     $secret = guard_secret();
     $logLines = iterator_to_array(guard_tail_log_lines(LOG_FILE, $rules['guard_scan_lines']), false);
     $analysis = guard_analyze_logs(
+        $logLines,
+        $rules,
+        time(),
+        $subscribePath,
+        $secret
+    );
+    $trafficLines = iterator_to_array(guard_tail_log_lines(TRAFFIC_LOG_FILE, $rules['traffic_scan_lines']), false);
+    $trafficAnalysis = traffic_analyze_logs(
+        $trafficLines,
         $logLines,
         $rules,
         time(),
@@ -76,6 +86,7 @@ function build_security_snapshot(): array {
         $secret,
         $whitelistIps
     );
+    $findings = array_merge($findings, $trafficAnalysis['findings'] ?? []);
     $findings = enrich_guard_findings($findings, $statsData, $secret, $rules, $whitelistIps);
     $counts = guard_policy_counts();
     $health = guard_health_snapshot($settings, $counts, $statsCacheFile);
@@ -92,12 +103,13 @@ function build_security_snapshot(): array {
         'generated_at' => date('Y-m-d H:i:s'),
         'subscribe_path' => $subscribePath,
         'mode' => !empty($rules['guard_observe_enabled']) ? 'observe' : 'paused',
-        'scope' => '独立网关日志，不连接机场用户、订单或邮箱数据库',
+        'scope' => '独立分析订阅与 UniProxy 上报日志，不连接机场用户、订单或邮箱数据库',
         'metrics' => $metrics,
         'policy_counts' => $counts,
         'rules' => $rules,
         'health' => $health,
         'mechanisms' => guard_mechanisms($rules, $counts, $health),
+        'traffic' => $trafficAnalysis['summary'] ?? [],
         'pull_limits' => $pullLimits,
         'findings' => $findings,
         'recent_actions' => $actions,
@@ -257,6 +269,7 @@ function guard_health_snapshot(array $settings, array $counts, string $statsCach
     $statsAge = file_exists($statsCacheFile) ? max(0, time() - (int)filemtime($statsCacheFile)) : null;
     $cloudAge = file_exists(CLOUD_GEO_CONF) ? max(0, time() - (int)filemtime(CLOUD_GEO_CONF)) : null;
     $logSize = file_exists(LOG_FILE) ? (int)filesize(LOG_FILE) : 0;
+    $trafficLogSize = file_exists(TRAFFIC_LOG_FILE) ? (int)filesize(TRAFFIC_LOG_FILE) : 0;
     $alertHistory = guard_read_json(ALERT_HISTORY_JSON);
     $limitState = guard_read_json(TOKEN_LIMIT_STATE_JSON);
     $limitAge = isset($limitState['updated_ts']) ? max(0, time() - (int)$limitState['updated_ts']) : null;
@@ -275,6 +288,8 @@ function guard_health_snapshot(array $settings, array $counts, string $statsCach
         'stats_cache_age' => $statsAge,
         'cloud_rules_age' => $cloudAge,
         'log_size' => $logSize,
+        'traffic_log_size' => $trafficLogSize,
+        'traffic_log_readable' => is_readable(TRAFFIC_LOG_FILE),
         'log_writable' => is_writable(LOG_FILE),
         'config_writable' => is_writable(dirname(SETTINGS_JSON)),
         'last_alert_check' => $lastAlertCheck,
@@ -291,6 +306,9 @@ function guard_mechanisms(array $settings, array $counts, array $health): array 
     $ipPolicyReady = file_exists(BLACKLIST_CONF) && file_exists(WHITELIST_CONF);
     $aiSettings = guard_read_json(AI_SETTINGS_JSON);
     $aiEnabled = !empty($aiSettings['enabled']) && trim((string)($aiSettings['api_key'] ?? '')) !== '';
+    $trafficEnabled = !empty($settings['traffic_monitor_enabled']);
+    $trafficAnalysisEnabled = !empty($settings['traffic_analysis_enabled']);
+    $trafficReady = file_exists(TRAFFIC_PROXY_CONF) && is_readable(TRAFFIC_LOG_FILE);
     $items = [
         ['key' => 'gateway', 'title' => '订阅入口防护', 'state' => $protect !== '' ? 'active' : 'error', 'detail' => $protect !== '' ? 'Nginx 订阅路径规则已加载' : 'protect.conf 缺失'],
         ['key' => 'rate_limit', 'title' => '请求速率限制', 'state' => str_contains($protect, 'limit_req') ? 'active' : 'error', 'detail' => str_contains($protect, 'limit_req') ? '网关限速与 429 响应已启用' : '未检测到 limit_req'],
@@ -300,6 +318,7 @@ function guard_mechanisms(array $settings, array $counts, array $health): array 
         ['key' => 'token_policy', 'title' => 'Token 精确拦截', 'state' => str_contains($tokenConf, 'is_token_blacklisted') ? 'active' : 'error', 'detail' => $counts['token_blacklist'] . ' 个 Token 规则'],
         ['key' => 'pull_limit', 'title' => '自动执行规则', 'state' => empty($settings['guard_pull_limit_enabled']) ? 'paused' : (!empty($settings['guard_pull_limit_enforce']) ? 'active' : 'optional'), 'detail' => empty($settings['guard_pull_limit_enabled']) ? '用量统计已关闭' : (!empty($settings['guard_pull_limit_enforce']) ? '限速与自动暂停生效 · 当前暂停 ' . $counts['token_suspended'] . ' 个' : '仅统计 · 自动执行未开启')],
         ['key' => 'observation', 'title' => '风险预警规则', 'state' => !empty($settings['guard_observe_enabled']) ? 'active' : 'paused', 'detail' => !empty($settings['guard_observe_enabled']) ? '提前生成风险证据，不自动封禁' : '风险预警已关闭'],
+        ['key' => 'traffic_monitor', 'title' => 'UniProxy 流量监控', 'state' => !$trafficReady ? 'error' : ($trafficEnabled ? ($trafficAnalysisEnabled ? 'active' : 'optional') : 'paused'), 'detail' => !$trafficReady ? '代理配置或日志缺失' : (!$trafficEnabled ? '透明转发保留，上报读取已关闭' : ($trafficAnalysisEnabled ? '读取流量并关联订阅证据' : '仅读取统计，异常分析已关闭'))],
         ['key' => 'stats_cache', 'title' => '后台统计预热', 'state' => ($health['stats_cache_age'] !== null && $health['stats_cache_age'] <= 180) ? 'active' : 'warn', 'detail' => $health['stats_cache_age'] === null ? '缓存不存在' : $health['stats_cache_age'] . ' 秒前更新'],
         ['key' => 'intel', 'title' => '多源 IP 情报', 'state' => 'active', 'detail' => $counts['ip_intel_cache'] . ' 个缓存画像'],
         ['key' => 'retention', 'title' => '日志保留与清理', 'state' => LOG_RETENTION_DAYS > 0 ? 'active' : 'paused', 'detail' => LOG_RETENTION_DAYS > 0 ? '保留 ' . LOG_RETENTION_DAYS . ' 天' : '自动清理已关闭'],

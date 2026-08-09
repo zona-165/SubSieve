@@ -60,33 +60,34 @@ if (str_starts_with($path, '/api/')) {
         }
         $previewFindings = [];
         $previewSummary = ['pending' => 0, 'watch' => 0, 'trusted' => 0, 'confirmed' => 0];
-        $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner', 'idc_provider_block'];
+        $findingKinds = ['daily_ip_volume', 'token_multi_ip', 'ip_multi_token', 'scanner', 'idc_provider_block', 'traffic_user_anomaly'];
         for ($i = 1; $i <= 13; $i++) {
             $status = $i <= 7 ? 'pending' : ($i <= 9 ? 'watch' : ($i <= 12 ? 'trusted' : 'confirmed'));
             $kind = $findingKinds[($i - 1) % count($findingKinds)];
             $isDaily = $i === 1;
             $isToken = $kind === 'token_multi_ip';
+            $isTraffic = $kind === 'traffic_user_anomaly';
             $previewSummary[$status]++;
             $isCloud = $kind === 'idc_provider_block';
             $previewFindings[] = [
                 'key' => $kind . ':' . substr(hash('sha256', 'preview-' . $i), 0, 24),
                 'kind' => $kind,
-                'title' => $isCloud ? '云厂商 / IDC 自动拦截' : ($isDaily ? '今日单 IP 高频拉取' : ($isToken ? 'Token 跨多 IP 拉取' : ($kind === 'scanner' ? '脚本/扫描器拉取订阅' : 'IP 拉取多个 Token'))),
-                'subject' => $isToken ? 'TKN-' . strtoupper(substr(hash('sha256', 'token-' . $i), 0, 16)) : '198.51.100.' . (20 + $i),
+                'title' => $isCloud ? '云厂商 / IDC 自动拦截' : ($isTraffic ? 'UniProxy 用户流量异常' : ($isDaily ? '今日单 IP 高频拉取' : ($isToken ? 'Token 跨多 IP 拉取' : ($kind === 'scanner' ? '脚本/扫描器拉取订阅' : 'IP 拉取多个 Token')))),
+                'subject' => $isToken ? 'TKN-' . strtoupper(substr(hash('sha256', 'token-' . $i), 0, 16)) : ($isTraffic ? 'USR-' . strtoupper(substr(hash('sha256', 'user-' . $i), 0, 16)) : '198.51.100.' . (20 + $i)),
                 'count' => $isDaily ? 233 : 30 + $i,
                 'threshold' => $isDaily ? 100 : 30,
                 'window' => $isDaily ? '今日' : ($i % 2 === 0 ? '最近日志窗口' : '1 分钟'),
-                'source' => $isCloud ? 'Nginx 自动拦截' : ($isDaily ? '订阅路径统计' : '本地日志'),
+                'source' => $isCloud ? 'Nginx 自动拦截' : ($isTraffic ? 'UniProxy + 订阅日志关联' : ($isDaily ? '订阅路径统计' : '本地日志')),
                 'last_seen' => date('Y-m-d H:i:s', time() - $i * 90),
                 'risk' => $isCloud ? '极高危' : ($isDaily ? '极高危' : ($i <= 4 ? '高危' : '关注')),
                 'score' => $isCloud ? 95 : ($isDaily ? 100 : max(62, 96 - $i * 2)),
-                'reason' => $isCloud ? '请求来源命中已启用的 Amazon Web Services CIDR 策略，网关已自动返回 403。' : ($isDaily ? '该 IP 今日累计拉取订阅 233 次，已超过观察阈值 100 次。' : '请求行为达到观察阈值，等待管理员复核。'),
+                'reason' => $isCloud ? '请求来源命中已启用的 Amazon Web Services CIDR 策略，网关已自动返回 403。' : ($isTraffic ? '节点上报流量与在线 IP 超过观察阈值，并在关联窗口内出现成功订阅拉取。' : ($isDaily ? '该 IP 今日累计拉取订阅 233 次，已超过观察阈值 100 次。' : '请求行为达到观察阈值，等待管理员复核。')),
                 'status_counts' => $isCloud ? ['403' => 7] : ($isDaily ? ['200' => 50, '403' => 70, '429' => 111, '444' => 2] : []),
                 'token_count' => $isDaily ? 3 : 0,
-                'location' => $isToken ? '' : 'Singapore / Central Singapore',
-                'asn' => $isToken ? '' : 'AS46997',
-                'operator' => $isToken ? '' : 'Black Mesa Corporation',
-                'network_type' => $isToken ? '' : '机房/托管',
+                'location' => ($isToken || $isTraffic) ? '' : 'Singapore / Central Singapore',
+                'asn' => ($isToken || $isTraffic) ? '' : 'AS46997',
+                'operator' => ($isToken || $isTraffic) ? '' : 'Black Mesa Corporation',
+                'network_type' => ($isToken || $isTraffic) ? '' : '机房/托管',
                 'automatic_block' => $isCloud,
                 'provider_id' => $isCloud ? 'aws' : '',
                 'provider_name' => $isCloud ? 'Amazon Web Services' : '',
@@ -94,7 +95,12 @@ if (str_starts_with($path, '/api/')) {
                 'provider_keywords' => $isCloud ? ['amazon web services','amazon technologies'] : [],
                 'sample_paths' => $isCloud ? ['/api/v1/client/subscribe'] : [],
                 'sample_uas' => $isCloud ? ['curl/8.0'] : [],
-                'trigger_details' => $isCloud ? ['触发规则'=>'Amazon Web Services CIDR 自动拦截','网关动作'=>'HTTP 403 · Forbidden: Cloud IP','命中厂商'=>'Amazon Web Services','命中次数'=>'7'] : [],
+                'sample_ips' => $isTraffic ? ['198.51.100.81', '203.0.113.22'] : [],
+                'linked_subscription_requests' => $isTraffic ? 3 : 0,
+                'linked_token_count' => $isTraffic ? 2 : 0,
+                'trigger_details' => $isCloud
+                    ? ['触发规则'=>'Amazon Web Services CIDR 自动拦截','网关动作'=>'HTTP 403 · Forbidden: Cloud IP','命中厂商'=>'Amazon Web Services','命中次数'=>'7']
+                    : ($isTraffic ? ['5 分钟流量'=>'14.8 GiB / 阈值 10 GiB','在线 IP'=>'12 个 / 阈值 10 个','订阅关联'=>'3 次成功拉取 · 2 个 Token 指纹'] : []),
                 'review' => ['status' => $status, 'note' => ''],
             ];
         }
@@ -106,7 +112,8 @@ if (str_starts_with($path, '/api/')) {
             'health' => [
                 'state' => 'healthy', 'label' => '网关运行正常', 'issues' => [],
                 'stats_cache_age' => 12, 'token_limit_state_age' => 8, 'cloud_rules_age' => 3600,
-                'log_size' => 5242880, 'log_writable' => true, 'retention_days' => 14,
+                'log_size' => 5242880, 'traffic_log_size' => 786432, 'traffic_log_readable' => true,
+                'log_writable' => true, 'retention_days' => 14,
                 'alert_enabled' => false, 'last_alert_check' => '',
             ],
             'metrics' => [
@@ -132,6 +139,7 @@ if (str_starts_with($path, '/api/')) {
                 ['key' => 'token_policy', 'state' => 'active', 'title' => 'Token 精确拦截', 'detail' => '3 个 Token 规则'],
                 ['key' => 'pull_limit', 'state' => 'active', 'title' => '自动执行规则', 'detail' => '限速与自动暂停生效 · 当前暂停 2 个'],
                 ['key' => 'observation', 'state' => 'active', 'title' => '风险预警规则', 'detail' => '提前生成风险证据，不自动封禁'],
+                ['key' => 'traffic_monitor', 'state' => 'active', 'title' => 'UniProxy 流量监控', 'detail' => '观察流量与在线 IP，关联订阅证据'],
                 ['key' => 'stats_cache', 'state' => 'active', 'title' => '后台统计预热', 'detail' => '12 秒前更新'],
                 ['key' => 'intel', 'state' => 'active', 'title' => '多源 IP 情报', 'detail' => '142 个缓存画像'],
                 ['key' => 'retention', 'state' => 'active', 'title' => '日志保留与清理', 'detail' => '保留 14 天'],
@@ -139,12 +147,27 @@ if (str_starts_with($path, '/api/')) {
                 ['key' => 'ai_review', 'state' => 'optional', 'title' => 'AI 风险研判', 'detail' => '未启用（可选）'],
             ],
             'review_summary' => $previewSummary,
+            'traffic' => [
+                'enabled' => true, 'capture_enabled' => true, 'analysis_enabled' => true,
+                'path' => '/api/v1/server/UniProxy', 'observed_reports' => 184,
+                'push_reports' => 122, 'alive_reports' => 62, 'users_24h' => 48,
+                'bytes_24h' => 322122547200, 'bytes_24h_label' => '300 GiB',
+                'last_report_ts' => time() - 8, 'last_report_at' => date('Y-m-d H:i:s', time() - 8),
+                'parse_errors' => 0, 'correlated_findings' => 2,
+            ],
             'findings' => $previewFindings,
             'rules' => [
                 'guard_observe_enabled' => 1, 'guard_ip_daily_requests' => 100,
                 'guard_ip_per_minute' => 30, 'guard_token_per_minute' => 8,
                 'guard_token_hour_ips' => 8, 'guard_ip_hour_tokens' => 20, 'guard_ip_404_5m' => 40,
                 'guard_scan_lines' => 30000,
+                'traffic_monitor_enabled' => 1, 'traffic_analysis_enabled' => 1,
+                'traffic_report_path' => '/api/v1/server/UniProxy',
+                'traffic_scan_lines' => 20000, 'traffic_user_5m_gb' => 10,
+                'traffic_user_1h_gb' => 50, 'traffic_user_24h_gb' => 100,
+                'traffic_user_hour_ips' => 10, 'traffic_upload_ratio' => 5,
+                'traffic_upload_min_gb' => 1, 'traffic_report_5m_requests' => 120,
+                'traffic_correlation_minutes' => 15,
             ],
             'recent_actions' => [[
                 'time' => date('H:i:s'), 'type' => 'Token 自动暂停', 'subject' => 'TKN-7BAD134E1B23C662', 'detail' => '超过每分钟拉取上限',
@@ -249,7 +272,8 @@ if (str_starts_with($path, '/api/')) {
             'settings' => [
                 'site_title' => 'SubSieve', 'page_title' => 'SubSieve Admin', 'admin_user' => 'admin',
                 'upstream_url' => 'https://panel.example.com', 'subscribe_path' => '/api/v1/client/subscribe',
-                'gateway_port' => 443,
+                'traffic_report_path' => '/api/v1/server/UniProxy',
+                'traffic_monitor_enabled' => 1, 'traffic_analysis_enabled' => 1, 'gateway_port' => 443,
             ],
             'cert' => ['exists' => true, 'subject' => 'preview.example.com', 'issuer' => 'Preview CA', 'valid_from' => '2026-01-01', 'valid_to' => '2027-01-01', 'days_left' => 146],
             'stats_cache' => ['exists' => true, 'fresh' => true, 'age_seconds' => 12, 'mtime' => date('Y-m-d H:i:s'), 'size_text' => '362 KB', 'scan_limit' => 30000],

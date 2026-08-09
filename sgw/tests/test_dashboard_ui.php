@@ -38,7 +38,18 @@ ui_check(str_contains($source, '自动刷新已暂停'), 'automatic refresh does
 ui_check(str_contains($source, 'captureDirtyConfigValues()'), 'background refresh cannot preserve unsaved field values');
 ui_check(str_contains($source, "markConfigSaved('pull_limit')"), 'pull limit save does not clear its dirty state');
 ui_check(str_contains($source, "markConfigSaved('guard')"), 'guard threshold save does not clear its dirty state');
+ui_check(str_contains($source, "markConfigSaved('traffic')"), 'traffic monitor save does not clear its dirty state');
 ui_check(str_contains($source, "markConfigSaved('cloud')"), 'cloud provider save does not clear its dirty state');
 ui_check(str_contains($source, 'button.config-dirty'), 'unsaved save-button indicator is missing');
+ui_check(str_contains($source, 'id="guard-kind-traffic"'), 'traffic risk category is missing');
+ui_check(str_contains($source, 'id="traffic-monitor-section"'), 'traffic monitor settings panel is missing');
+ui_check(str_contains($source, 'id="cfg-traffic-report-path"'), 'custom UniProxy path is missing from gateway settings');
+ui_check(str_contains($source, 'id="cfg-traffic-monitor-enabled"'), 'traffic capture switch is missing');
+ui_check(str_contains($source, 'id="cfg-traffic-analysis-enabled"'), 'traffic analysis switch is missing');
+ui_check(str_contains($source, '记录 push / alive 数据用于统计'), 'traffic capture switch purpose is unclear');
+ui_check(str_contains($source, '生成流量风险事件'), 'traffic analysis switch purpose is unclear');
+ui_check(!str_contains($source, 'id="traffic-monitor-enabled"'), 'duplicate traffic switch still exists in protection settings');
+ui_check(str_contains($source, '流量异常只进入人工复核，不会自动封禁'), 'traffic evidence boundary is missing');
+ui_check(str_contains($source, '.traffic-monitor-summary{grid-template-columns:minmax(0,1fr)}'), 'narrow mobile traffic summary layout is missing');
 
 echo "dashboard UI contract tests passed\n";

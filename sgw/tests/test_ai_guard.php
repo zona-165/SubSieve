@@ -66,6 +66,18 @@ ai_check(str_contains($optionalJson, '198.51.100.30'), 'enabled IP field was omi
 ai_check(str_contains($optionalJson, 'curl/8.0'), 'enabled UA field was omitted');
 ai_check(str_contains($optionalJson, '/go/test/'), 'enabled path field was omitted');
 
+$trafficEvidence = ai_prepare_evidence([[
+    'key' => 'traffic_user_anomaly:1234567890abcdef12345678',
+    'kind' => 'traffic_user_anomaly',
+    'title' => 'UniProxy 用户流量异常',
+    'subject' => 'USR-0123456789ABCDEF',
+    'count' => 12,
+    'threshold' => 10,
+    'trigger_details' => ['5 分钟流量' => '12 GiB / 阈值 10 GiB', '订阅关联' => '3 次成功拉取'],
+]], ai_default_settings(), 'unit-test-guard-secret');
+$trafficJson = json_encode($trafficEvidence, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+ai_check(str_contains($trafficJson, '12 GiB / 阈值 10 GiB'), 'traffic trigger details were omitted from AI evidence');
+
 $decoded = ai_decode_json("```json\n{\"risk_level\":\"critical\",\"confidence\":130,\"verdict\":\"test\"}\n```");
 $decision = ai_normalize_decision($decoded);
 ai_check($decision['risk_level'] === 'critical', 'risk level normalization failed');

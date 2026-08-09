@@ -398,6 +398,7 @@ tr:hover td{background:rgba(99,102,241,.055)}
 .pull-limit-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .limit-mode-badge{padding:5px 9px;border-radius:999px;border:1px solid rgba(14,165,233,.22);background:rgba(14,165,233,.09);color:#38bdf8;font-size:11px;font-weight:850;white-space:nowrap}
 .limit-mode-badge.enforce{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.10);color:#f59e0b}
+.limit-mode-badge.observe{border-color:rgba(20,184,166,.25);background:rgba(20,184,166,.10);color:#0f766e}
 .limit-mode-badge.paused{border-color:var(--border);background:rgba(100,116,139,.07);color:var(--text3)}
 .pull-limit-rule-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .pull-limit-rule{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;align-items:center;min-height:78px;padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--bg3)}
@@ -717,7 +718,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .analysis-overview-meta{margin-top:5px;color:var(--text3);font-size:11px}
 .analysis-window{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg2);color:var(--text3);font-size:10px}
 .analysis-window strong{color:var(--text2);font-size:11px}
-.analysis-core-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.analysis-core-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .analysis-core-grid .stats-card{display:flex;min-width:0;min-height:132px;flex-direction:column;padding:14px 15px;border-color:var(--border);background:var(--bg3);box-shadow:none}
 .analysis-core-grid .stats-card::before{width:3px;opacity:.78}
 .analysis-core-grid .stats-card:hover{border-color:var(--tone-border);background:color-mix(in srgb,var(--tone-soft) 28%,var(--bg3));box-shadow:0 8px 20px rgba(0,0,0,.07)}
@@ -762,6 +763,13 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .risk-intel{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;color:var(--text3);font-size:10px}
 .risk-intel span{padding:3px 7px;border-radius:5px;background:rgba(100,116,139,.07)}
 .risk-status-counts{display:inline-flex;gap:3px;font-variant-numeric:tabular-nums}
+.traffic-monitor-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.traffic-summary-item{min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg2)}
+.traffic-summary-value{overflow:hidden;color:var(--text);font-size:17px;font-weight:850;text-overflow:ellipsis;white-space:nowrap}
+.traffic-summary-label{margin-top:4px;color:var(--text3);font-size:10px}
+.traffic-monitor-switch{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 12px;padding:11px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg2)}
+.traffic-monitor-switch strong{display:block;color:var(--text);font-size:12px}
+.traffic-monitor-switch small{display:block;margin-top:3px;color:var(--text3);font-size:10px;line-height:1.5}
 
 .workspace-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
 .workspace-intro h1{font-size:22px;line-height:1.2;font-weight:850}
@@ -890,6 +898,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .review-pagination{align-items:flex-start;flex-direction:column}
   .review-page-actions{width:100%}
   .review-page-actions .mode-btn{flex:1}
+  .traffic-monitor-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 
   #panel-logs>.card{padding:10px;background:transparent;border:0;box-shadow:none}
   #panel-logs .log-mode-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
@@ -937,7 +946,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .sidebar{grid-template-columns:34px minmax(0,1fr);gap:5px;padding-inline:7px}
   .nav-item{padding-inline:8px}
   .topbar-subtitle,.auto-timer{display:none}
-  .security-metrics,.pull-limit-summary,.rule-grid{grid-template-columns:minmax(0,1fr)}
+  .security-metrics,.pull-limit-summary,.rule-grid,.traffic-monitor-summary{grid-template-columns:minmax(0,1fr)}
   .guard-search-row,.guard-batch-toolbar{grid-template-columns:minmax(0,1fr)}
   .guard-batch-choice-group{grid-template-columns:repeat(2,minmax(0,1fr));grid-column:auto}
   .guard-batch-note,.guard-batch-apply{grid-column:auto}
@@ -1089,6 +1098,29 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
             </div>
           </section>
 
+          <section class="security-section" id="traffic-monitor-section">
+            <div class="security-section-head">
+              <div><div class="security-section-title">UniProxy 流量上报监控</div><div class="security-section-sub">读取节点增量流量和在线 IP，并与成功订阅记录做时间关联</div></div>
+              <span id="traffic-monitor-mode" class="limit-mode-badge paused">读取中</span>
+            </div>
+            <div id="traffic-monitor-summary" class="traffic-monitor-summary"><div class="loading">加载流量上报状态…</div></div>
+            <div class="rule-grid">
+              <div class="rule-field"><label>单用户 5 分钟流量（GiB）</label><input class="ip-input" id="traffic-user-5m" type="number" min="1" max="10000"></div>
+              <div class="rule-field"><label>单用户 1 小时流量（GiB）</label><input class="ip-input" id="traffic-user-1h" type="number" min="1" max="50000"></div>
+              <div class="rule-field"><label>单用户 24 小时流量（GiB）</label><input class="ip-input" id="traffic-user-24h" type="number" min="1" max="100000"></div>
+              <div class="rule-field"><label>单用户 1 小时在线 IP</label><input class="ip-input" id="traffic-user-hour-ips" type="number" min="2" max="500"></div>
+              <div class="rule-field"><label>上传 / 下载异常倍数</label><input class="ip-input" id="traffic-upload-ratio" type="number" min="2" max="100"></div>
+              <div class="rule-field"><label>上传判断最小流量（GiB）</label><input class="ip-input" id="traffic-upload-min" type="number" min="1" max="10000"></div>
+              <div class="rule-field"><label>节点 5 分钟上报次数</label><input class="ip-input" id="traffic-report-5m" type="number" min="10" max="10000"></div>
+              <div class="rule-field"><label>订阅关联窗口（分钟）</label><input class="ip-input" id="traffic-correlation-minutes" type="number" min="1" max="180"></div>
+              <div class="rule-field"><label>扫描流量日志行数</label><input class="ip-input" id="traffic-scan-lines" type="number" min="1000" max="100000" step="1000"></div>
+            </div>
+            <div class="rule-actions">
+              <div class="pull-limit-note">入口路径与两个功能开关在「系统设置 → 网关与上游」配置。用户 ID 只以不可逆 USR 指纹显示；流量异常只进入人工复核，不会自动封禁 IP 或 Token。</div>
+              <button class="btn-primary" id="save-traffic-settings" onclick="saveTrafficSettings()">保存流量阈值</button>
+            </div>
+          </section>
+
           <section class="security-section" id="security-actions-section">
             <div class="security-section-head">
               <div><div class="security-section-title">最近处理</div><div class="security-section-sub">名单操作与告警审计</div></div>
@@ -1189,7 +1221,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
     <!-- ─── 分析 ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-stats">
       <div class="workspace-intro">
-        <div><div class="workspace-kicker">处置中心</div><h1>风险工作台</h1><p>集中处理高频拉取、Token 共享、异常来源与脚本扫描事件。</p></div>
+        <div><div class="workspace-kicker">处置中心</div><h1>风险工作台</h1><p>集中处理高频拉取、Token 共享、异常来源、脚本扫描与流量上报事件。</p></div>
         <button class="mode-btn" onclick="loadTab('stats',{force:true})">刷新分析</button>
       </div>
       <div id="risk-analysis-summary" class="analysis-core-grid"><div class="loading">加载风险分类…</div></div>
@@ -1204,6 +1236,7 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
           <button class="mode-btn" id="guard-kind-token" onclick="setGuardRiskKind('token')">Token 异常</button>
           <button class="mode-btn" id="guard-kind-source" onclick="setGuardRiskKind('source')">来源异常</button>
           <button class="mode-btn" id="guard-kind-scanner" onclick="setGuardRiskKind('scanner')">脚本扫描</button>
+          <button class="mode-btn" id="guard-kind-traffic" onclick="setGuardRiskKind('traffic')">流量异常</button>
         </div>
         <div class="review-toolbar">
           <div class="log-mode-btns">
@@ -1400,6 +1433,18 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">订阅路径</label>
               <input class="ip-input" id="cfg-subscribe-path" placeholder="/api/v1/client/subscribe" value="<?= _val($_preSg['subscribe_path'] ?? '') ?>" style="width:100%">
             </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">UniProxy 流量上报路径</label>
+              <input class="ip-input" id="cfg-traffic-report-path" placeholder="/api/v1/server/UniProxy" value="<?= _val($_preSg['traffic_report_path'] ?? '/api/v1/server/UniProxy') ?>" style="width:100%">
+            </div>
+            <label class="traffic-monitor-switch" style="margin:0">
+              <span><strong>读取流量上报</strong><small>记录 push / alive 数据用于统计；关闭后仍透明转发节点请求</small></span>
+              <span class="switch-control"><input id="cfg-traffic-monitor-enabled" type="checkbox" <?= !array_key_exists('traffic_monitor_enabled', $_preSg) || !empty($_preSg['traffic_monitor_enabled']) ? 'checked' : '' ?>><span class="switch-track"></span></span>
+            </label>
+            <label class="traffic-monitor-switch" style="margin:0">
+              <span><strong>异常分析与订阅关联</strong><small>生成流量风险事件；仅在“读取流量上报”开启时生效</small></span>
+              <span class="switch-control"><input id="cfg-traffic-analysis-enabled" type="checkbox" <?= !array_key_exists('traffic_analysis_enabled', $_preSg) || !empty($_preSg['traffic_analysis_enabled']) ? 'checked' : '' ?>><span class="switch-track"></span></span>
+            </label>
             <div class="apply-hint" style="color:#eab308">⚡ 保存后立即更新 nginx 配置并 reload</div>
             <button class="btn-primary" id="save-upstream-settings" onclick="saveUpstreamSettings()">保存并立即生效</button>
           </div>
@@ -1636,7 +1681,7 @@ const dirtyConfigScopes = new Set();
 const configScopeButtons = {
   title:'save-title-settings', credentials:'save-credential-settings', upstream:'save-upstream-settings',
   gateway:'save-gateway-settings', alert:'save-alert-settings', ai:'save-ai-settings',
-  pull_limit:'save-pull-limit-settings', guard:'save-guard-settings', cloud:'save-cloud-providers',
+  pull_limit:'save-pull-limit-settings', guard:'save-guard-settings', traffic:'save-traffic-settings', cloud:'save-cloud-providers',
 };
 
 const ACCESS_SECTIONS = {
@@ -1667,7 +1712,7 @@ function mountWorkspaceLayout() {
   workspaceMounted = true;
 
   const protectionTarget = document.getElementById('protection-content');
-  ['pull-limit-section', 'guard-threshold-section'].forEach(id => {
+  ['pull-limit-section', 'guard-threshold-section', 'traffic-monitor-section'].forEach(id => {
     const section = document.getElementById(id);
     if (section && protectionTarget) protectionTarget.appendChild(section);
   });
@@ -1852,13 +1897,14 @@ function configScopeFromElement(element) {
   const id = element.id || '';
   if (['cfg-site-title','cfg-page-title'].includes(id)) return 'title';
   if (['cfg-admin-user','cfg-new-pass','cfg-confirm-pass'].includes(id)) return 'credentials';
-  if (['cfg-upstream-url','cfg-upstream-port','cfg-subscribe-path'].includes(id)) return 'upstream';
+  if (['cfg-upstream-url','cfg-upstream-port','cfg-subscribe-path','cfg-traffic-report-path','cfg-traffic-monitor-enabled','cfg-traffic-analysis-enabled'].includes(id)) return 'upstream';
   if (id === 'cfg-gateway-port') return 'gateway';
   if (id.startsWith('cfg-alert-')) return 'alert';
   if (id.startsWith('cfg-ai-')) return 'ai';
   if (element.matches('[data-provider-toggle]')) return 'cloud';
   if (element.closest('#pull-limit-section')) return 'pull_limit';
   if (element.closest('#guard-threshold-section')) return 'guard';
+  if (element.closest('#traffic-monitor-section')) return 'traffic';
   return '';
 }
 
@@ -2570,6 +2616,7 @@ function guardFindingGroup(row) {
   if (['token_multi_ip','history_token_ips'].includes(kind)) return 'token';
   if (['ip_multi_token','history_ip_tokens','ip_404_flood','idc_provider_block'].includes(kind)) return 'source';
   if (kind === 'scanner') return 'scanner';
+  if (['traffic_user_anomaly','traffic_report_flood'].includes(kind)) return 'traffic';
   return 'source';
 }
 
@@ -2583,6 +2630,7 @@ function renderRiskAnalysis() {
     {key:'token',tone:'violet',icon:'#',title:'Token 异常',unit:'条待处理',kinds:'多 IP 共享与高频调用'},
     {key:'source',tone:'rose',icon:'!',title:'来源异常',unit:'条待处理',kinds:'多 Token、404 与异常来源'},
     {key:'scanner',tone:'cyan',icon:'⌘',title:'脚本扫描',unit:'条待处理',kinds:'自动化客户端与扫描特征'},
+    {key:'traffic',tone:'emerald',icon:'⇅',title:'流量异常',unit:'条待处理',kinds:'UniProxy 流量、在线 IP 与订阅关联'},
   ];
   target.innerHTML = groups.map(group => {
     const rows = active.filter(row => guardFindingGroup(row) === group.key);
@@ -3235,6 +3283,9 @@ async function loadSettings() {
   document.getElementById('cfg-upstream-url').value    = _displayUrl;
   document.getElementById('cfg-upstream-port').value   = _displayPort;
   document.getElementById('cfg-subscribe-path').value  = currentSettings.subscribe_path || '';
+  document.getElementById('cfg-traffic-report-path').value = currentSettings.traffic_report_path || '/api/v1/server/UniProxy';
+  document.getElementById('cfg-traffic-monitor-enabled').checked = Number(currentSettings.traffic_monitor_enabled ?? 1) === 1;
+  document.getElementById('cfg-traffic-analysis-enabled').checked = Number(currentSettings.traffic_analysis_enabled ?? 1) === 1;
   // 填充网关端口
   if (currentSettings.gateway_port) {
     document.getElementById('cfg-gateway-port').value = currentSettings.gateway_port;
@@ -3744,6 +3795,7 @@ async function saveGatewayPort() {
 async function saveUpstreamSettings() {
   let urlRaw   = document.getElementById('cfg-upstream-url').value.trim();
   const path   = document.getElementById('cfg-subscribe-path').value.trim();
+  const trafficPath = document.getElementById('cfg-traffic-report-path').value.trim();
   const portStr= document.getElementById('cfg-upstream-port').value.trim();
   if (!urlRaw && !path) { toast('请填写机场地址或订阅路径', 'err'); return; }
   const body = {};
@@ -3763,6 +3815,14 @@ async function saveUpstreamSettings() {
     }
   }
   if (path) body.subscribe_path = path;
+  if (!trafficPath.startsWith('/') || /[\s{};#?]/.test(trafficPath)) {
+    toast('UniProxy 路径必须以 / 开头，且不能包含空格或查询参数', 'err');
+    document.getElementById('cfg-traffic-report-path').focus();
+    return;
+  }
+  body.traffic_report_path = trafficPath;
+  body.traffic_monitor_enabled = document.getElementById('cfg-traffic-monitor-enabled').checked ? 1 : 0;
+  body.traffic_analysis_enabled = document.getElementById('cfg-traffic-analysis-enabled').checked ? 1 : 0;
   const d = await apiFetch('/api/settings.php', {
     method: 'POST', body: JSON.stringify(body),
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
@@ -4040,6 +4100,7 @@ function renderSecurity() {
   renderGuardFindings();
   renderRiskAnalysis();
   renderGuardRules();
+  renderTrafficMonitor();
   renderSecurityActions();
 }
 
@@ -4053,11 +4114,12 @@ function renderSecurityMetrics() {
     {label:'风险复核队列', value:m.risk_findings || 0, note:`待处理 ${(securityData.review_summary || {}).pending || 0} 条`, color:'#f59e0b'},
     {label:'今日网关拦截', value:m.today_blocked || 0, note:'403 / 429 / 444', color:'#ef4444'},
     {label:'生效名单策略', value:(c.ip_blacklist || 0) + (c.token_blacklist || 0), note:`IP ${c.ip_blacklist || 0} · Token ${c.token_blacklist || 0}`, color:'#10b981'},
+    {label:'UniProxy 24h 流量', value:(securityData.traffic || {}).bytes_24h_label || '0 B', note:`${(securityData.traffic || {}).users_24h || 0} 个用户指纹`, color:'#14b8a6', text:true},
   ];
   document.getElementById('security-metrics').innerHTML = rows.map(row => `
     <div class="security-metric" style="--metric:${row.color}">
       <div class="security-metric-label">${esc(row.label)}</div>
-      <div class="security-metric-value">${Number(row.value).toLocaleString()}</div>
+      <div class="security-metric-value">${row.text ? esc(String(row.value)) : Number(row.value).toLocaleString()}</div>
       <div class="security-metric-note">${esc(row.note)}</div>
     </div>`).join('');
 }
@@ -4337,6 +4399,7 @@ const MECHANISM_CONFIG_TARGETS = {
   token_policy: {access:'token_blacklist', selector:'[data-access-pane="token_blacklist"]', label:'管理'},
   pull_limit:   {tab:'protection', selector:'#pull-limit-section', label:'配置'},
   observation:  {tab:'protection', selector:'#guard-threshold-section', label:'配置'},
+  traffic_monitor:{tab:'settings', cardTitle:'机场（反代目标）', label:'配置'},
   stats_cache:  {tab:'settings', cardTitle:'分析统计缓存', label:'查看'},
   intel:        {tab:'logs', selector:'#panel-logs .log-status-summary', label:'查看'},
   retention:    {tab:'security', selector:'#security-health-section', label:'查看'},
@@ -4389,6 +4452,7 @@ function renderSecurityHealth() {
     ['Token 限制状态', h.token_limit_state_age == null ? '等待首次巡检' : `${age(h.token_limit_state_age)}更新`],
     ['IDC 规则库', h.cloud_rules_age == null ? '不存在' : `${age(h.cloud_rules_age)}更新`],
     ['访问日志', `${formatFileSize(h.log_size || 0)} · ${h.log_writable ? '可读写' : '权限异常'}`],
+    ['流量上报日志', `${formatFileSize(h.traffic_log_size || 0)} · ${h.traffic_log_readable ? '可读取' : '权限异常'}`],
     ['日志清理', h.retention_days > 0 ? `保留 ${h.retention_days} 天` : '已关闭'],
     ['告警巡检', h.alert_enabled ? (h.last_alert_check || '等待首次检查') : '未开启（可选）'],
     ['诊断结果', issues],
@@ -4405,9 +4469,9 @@ function setGuardFilter(filter) {
 }
 
 function setGuardRiskKind(kind) {
-  guardRiskKindFilter = ['all','volume','token','source','scanner'].includes(kind) ? kind : 'all';
+  guardRiskKindFilter = ['all','volume','token','source','scanner','traffic'].includes(kind) ? kind : 'all';
   guardReviewPage = 1;
-  ['all','volume','token','source','scanner'].forEach(name => document.getElementById('guard-kind-' + name)?.classList.toggle('active', name === guardRiskKindFilter));
+  ['all','volume','token','source','scanner','traffic'].forEach(name => document.getElementById('guard-kind-' + name)?.classList.toggle('active', name === guardRiskKindFilter));
   renderRiskAnalysis();
   renderGuardFindings();
 }
@@ -4546,6 +4610,7 @@ function renderGuardFindings() {
     ].filter(Boolean);
     const canBlockIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(subject) && !blacklistIpSet.has(subject);
     const tokenFingerprint = row.token_fingerprint || (/^TKN-[A-F0-9]{16}$/.test(subject) ? subject : '');
+    const linkedSubscriptionIp = guardFindingGroup(row) === 'traffic' && Array.isArray(row.sample_ips) ? (row.sample_ips[0] || '') : '';
     const status = row.status_counts || {};
     const statusSummary = Object.values(status).some(value => Number(value || 0) > 0)
       ? `<span class="risk-status-counts" title="成功 / 403 / 429 / 444"><b style="color:#22c55e">${Number(status['200'] || 0)}</b>/<b style="color:#ef4444">${Number(status['403'] || 0)}</b>/<b style="color:#eab308">${Number(status['429'] || 0)}</b>/<b style="color:#64748b">${Number(status['444'] || 0)}</b></span>`
@@ -4576,6 +4641,7 @@ function renderGuardFindings() {
           <button class="mode-btn note-save-btn" id="guard-note-save-${index}" onclick="saveGuardReview(${jsArg(row.key)},${index},this)" disabled>备注已保存</button>
           <button class="mode-btn ai-run-btn" onclick="runAiAnalysis(${jsArg(row.key)})">AI 研判</button>
           ${canBlockIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(subject)})">查看拉取记录</button>` : ''}
+          ${linkedSubscriptionIp ? `<button class="mode-btn" onclick="openRiskLogs(${jsArg(linkedSubscriptionIp)})">查看关联订阅</button>` : ''}
           ${tokenFingerprint ? `<button class="mode-btn" onclick="openTokenInvestigation(${jsArg(tokenFingerprint)})">调查 Token</button>` : ''}
           ${row.automatic_block ? `<span class="idc-policy-status">已由厂商策略拦截</span>` : (canBlockIp ? `<button class="mode-btn danger" onclick="quickBlacklist(${jsArg(subject)})">封禁 IP</button>` : '')}
         </div>
@@ -4876,6 +4942,58 @@ function openRiskLogs(ip='') {
   logPage = 1;
   openPanelTab('logs');
   loadTab('logs', {force:true}).catch(() => {});
+}
+
+function renderTrafficMonitor() {
+  const rules = securityData?.rules || {};
+  const traffic = securityData?.traffic || {};
+  const captureEnabled = !!Number(rules.traffic_monitor_enabled ?? 1);
+  const analysisEnabled = !!Number(rules.traffic_analysis_enabled ?? 1);
+  const mode = document.getElementById('traffic-monitor-mode');
+  if (!mode) return;
+  mode.className = 'limit-mode-badge ' + (captureEnabled ? (analysisEnabled ? '' : 'observe') : 'paused');
+  mode.textContent = !captureEnabled ? '未读取' : (analysisEnabled ? '分析中' : '仅统计');
+  document.getElementById('traffic-user-5m').value = rules.traffic_user_5m_gb ?? 10;
+  document.getElementById('traffic-user-1h').value = rules.traffic_user_1h_gb ?? 50;
+  document.getElementById('traffic-user-24h').value = rules.traffic_user_24h_gb ?? 100;
+  document.getElementById('traffic-user-hour-ips').value = rules.traffic_user_hour_ips ?? 10;
+  document.getElementById('traffic-upload-ratio').value = rules.traffic_upload_ratio ?? 5;
+  document.getElementById('traffic-upload-min').value = rules.traffic_upload_min_gb ?? 1;
+  document.getElementById('traffic-report-5m').value = rules.traffic_report_5m_requests ?? 120;
+  document.getElementById('traffic-correlation-minutes').value = rules.traffic_correlation_minutes ?? 15;
+  document.getElementById('traffic-scan-lines').value = rules.traffic_scan_lines ?? 20000;
+  const rows = [
+    [traffic.observed_reports || 0, '已读取上报'],
+    [traffic.users_24h || 0, '24h 用户指纹'],
+    [traffic.bytes_24h_label || '0 B', '24h 上报流量'],
+    [traffic.correlated_findings || 0, '关联订阅异常'],
+  ];
+  document.getElementById('traffic-monitor-summary').innerHTML = rows.map(([value,label]) => `
+    <div class="traffic-summary-item"><div class="traffic-summary-value">${esc(String(value))}</div><div class="traffic-summary-label">${esc(label)}</div></div>`).join('') +
+    `<div class="traffic-summary-item" style="grid-column:1/-1"><div class="traffic-summary-value" style="font-size:12px">${esc(traffic.last_report_at || '尚未收到上报')}</div><div class="traffic-summary-label">最后上报 · ${Number(traffic.parse_errors || 0)} 条解析失败</div></div>`;
+}
+
+async function saveTrafficSettings() {
+  const body = {
+    traffic_user_5m_gb: Number(document.getElementById('traffic-user-5m').value),
+    traffic_user_1h_gb: Number(document.getElementById('traffic-user-1h').value),
+    traffic_user_24h_gb: Number(document.getElementById('traffic-user-24h').value),
+    traffic_user_hour_ips: Number(document.getElementById('traffic-user-hour-ips').value),
+    traffic_upload_ratio: Number(document.getElementById('traffic-upload-ratio').value),
+    traffic_upload_min_gb: Number(document.getElementById('traffic-upload-min').value),
+    traffic_report_5m_requests: Number(document.getElementById('traffic-report-5m').value),
+    traffic_correlation_minutes: Number(document.getElementById('traffic-correlation-minutes').value),
+    traffic_scan_lines: Number(document.getElementById('traffic-scan-lines').value),
+  };
+  const d = await apiFetch('/api/settings.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(body),
+  });
+  if (!d.ok) { toast(d.error || '流量监控保存失败', 'err'); return; }
+  markConfigSaved('traffic');
+  toast('流量异常阈值已保存');
+  await loadSecurity({force:true});
 }
 
 function renderGuardRules() {
