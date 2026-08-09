@@ -691,17 +691,25 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
 .analysis-overview-meta{margin-top:5px;color:var(--text3);font-size:11px}
 .analysis-window{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg2);color:var(--text3);font-size:10px}
 .analysis-window strong{color:var(--text2);font-size:11px}
-.analysis-core-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.analysis-core-grid .stats-card{display:flex;min-height:174px;flex-direction:column;padding:19px 20px;border-width:1px;background:var(--bg3);box-shadow:none}
-.analysis-core-grid .stats-card:hover{border-color:var(--tone);box-shadow:0 12px 28px rgba(0,0,0,.10)}
-.analysis-core-grid .stats-card-title{margin-bottom:18px}
-.stats-card-count-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.stats-card-main{font-size:30px;font-weight:850;letter-spacing:0}
-.stats-card-unit{margin-left:5px;color:var(--text2);font-size:12px;font-weight:750}
-.stats-card-status{padding:4px 8px;border-radius:6px;background:var(--tone-soft);color:var(--tone);font-size:10px;font-weight:850;white-space:nowrap}
-.stats-card-sub{min-height:34px;margin-top:9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.stats-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--border);color:var(--text3);font-size:10px;font-weight:750}
-.stats-card-foot strong{color:var(--tone);font-size:15px;line-height:1}
+.analysis-core-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.analysis-core-grid .stats-card{display:flex;min-width:0;min-height:132px;flex-direction:column;padding:14px 15px;border-color:var(--border);background:var(--bg3);box-shadow:none}
+.analysis-core-grid .stats-card::before{width:3px;opacity:.78}
+.analysis-core-grid .stats-card:hover{border-color:var(--tone-border);background:color-mix(in srgb,var(--tone-soft) 28%,var(--bg3));box-shadow:0 8px 20px rgba(0,0,0,.07)}
+.analysis-core-grid .stats-card.active{border-color:var(--tone);background:color-mix(in srgb,var(--tone-soft) 40%,var(--bg3));box-shadow:0 0 0 1px var(--tone-soft)}
+.analysis-core-grid .stats-card-title{margin-bottom:8px}
+.analysis-core-grid .stats-card-icon{width:24px;height:24px;border-radius:6px;font-size:12px}
+.analysis-core-grid .stats-card-kicker{gap:7px;color:var(--text2);font-size:11px;font-weight:820}
+.stats-card-count-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stats-card-main{min-width:0;font-size:23px;font-weight:850;letter-spacing:0;line-height:1.15}
+.stats-card-unit{margin-left:4px;color:var(--text2);font-size:10px;font-weight:750}
+.stats-card-status{max-width:94px;padding:3px 6px;overflow:hidden;border-radius:5px;background:var(--tone-soft);color:var(--tone);font-size:9px;font-weight:850;white-space:nowrap;text-overflow:ellipsis}
+.stats-card-sub{min-height:16px;margin-top:7px;overflow:hidden;color:var(--text3);font-size:10px;line-height:1.5;white-space:nowrap;text-overflow:ellipsis;display:block}
+.stats-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--text3);font-size:9px;font-weight:750}
+.stats-card-foot strong{color:var(--tone);font-size:13px;line-height:1}
+
+@media(max-width:1100px){
+  .analysis-core-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 
 .review-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .review-toolbar .log-mode-btns{margin:0!important}
@@ -825,8 +833,8 @@ body{background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-syste
   .security-layout{display:block}
   #security-mechanisms-section,#security-health-section,#security-actions-section{grid-column:auto;grid-row:auto}
   .analysis-overview-head{align-items:flex-start;flex-direction:column;gap:9px}
-  .analysis-core-grid{grid-template-columns:minmax(0,1fr);gap:10px}
-  .analysis-core-grid .stats-card{min-height:156px;padding:15px}
+  .analysis-core-grid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .analysis-core-grid .stats-card{min-height:118px;padding:13px 14px}
   .review-toolbar{align-items:flex-start;flex-direction:column}
   .review-size-control{width:100%;justify-content:flex-start}
   .guard-batch-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
@@ -2335,11 +2343,12 @@ function renderRiskAnalysis() {
   target.innerHTML = groups.map(group => {
     const rows = active.filter(row => guardFindingGroup(row) === group.key);
     const top = rows.slice().sort((a,b) => Number(b.score || 0) - Number(a.score || 0))[0];
-    return `<button class="stats-card tone-${group.tone} ${guardRiskKindFilter === group.key ? 'active' : ''}" onclick="setGuardRiskKind('${group.key}')">
+    const selected = guardRiskKindFilter === group.key;
+    return `<button class="stats-card tone-${group.tone} ${selected ? 'active' : ''}" aria-pressed="${selected ? 'true' : 'false'}" title="筛选${esc(group.title)}事件" onclick="setGuardRiskKind('${group.key}')">
       <div class="stats-card-title"><span class="stats-card-kicker"><span class="stats-card-icon">${esc(group.icon)}</span>${esc(group.title)}</span></div>
       <div class="stats-card-count-row"><div class="stats-card-main">${rows.length}<span class="stats-card-unit">${esc(group.unit)}</span></div><span class="stats-card-status">${top ? esc((top.risk || '关注') + ' ' + Number(top.score || 0)) : '暂无异常'}</span></div>
       <div class="stats-card-sub">${top ? `${esc(top.title || '')} · ${esc(top.subject || '')}` : esc(group.kinds)}</div>
-      <div class="stats-card-foot"><span>${guardRiskKindFilter === group.key ? '当前筛选' : '筛选此类'}</span><strong>→</strong></div>
+      <div class="stats-card-foot"><span>${selected ? '当前筛选' : '查看事件'}</span><strong>→</strong></div>
     </button>`;
   }).join('');
 }
